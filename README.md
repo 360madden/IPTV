@@ -1,22 +1,28 @@
 # IPTV Playlist
 
-## Philippines Channels
+## Quick Access
 
-**M3U URL (copy into your IPTV player):**  
-https://raw.githubusercontent.com/360madden/IPTV/main/ph.m3u
+| Playlist | URL |
+|----------|-----|
+| Philippines (Structured) | https://raw.githubusercontent.com/360madden/IPTV/main/ph.m3u |
 
 ---
 
-## How to Use
+## Features
 
-1. Open your IPTV player.
-2. Add a new playlist or network stream.
-3. Paste the M3U URL above.
-4. Load the channels.
+- Organized channel groups (News, Religious, etc.)
+- Clean metadata for IPTV players
+
+---
+
+## Usage
+
+1. Paste URL into IPTV player
+2. Load playlist
 
 ---
 
 ## Notes
 
-- Streams are publicly sourced and may go offline.
-- No guarantee of uptime, availability, or stream quality.
+- Streams may go offline
+- No uptime guarantees
