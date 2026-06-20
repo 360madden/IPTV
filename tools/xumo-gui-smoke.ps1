@@ -10,6 +10,7 @@ param(
     [switch]$RequireClockOverlay,
     [switch]$UseDialogImport,
     [switch]$ExerciseMutatingOrganization,
+    [switch]$CaptureScreenshots,
     [switch]$UseRealUserProfile
 )
 
@@ -18,6 +19,7 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -38,6 +40,7 @@ $appExe = Join-Path $repoRoot "src\Iptv.App\bin\Debug\net10.0-windows\Iptv.App.e
 $process = $null
 $originalLocalAppData = $env:LOCALAPPDATA
 $isolatedProfileRoot = $null
+$screenshotRoot = Join-Path $repoRoot "artifacts\gui-smoke"
 
 function Wait-Until {
     param(
@@ -229,6 +232,36 @@ function Assert-Fullscreen {
     }
 }
 
+function Save-WindowScreenshot {
+    param(
+        [System.Windows.Automation.AutomationElement]$Window,
+        [string]$Name
+    )
+
+    if (-not $CaptureScreenshots) {
+        return
+    }
+
+    $rect = $Window.Current.BoundingRectangle
+    if ($rect.IsEmpty -or $rect.Width -le 0 -or $rect.Height -le 0) {
+        throw "Cannot capture screenshot '$Name' because the window bounds are empty."
+    }
+
+    New-Item -ItemType Directory -Force -Path $screenshotRoot | Out-Null
+    $path = Join-Path $screenshotRoot "$Name.png"
+    $bitmap = [System.Drawing.Bitmap]::new([int]$rect.Width, [int]$rect.Height)
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $graphics.CopyFromScreen([int]$rect.X, [int]$rect.Y, 0, 0, $bitmap.Size)
+        $bitmap.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
+        Write-Host "Screenshot saved: $path"
+    }
+    finally {
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+}
+
 try {
     if (-not $UseRealUserProfile) {
         $isolatedProfileRoot = Join-Path ([System.IO.Path]::GetTempPath()) "iptv-gui-smoke-$([Guid]::NewGuid().ToString('N'))"
@@ -289,6 +322,7 @@ try {
     Wait-Until { Find-ByName $main "EPG Timeline" } $TimeoutSeconds "EPG timeline panel" | Out-Null
     Wait-Until { Find-ByName $main "VOD Detail Page" } $TimeoutSeconds "VOD detail page panel" | Out-Null
     Wait-Until { Find-ByName $main "VOD Library" } $TimeoutSeconds "VOD library panel" | Out-Null
+    Wait-Until { Find-ByName $main "Saved Smart View" } $TimeoutSeconds "saved smart view selector" | Out-Null
     Wait-Until { Find-ByName $main "Fallback Streams" } $TimeoutSeconds "fallback streams panel" | Out-Null
     Wait-Until { Find-ByName $main "Refresh Approval" } $TimeoutSeconds "refresh approval panel" | Out-Null
     Wait-Until { Find-ByName $main "Search Benchmark" } $TimeoutSeconds "search benchmark panel" | Out-Null
@@ -298,9 +332,12 @@ try {
 
     Expand-Element (Wait-Until { Find-ByName $main "EPG Timeline" } $TimeoutSeconds "EPG timeline panel")
     Wait-Until { Find-ByName $main "EPG Timeline Window" } $TimeoutSeconds "EPG timeline window selector" | Out-Null
+    Wait-Until { Find-ByName $main "EPG Search" } $TimeoutSeconds "EPG search field" | Out-Null
 
     Expand-Element (Wait-Until { Find-ByName $main "Search Benchmark" } $TimeoutSeconds "search benchmark panel")
     Wait-Until { Find-ByName $main "Search Benchmark Results" } $TimeoutSeconds "search benchmark results list" | Out-Null
+
+    Save-WindowScreenshot $main "window-library"
 
     if ($ExerciseMutatingOrganization) {
         Write-Host "Exercising isolated PIN lock/unlock workflow..."
@@ -321,6 +358,13 @@ try {
         $hideDuplicates = Wait-Until { Find-ByName $main "Hide Duplicates" } $TimeoutSeconds "Hide Duplicates button"
         if ($hideDuplicates.Current.IsEnabled) {
             Invoke-Element $hideDuplicates
+            $duplicateDialog = Wait-Until {
+                Find-ByName `
+                    -Root ([System.Windows.Automation.AutomationElement]::RootElement) `
+                    -Name "Duplicate Preview Dialog" `
+                    -Scope ([System.Windows.Automation.TreeScope]::Children)
+            } $TimeoutSeconds "duplicate preview dialog"
+            Invoke-Element (Wait-Until { Find-ByName $duplicateDialog "Confirm Hide Duplicates" } $TimeoutSeconds "confirm hide duplicates button")
             Wait-Until { Find-ByNameContains $main "Hid " } $TimeoutSeconds "duplicate hide status" | Out-Null
             $undo = Find-ByName $main "Undo Org"
             if ($null -ne $undo -and $undo.Current.IsEnabled) {
@@ -369,6 +413,7 @@ try {
     Start-Sleep -Milliseconds 750
     $main = Wait-Until { Get-AppWindow -ProcessId $process.Id } $TimeoutSeconds "main app window in fullscreen"
     Wait-Until { Assert-Fullscreen $main $process; $true } $TimeoutSeconds "true fullscreen bounds" | Out-Null
+    Save-WindowScreenshot $main "fullscreen-clock"
     try {
         Wait-Until { Find-ByNameContains $main "Clock Overlay" } $TimeoutSeconds "clock overlay in fullscreen" | Out-Null
     }

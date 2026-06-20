@@ -35,6 +35,7 @@ public sealed class MainViewModel : ObservableObject
     private const int MaximumEpgTimelineRows = 250;
     private const int MaximumDuplicateGroups = 100;
     private const int MaximumVodLibraryItems = 1_000;
+    private const int VodLibraryPageSize = 60;
     private const int SearchBenchmarkChannelCount = 50_000;
     private const long MaximumRemoteXmltvBytes = 50L * 1024 * 1024;
 
@@ -100,18 +101,22 @@ public sealed class MainViewModel : ObservableObject
     private VodLibraryItemViewModel? selectedVodLibraryItem;
     private HiddenLockedAuditRowViewModel? selectedAuditRow;
     private ChannelFallbackViewModel? selectedChannelFallback;
+    private SmartViewFilter selectedSmartView;
+    private string epgSearchText = string.Empty;
     private string duplicateAssistantSummaryText = "Duplicate assistant: import a playlist, then refresh duplicate groups.";
     private string vodLibrarySummaryText = "VOD library appears after importing playlists with VOD or series entries.";
     private string auditSummaryText = "Hidden/locked audit appears after importing a playlist.";
     private string fallbackSummaryText = "Fallback streams appear when playlist alternates share the selected channel name.";
     private string pendingRefreshSummaryText = "Refresh approval: no pending refresh.";
     private string searchBenchmarkSummaryText = "Search benchmark has not run.";
+    private string playbackProgressText = "Playback position unavailable.";
     private string conflictReviewText = "Refresh conflicts unavailable until a playlist is refreshed.";
     private string logoPrefetchStatusText = "Logo prefetch idle.";
     private string streamHealthSummaryText = "Stream health appears after playback attempts.";
     private string epgTimelineSummaryText = "EPG timeline appears after importing XMLTV guide data.";
     private string selectedVodDetailText = "Select VOD or series content to view detail and resume controls.";
     private EpgTimelineWindow selectedEpgTimelineWindow;
+    private int vodLibraryPageIndex;
     private string refreshScheduleStatusText = "Provider refresh schedule is off.";
     private bool refreshScheduleEnabled;
     private int selectedRefreshIntervalMinutes = 60;
@@ -142,6 +147,7 @@ public sealed class MainViewModel : ObservableObject
     private int volume = 80;
     private CancellationTokenSource? logoCts;
     private CancellationTokenSource? logoPrefetchCts;
+    private DateTimeOffset lastResumeStateSaveAt = DateTimeOffset.MinValue;
 
     public MainViewModel(
         IPlaylistImportService playlistImportService,
@@ -193,6 +199,8 @@ public sealed class MainViewModel : ObservableObject
         BatchClearGroupCommand = new RelayCommand(_ => ApplyBatchUpdate(channel => channel with { CustomGroup = null }, "removed from custom groups"), _ => HasBatchSelection);
         ImportCustomGroupCsvCommand = new AsyncRelayCommand(_ => ImportCustomGroupCsvAsync(), _ => !IsBusy);
         ExportCustomGroupCsvCommand = new AsyncRelayCommand(_ => ExportCustomGroupCsvAsync(), _ => !IsBusy && allChannels.Count > 0);
+        PreviousVodPageCommand = new RelayCommand(_ => MoveVodPage(-1), _ => VodLibraryPageIndex > 0);
+        NextVodPageCommand = new RelayCommand(_ => MoveVodPage(1), _ => HasNextVodPage());
         PreviewSmartGroupCommand = new RelayCommand(_ => PreviewSmartGroup());
         ApplySmartGroupCommand = new RelayCommand(_ => ApplySmartGroup());
         SaveSmartGroupPresetCommand = new RelayCommand(_ => SaveSmartGroupPreset());
@@ -226,6 +234,7 @@ public sealed class MainViewModel : ObservableObject
         ClearFiltersCommand = new RelayCommand(_ => ClearFilters());
 
         playbackEngine.StateChanged += (_, state) => UiDispatcher.Run(() => ApplyPlaybackState(state));
+        playbackEngine.ProgressChanged += (_, progress) => UiDispatcher.Run(() => ApplyPlaybackProgress(progress));
     }
 
     public RangeObservableCollection<Channel> VisibleChannels { get; } = [];
@@ -328,6 +337,14 @@ public sealed class MainViewModel : ObservableObject
 
     public IReadOnlyList<int> RetryCountOptions { get; } = [0, 1, 2, 3];
 
+    public IReadOnlyList<UiSelectionOption<SmartViewFilter>> SmartViewOptions { get; } =
+    [
+        new(SmartViewFilter.All, "All channels"),
+        new(SmartViewFilter.UnwatchedMovies, "Unwatched movies"),
+        new(SmartViewFilter.RecentlyAdded, "Recently added"),
+        new(SmartViewFilter.FavoritesByGroup, "Favorites by group")
+    ];
+
     public IReadOnlyList<UiSelectionOption<EpgTimelineWindow>> EpgTimelineWindowOptions { get; } =
     [
         new(EpgTimelineWindow.Now, "Now"),
@@ -385,6 +402,10 @@ public sealed class MainViewModel : ObservableObject
     public ICommand ImportCustomGroupCsvCommand { get; }
 
     public ICommand ExportCustomGroupCsvCommand { get; }
+
+    public ICommand PreviousVodPageCommand { get; }
+
+    public ICommand NextVodPageCommand { get; }
 
     public ICommand PreviewSmartGroupCommand { get; }
 
@@ -813,6 +834,36 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    public SmartViewFilter SelectedSmartView
+    {
+        get => selectedSmartView;
+        set
+        {
+            if (!Enum.IsDefined(value))
+            {
+                value = SmartViewFilter.All;
+            }
+
+            if (SetProperty(ref selectedSmartView, value))
+            {
+                ScheduleSearch();
+            }
+        }
+    }
+
+    public string EpgSearchText
+    {
+        get => epgSearchText;
+        set
+        {
+            if (SetProperty(ref epgSearchText, value ?? string.Empty))
+            {
+                RefreshSelectedChannelEpgGuide();
+                RefreshEpgTimeline();
+            }
+        }
+    }
+
     public string DuplicateAssistantSummaryText
     {
         get => duplicateAssistantSummaryText;
@@ -847,6 +898,24 @@ public sealed class MainViewModel : ObservableObject
     {
         get => searchBenchmarkSummaryText;
         private set => SetProperty(ref searchBenchmarkSummaryText, value);
+    }
+
+    public string PlaybackProgressText
+    {
+        get => playbackProgressText;
+        private set => SetProperty(ref playbackProgressText, value);
+    }
+
+    public int VodLibraryPageIndex
+    {
+        get => vodLibraryPageIndex;
+        private set
+        {
+            if (SetProperty(ref vodLibraryPageIndex, Math.Max(0, value)))
+            {
+                RaiseVodPageCommandStates();
+            }
+        }
     }
 
     public int SelectedChannelCount
@@ -1309,6 +1378,55 @@ public sealed class MainViewModel : ObservableObject
         StatusText = $"Moved '{dragged.DisplayName}' before '{target.DisplayName}' in '{group}'.";
     }
 
+    public void AssignDraggedChannelsToCustomGroup(Guid draggedChannelId, string? targetGroup)
+    {
+        string? normalizedGroup = NormalizeCustomGroup(targetGroup);
+        if (draggedChannelId == Guid.Empty || normalizedGroup is null)
+        {
+            StatusText = "Drop a channel on a custom group to assign it.";
+            return;
+        }
+
+        HashSet<Guid> targetIds = selectedChannelIds.Contains(draggedChannelId)
+            ? selectedChannelIds.ToHashSet()
+            : [draggedChannelId];
+        Channel[] affected = allChannels.Where(channel => targetIds.Contains(channel.Id)).ToArray();
+        if (affected.Length == 0)
+        {
+            StatusText = "Group drop failed because the dragged channel is no longer loaded.";
+            return;
+        }
+
+        PushOrganizationUndo($"drag assign to '{normalizedGroup}'", affected);
+        int changed = 0;
+        for (int index = 0; index < allChannels.Count; index++)
+        {
+            Channel channel = allChannels[index];
+            if (!targetIds.Contains(channel.Id) ||
+                string.Equals(channel.CustomGroup, normalizedGroup, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            Channel updated = channel with { CustomGroup = normalizedGroup };
+            allChannels[index] = updated;
+            UpdateChannelStateIndex(updated);
+            changed++;
+            if (SelectedChannel?.Id == updated.Id)
+            {
+                SelectedChannel = updated;
+            }
+        }
+
+        knownCustomGroups.Add(normalizedGroup);
+        RefreshGroupsAndCategories();
+        RefreshVodLibrary();
+        ScheduleSearch();
+        _ = SaveChannelStatesSafelyAsync();
+        _ = SaveOrganizationPreferencesSafelyAsync();
+        StatusText = $"Assigned {changed:N0} channel(s) to custom group '{normalizedGroup}' by drag/drop.";
+    }
+
     public async ValueTask DisposeAsync()
     {
         shutdownCts.Cancel();
@@ -1635,7 +1753,16 @@ public sealed class MainViewModel : ObservableObject
             }
             StatusText = "Downloading XMLTV guide...";
             AddDiagnostic($"XMLTV URL import started from host {uri.Host}.");
-            tempPath = Path.Combine(Path.GetTempPath(), $"iptv-xmltv-{Guid.NewGuid():N}.xml");
+            string extension = Path.GetExtension(uri.LocalPath);
+            if (!extension.Equals(".xml", StringComparison.OrdinalIgnoreCase) &&
+                !extension.Equals(".xmltv", StringComparison.OrdinalIgnoreCase) &&
+                !extension.Equals(".gz", StringComparison.OrdinalIgnoreCase) &&
+                !extension.Equals(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                extension = ".xml";
+            }
+
+            tempPath = Path.Combine(Path.GetTempPath(), $"iptv-xmltv-{Guid.NewGuid():N}{extension}");
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(shutdownCts.Token);
             timeoutCts.CancelAfter(TimeSpan.FromSeconds(25));
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
@@ -1809,6 +1936,7 @@ public sealed class MainViewModel : ObservableObject
                 throw lastException;
             }
 
+            QueueResumeSeek(channelToPlay);
             UpdateSelectedChannel(channel => channel with { LastWatchedAt = DateTimeOffset.UtcNow }, refreshGroups: false);
             AddDiagnostic($"Playback requested for '{channelToPlay.DisplayName}' on host {channelToPlay.StreamUrl.Host}.");
         }
@@ -2400,6 +2528,7 @@ public sealed class MainViewModel : ObservableObject
         SelectedContentKind = null;
         FavoritesOnly = false;
         SelectedHiddenFilter = HiddenChannelFilter.VisibleOnly;
+        SelectedSmartView = SmartViewFilter.All;
         ScheduleSearch();
     }
 
@@ -2440,11 +2569,11 @@ public sealed class MainViewModel : ObservableObject
             VodYear = TryParseVodYear(SelectedVodYear),
             FavoritesOnly = FavoritesOnly,
             HiddenFilter = SelectedHiddenFilter,
-            SortMode = SelectedSortMode,
+            SortMode = SelectedSmartView == SmartViewFilter.FavoritesByGroup ? ChannelSortMode.GroupThenName : SelectedSortMode,
             Limit = GetVisibleResultLimit()
         };
 
-        Channel[] snapshot = GetSearchableChannels();
+        Channel[] snapshot = ApplySmartViewFilter(GetSearchableChannels()).ToArray();
         IReadOnlyList<Channel> results = await Task.Run(
             () => channelSearchService.Search(snapshot, query),
             cancellationToken).ConfigureAwait(false);
@@ -3094,13 +3223,24 @@ public sealed class MainViewModel : ObservableObject
     {
         string? previousId = SelectedVodLibraryItem?.ChannelId.ToString();
         VodLibraryItems.Clear();
-        Channel[] vodChannels = allChannels
+        Channel[] allVodChannels = allChannels
             .Where(IsChannelUnlockedForUi)
             .Where(channel => channel.ContentKind is ContentKind.Vod or ContentKind.Series)
             .OrderByDescending(channel => channel.ResumeProgressPercent ?? -1)
             .ThenByDescending(channel => channel.LastWatchedAt ?? DateTimeOffset.MinValue)
             .ThenBy(channel => channel.DisplayName, StringComparer.OrdinalIgnoreCase)
             .Take(MaximumVodLibraryItems)
+            .ToArray();
+        int totalVod = allChannels.Count(channel => channel.ContentKind is ContentKind.Vod or ContentKind.Series);
+        int maxPageIndex = allVodChannels.Length == 0 ? 0 : (allVodChannels.Length - 1) / VodLibraryPageSize;
+        if (VodLibraryPageIndex > maxPageIndex)
+        {
+            VodLibraryPageIndex = maxPageIndex;
+        }
+
+        Channel[] vodChannels = allVodChannels
+            .Skip(VodLibraryPageIndex * VodLibraryPageSize)
+            .Take(VodLibraryPageSize)
             .ToArray();
 
         foreach (Channel channel in vodChannels)
@@ -3120,10 +3260,31 @@ public sealed class MainViewModel : ObservableObject
         SelectedVodLibraryItem = previousId is null
             ? null
             : VodLibraryItems.FirstOrDefault(item => item.ChannelId.ToString().Equals(previousId, StringComparison.OrdinalIgnoreCase));
-        int totalVod = allChannels.Count(channel => channel.ContentKind is ContentKind.Vod or ContentKind.Series);
         VodLibrarySummaryText = totalVod == 0
             ? "VOD library: no VOD or series entries detected."
-            : $"VOD library: showing {VodLibraryItems.Count:N0} of {totalVod:N0} VOD/series entries, sorted by resume progress.";
+            : $"VOD library: page {VodLibraryPageIndex + 1:N0}/{maxPageIndex + 1:N0}; showing {VodLibraryItems.Count:N0} of {Math.Min(totalVod, MaximumVodLibraryItems):N0} capped VOD/series entries, sorted by resume progress.";
+        RaiseVodPageCommandStates();
+    }
+
+    private void MoveVodPage(int delta)
+    {
+        int next = Math.Max(0, VodLibraryPageIndex + delta);
+        if (next == VodLibraryPageIndex)
+        {
+            return;
+        }
+
+        VodLibraryPageIndex = next;
+        RefreshVodLibrary();
+    }
+
+    private bool HasNextVodPage()
+    {
+        int totalVod = allChannels
+            .Where(IsChannelUnlockedForUi)
+            .Count(channel => channel.ContentKind is ContentKind.Vod or ContentKind.Series);
+        int capped = Math.Min(totalVod, MaximumVodLibraryItems);
+        return (VodLibraryPageIndex + 1) * VodLibraryPageSize < capped;
     }
 
     private void RefreshDuplicateGroups()
@@ -3183,6 +3344,18 @@ public sealed class MainViewModel : ObservableObject
         if (toHide.Length == 0)
         {
             StatusText = "Duplicate group is already hidden except for the first channel.";
+            return;
+        }
+
+        string title = $"Hide {toHide.Length:N0} duplicate(s) for '{duplicateChannels[0].DisplayName}'?";
+        string[] previewLines = duplicateChannels
+            .Select((channel, index) => index == 0
+                ? $"KEEP: {channel.DisplayName} · {channel.EffectiveGroupTitle} · {channel.StreamUrl.Host}"
+                : $"HIDE: {channel.DisplayName} · {channel.EffectiveGroupTitle} · {channel.StreamUrl.Host}")
+            .ToArray();
+        if (!dialogService.ConfirmDuplicateHide(title, previewLines))
+        {
+            StatusText = "Duplicate hide cancelled.";
             return;
         }
 
@@ -3487,6 +3660,7 @@ public sealed class MainViewModel : ObservableObject
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
         foreach (EpgProgram program in GetProgramsForChannel(SelectedChannel)
+                     .Where(MatchesEpgSearch)
                      .Where(program => program.Stop is null || program.Stop >= now.AddHours(-1))
                      .OrderBy(program => program.Start ?? DateTimeOffset.MaxValue)
                      .Take(8))
@@ -3510,17 +3684,21 @@ public sealed class MainViewModel : ObservableObject
                      .Where(channel => channel.Id != selected.Id)
                      .Where(channel => channel.ContentKind == selected.ContentKind)
                      .Where(channel => channel.NormalizedName.Equals(selected.NormalizedName, StringComparison.Ordinal))
-                     .OrderBy(channel => channel.IsHidden)
+                     .OrderByDescending(CalculateFallbackScore)
+                     .ThenBy(channel => channel.IsHidden)
                      .ThenBy(channel => channel.EffectiveGroupTitle, StringComparer.OrdinalIgnoreCase)
                      .ThenBy(channel => channel.StreamUrl.Host, StringComparer.OrdinalIgnoreCase)
                      .Take(20))
         {
+            (int score, string reason) = CalculateFallbackScoreDetail(fallback);
             ChannelFallbacks.Add(new ChannelFallbackViewModel(
                 fallback.Id,
                 fallback.DisplayName,
                 fallback.EffectiveGroupTitle,
                 fallback.StreamUrl.Host,
-                fallback.IsHidden));
+                fallback.IsHidden,
+                score,
+                reason));
         }
 
         SelectedChannelFallback = ChannelFallbacks.FirstOrDefault();
@@ -3565,6 +3743,7 @@ public sealed class MainViewModel : ObservableObject
         foreach (Channel channel in VisibleChannels.Take(MaximumEpgTimelineRows))
         {
             EpgProgram[] upcoming = GetProgramsForChannel(channel)
+                .Where(MatchesEpgSearch)
                 .Where(program => program.Stop is null || program.Stop >= windowStart)
                 .Where(program => program.Start is null || program.Start <= windowStart.AddHours(4))
                 .OrderBy(program => program.Start ?? DateTimeOffset.MaxValue)
@@ -3586,8 +3765,8 @@ public sealed class MainViewModel : ObservableObject
 
         string windowLabel = EpgTimelineWindowOptions.First(option => option.Value == SelectedEpgTimelineWindow).Label;
         EpgTimelineSummaryText = matched == 0
-            ? $"EPG timeline ({windowLabel}): no guide matches for the visible channels."
-            : $"EPG timeline ({windowLabel}): {matched:N0} visible channels with programs around {windowStart.ToLocalTime():g} (capped at {MaximumEpgTimelineRows:N0}).";
+            ? $"EPG timeline ({windowLabel}): no guide matches for the visible channels{FormatEpgSearchSuffix()}."
+            : $"EPG timeline ({windowLabel}): {matched:N0} visible channels with programs around {windowStart.ToLocalTime():g}{FormatEpgSearchSuffix()} (capped at {MaximumEpgTimelineRows:N0}).";
     }
 
     private void RebuildEpgIndex()
@@ -3649,6 +3828,63 @@ public sealed class MainViewModel : ObservableObject
         }
 
         yield return channel.NormalizedName;
+    }
+
+    private bool MatchesEpgSearch(EpgProgram program)
+    {
+        string normalizedSearch = ChannelNormalizer.NormalizeForSearch(EpgSearchText);
+        return string.IsNullOrWhiteSpace(normalizedSearch) ||
+            ChannelNormalizer.NormalizeForSearch(program.Title).Contains(normalizedSearch, StringComparison.Ordinal) ||
+            ChannelNormalizer.NormalizeForSearch(program.Description).Contains(normalizedSearch, StringComparison.Ordinal);
+    }
+
+    private string FormatEpgSearchSuffix()
+    {
+        return string.IsNullOrWhiteSpace(EpgSearchText)
+            ? string.Empty
+            : $" matching '{EpgSearchText.Trim()}'";
+    }
+
+    private int CalculateFallbackScore(Channel channel)
+    {
+        return CalculateFallbackScoreDetail(channel).Score;
+    }
+
+    private (int Score, string Reason) CalculateFallbackScoreDetail(Channel channel)
+    {
+        int score = channel.IsHidden ? 40 : 60;
+        List<string> reasons = [];
+        if (channel.StreamUrl.Uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            score += 10;
+            reasons.Add("https");
+        }
+        else
+        {
+            reasons.Add(channel.StreamUrl.Uri.Scheme);
+        }
+
+        if (streamHealthSnapshots.TryGetValue(channel.Id, out StreamHealthSnapshot? health))
+        {
+            score += Math.Min(30, health.SuccessCount * 10);
+            score -= Math.Min(35, health.FailureCount * 12);
+            score -= Math.Min(15, health.SlowEventCount * 5);
+            reasons.Add($"{health.LastStatus}");
+        }
+        else
+        {
+            reasons.Add("health unknown");
+        }
+
+        ProviderPlaybackProfile profile = GetPlaybackProfile(channel.SourceId);
+        if (profile.BufferingPreset == BufferingPreset.PoorNetwork)
+        {
+            score += 5;
+            reasons.Add("stable buffer");
+        }
+
+        reasons.Add("bitrate n/a");
+        return (Math.Clamp(score, 0, 100), string.Join(", ", reasons));
     }
 
     private void SetSelectedResumeProgress(int? progress)
@@ -4213,6 +4449,20 @@ public sealed class MainViewModel : ObservableObject
         return allChannels.Where(IsChannelUnlockedForUi).ToArray();
     }
 
+    private IEnumerable<Channel> ApplySmartViewFilter(IEnumerable<Channel> channels)
+    {
+        return SelectedSmartView switch
+        {
+            SmartViewFilter.UnwatchedMovies => channels.Where(channel =>
+                channel.ContentKind is ContentKind.Vod or ContentKind.Series &&
+                (channel.ResumeProgressPercent is null or <= 0)),
+            SmartViewFilter.RecentlyAdded => channels.Where(channel =>
+                channel.ImportedAt >= DateTimeOffset.UtcNow.AddDays(-7)),
+            SmartViewFilter.FavoritesByGroup => channels.Where(channel => channel.IsFavorite),
+            _ => channels
+        };
+    }
+
     private bool IsChannelUnlockedForUi(Channel channel)
     {
         return IsParentalUnlocked || !lockedGroups.Contains(channel.EffectiveGroupTitle);
@@ -4469,6 +4719,57 @@ public sealed class MainViewModel : ObservableObject
         UpdateNowPlayingMarker(state);
         UpdateStreamHealth(state);
         AddDiagnostic(PlaybackStatusText);
+    }
+
+    private void ApplyPlaybackProgress(PlaybackProgressSnapshot progress)
+    {
+        PlaybackProgressText = progress.DisplayText;
+        if (progress.Channel is null ||
+            progress.ProgressPercent is not int percent ||
+            progress.Channel.ContentKind is not (ContentKind.Vod or ContentKind.Series) ||
+            percent is < 0 or > 98)
+        {
+            return;
+        }
+
+        int index = allChannels.FindIndex(channel => channel.Id == progress.Channel.Id);
+        if (index < 0)
+        {
+            return;
+        }
+
+        Channel current = allChannels[index];
+        int? previousProgress = current.ResumeProgressPercent;
+        if (previousProgress == percent)
+        {
+            return;
+        }
+
+        Channel updated = current with
+        {
+            ResumeProgressPercent = percent,
+            LastWatchedAt = DateTimeOffset.UtcNow
+        };
+        allChannels[index] = updated;
+        UpdateChannelStateIndex(updated);
+        if (SelectedChannel?.Id == updated.Id)
+        {
+            selectedChannel = updated;
+            OnPropertyChanged(nameof(SelectedChannel));
+            OnPropertyChanged(nameof(ResumeProgressText));
+            SelectedVodDetailText = FormatVodDetail(updated);
+        }
+
+        if (previousProgress is null || Math.Abs(previousProgress.Value - percent) >= 5)
+        {
+            RefreshVodLibrary();
+        }
+
+        if (DateTimeOffset.UtcNow - lastResumeStateSaveAt > TimeSpan.FromSeconds(12))
+        {
+            lastResumeStateSaveAt = DateTimeOffset.UtcNow;
+            _ = SaveChannelStatesSafelyAsync();
+        }
     }
 
     private void UpdateNowPlayingMarker(PlaybackStateSnapshot state)
@@ -4758,6 +5059,43 @@ public sealed class MainViewModel : ObservableObject
         if (DiscardPendingRefreshCommand is RelayCommand discard)
         {
             discard.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void QueueResumeSeek(Channel channel)
+    {
+        if (channel.ContentKind is not (ContentKind.Vod or ContentKind.Series) ||
+            channel.ResumeProgressPercent is not int progress ||
+            progress is <= 0 or >= 95)
+        {
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(900), shutdownCts.Token).ConfigureAwait(false);
+                await playbackEngine.SeekToProgressAsync(progress, shutdownCts.Token).ConfigureAwait(false);
+                UiDispatcher.Run(() => AddDiagnostic($"Resume seek requested for '{channel.DisplayName}' at {progress:N0}%."));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                UiDispatcher.Run(() => AddDiagnostic($"Resume seek skipped: {SensitiveTextRedactor.RedactText(ex.Message)}"));
+            }
+        }, shutdownCts.Token);
+    }
+
+    private void RaiseVodPageCommandStates()
+    {
+        if (PreviousVodPageCommand is RelayCommand previous)
+        {
+            previous.RaiseCanExecuteChanged();
+        }
+
+        if (NextVodPageCommand is RelayCommand next)
+        {
+            next.RaiseCanExecuteChanged();
         }
     }
 

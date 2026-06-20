@@ -11,6 +11,7 @@ public sealed class FakePlaybackEngine : PlaybackEngineBase
         Publish(PlaybackStatus.Loading, channel, "Opening stream...");
         await Task.Delay(25, cancellationToken).ConfigureAwait(false);
         Publish(PlaybackStatus.Playing, channel, "Playing via fake playback engine.");
+        PublishProgress(channel, 25_000, 100_000, 0.25f);
     }
 
     public override Task PauseAsync(CancellationToken cancellationToken)

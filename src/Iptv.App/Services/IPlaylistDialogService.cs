@@ -22,5 +22,7 @@ public interface IPlaylistDialogService
 
     string? PromptXmltvUrl();
 
+    bool ConfirmDuplicateHide(string title, IReadOnlyList<string> previewLines);
+
     void ShowError(string title, string message);
 }

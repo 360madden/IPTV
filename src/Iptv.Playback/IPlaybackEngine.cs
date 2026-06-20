@@ -7,6 +7,8 @@ public interface IPlaybackEngine : IAsyncDisposable
 {
     event EventHandler<PlaybackStateSnapshot>? StateChanged;
 
+    event EventHandler<PlaybackProgressSnapshot>? ProgressChanged;
+
     PlaybackStateSnapshot CurrentState { get; }
 
     Task PlayAsync(Channel channel, CancellationToken cancellationToken);
@@ -18,4 +20,6 @@ public interface IPlaybackEngine : IAsyncDisposable
     Task SetVolumeAsync(int volume, CancellationToken cancellationToken);
 
     Task SetBufferingPresetAsync(BufferingPreset preset, CancellationToken cancellationToken);
+
+    Task SeekToProgressAsync(int progressPercent, CancellationToken cancellationToken);
 }

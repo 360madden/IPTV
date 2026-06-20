@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO.Compression;
 using System.Xml;
 using Iptv.Core.Epg;
 using Iptv.Core.PlaylistImport;
@@ -44,11 +45,10 @@ public sealed class XmltvImportService : IXmltvImportService
             IgnoreWhitespace = true
         };
 
-        await using FileStream stream = file.OpenRead();
-        using XmlReader reader = XmlReader.Create(stream, settings);
-
         try
         {
+            using XmltvReadInput input = OpenXmltvInput(file, options.MaxXmltvBytes);
+            using XmlReader reader = XmlReader.Create(input.Stream, settings);
             while (await reader.ReadAsync().ConfigureAwait(false))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -80,6 +80,14 @@ public sealed class XmltvImportService : IXmltvImportService
         {
             issues.Add(new PlaylistImportIssue(ImportIssueSeverity.Error, "invalid-xmltv", ex.Message, ex.LineNumber));
         }
+        catch (InvalidDataException ex)
+        {
+            issues.Add(new PlaylistImportIssue(ImportIssueSeverity.Error, "invalid-xmltv-archive", ex.Message));
+        }
+        catch (IOException ex)
+        {
+            issues.Add(new PlaylistImportIssue(ImportIssueSeverity.Error, "xmltv-read-failed", ex.Message));
+        }
 
         if (channels.Count == 0)
         {
@@ -87,6 +95,44 @@ public sealed class XmltvImportService : IXmltvImportService
         }
 
         return new EpgImportResult(channels, programs, issues);
+    }
+
+    private static XmltvReadInput OpenXmltvInput(FileInfo file, long maxXmltvBytes)
+    {
+        FileStream fileStream = file.OpenRead();
+        string extension = file.Extension.ToLowerInvariant();
+        if (extension is ".gz" or ".gzip")
+        {
+            var gzip = new GZipStream(fileStream, CompressionMode.Decompress);
+            return new XmltvReadInput(new LimitedReadStream(gzip, maxXmltvBytes));
+        }
+
+        if (extension == ".zip")
+        {
+            var archive = new ZipArchive(fileStream, ZipArchiveMode.Read);
+            ZipArchiveEntry? entry = archive.Entries
+                .Where(entry => !string.IsNullOrWhiteSpace(entry.Name))
+                .OrderByDescending(entry => Path.GetExtension(entry.Name).Equals(".xml", StringComparison.OrdinalIgnoreCase) ||
+                    Path.GetExtension(entry.Name).Equals(".xmltv", StringComparison.OrdinalIgnoreCase))
+                .ThenBy(entry => entry.FullName, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+            if (entry is null)
+            {
+                archive.Dispose();
+                throw new InvalidDataException("ZIP archive does not contain an XMLTV file.");
+            }
+
+            if (entry.Length > maxXmltvBytes)
+            {
+                archive.Dispose();
+                throw new InvalidDataException($"XMLTV entry exceeds the configured {maxXmltvBytes:N0} byte limit.");
+            }
+
+            Stream entryStream = entry.Open();
+            return new XmltvReadInput(new LimitedReadStream(entryStream, maxXmltvBytes), archive);
+        }
+
+        return new XmltvReadInput(new LimitedReadStream(fileStream, maxXmltvBytes));
     }
 
     private static async Task<EpgChannel?> ReadChannelAsync(XmlReader reader, CancellationToken cancellationToken)
@@ -213,6 +259,113 @@ public sealed class XmltvImportService : IXmltvImportService
         }
 
         return value;
+    }
+
+    private sealed class XmltvReadInput : IDisposable
+    {
+        private readonly IDisposable[] disposables;
+
+        public XmltvReadInput(Stream stream, params IDisposable[] disposables)
+        {
+            Stream = stream;
+            this.disposables = disposables;
+        }
+
+        public Stream Stream { get; }
+
+        public void Dispose()
+        {
+            Stream.Dispose();
+            foreach (IDisposable disposable in disposables.Reverse())
+            {
+                disposable.Dispose();
+            }
+        }
+    }
+
+    private sealed class LimitedReadStream : Stream
+    {
+        private readonly Stream inner;
+        private readonly long maxBytes;
+        private long totalRead;
+
+        public LimitedReadStream(Stream inner, long maxBytes)
+        {
+            this.inner = inner;
+            this.maxBytes = maxBytes;
+        }
+
+        public override bool CanRead => inner.CanRead;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => totalRead;
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+            inner.Flush();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int read = inner.Read(buffer, offset, count);
+            Track(read);
+            return read;
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            int read = await inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            Track(read);
+            return read;
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            return ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                inner.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        private void Track(int read)
+        {
+            totalRead += read;
+            if (totalRead > maxBytes)
+            {
+                throw new InvalidDataException($"XMLTV file exceeds the configured {maxBytes:N0} byte limit.");
+            }
+        }
     }
 
     private static EpgImportResult Failure(string code, string message)

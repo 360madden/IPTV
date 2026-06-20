@@ -7,6 +7,8 @@ public abstract class PlaybackEngineBase : IPlaybackEngine
 {
     public event EventHandler<PlaybackStateSnapshot>? StateChanged;
 
+    public event EventHandler<PlaybackProgressSnapshot>? ProgressChanged;
+
     public PlaybackStateSnapshot CurrentState { get; private set; } = PlaybackStateSnapshot.Idle;
 
     public abstract Task PlayAsync(Channel channel, CancellationToken cancellationToken);
@@ -26,6 +28,12 @@ public abstract class PlaybackEngineBase : IPlaybackEngine
         return Task.CompletedTask;
     }
 
+    public virtual Task SeekToProgressAsync(int progressPercent, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
     public virtual ValueTask DisposeAsync()
     {
         return ValueTask.CompletedTask;
@@ -35,5 +43,12 @@ public abstract class PlaybackEngineBase : IPlaybackEngine
     {
         CurrentState = new PlaybackStateSnapshot(status, channel, message, DateTimeOffset.UtcNow);
         StateChanged?.Invoke(this, CurrentState);
+    }
+
+    protected void PublishProgress(Channel? channel, long timeMilliseconds, long lengthMilliseconds, float position)
+    {
+        ProgressChanged?.Invoke(
+            this,
+            new PlaybackProgressSnapshot(channel, timeMilliseconds, lengthMilliseconds, position, DateTimeOffset.UtcNow));
     }
 }

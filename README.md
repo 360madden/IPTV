@@ -41,6 +41,7 @@ For a GUI regression pass against the public Xumo playlist:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\xumo-gui-smoke.ps1 -SkipBuild
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\xumo-gui-smoke.ps1 -SkipBuild -ExerciseMutatingOrganization
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\xumo-gui-smoke.ps1 -SkipBuild -CaptureScreenshots
 ```
 
 The GUI smoke uses an isolated local app-data profile by default. Add `-UseRealUserProfile` only when intentionally testing current user settings.
@@ -49,19 +50,21 @@ The GUI smoke uses an isolated local app-data profile by default. Add `-UseRealU
 
 - Local and remote M3U/M3U8 import.
 - Playlist refresh with added/removed/unchanged diff summary, removable/new-channel review, and explicit apply/discard approval before replacing the loaded library.
-- XMLTV file or URL import with size/time limits, optional auto-load after playlist import, channel/program counts, basic channel matching, selected-channel EPG guide preview, and virtualized timeline windows for now, +2 hours, tonight, and tomorrow.
-- Search, group/category/content/VOD-year/visibility filters, sort modes, favorites, hidden channels, and custom group assignment.
-- Local channel organization persistence for favorites, hidden channels, custom groups, custom order, recently watched sorting, and VOD/series resume progress.
-- VOD/series library mode with a capped virtualized list, poster status, resume-first sorting, and quick selection into the player detail pane.
-- Custom group manager with counts, add, rename, delete, import/export CSV, hidden/locked audit restore actions, undo, batch actions, select-all/clear-selection, duplicate-channel hiding, advanced smart group rules/presets, and drag/drop or up/down custom ordering.
+- XMLTV file or URL import with size/time limits, `.gz`/`.zip` guide support, optional auto-load after playlist import, channel/program counts, basic channel matching, selected-channel EPG guide preview, EPG title/description search, and virtualized timeline windows for now, +2 hours, tonight, and tomorrow.
+- Search, group/category/content/VOD-year/visibility filters, sort modes, built-in saved smart views, favorites, hidden channels, and custom group assignment.
+- Local channel organization persistence for favorites, hidden channels, custom groups, custom order, recently watched sorting, and VOD/series resume progress captured from playback position when available.
+- VOD/series library mode with a paged poster grid, poster status, resume-first sorting, and quick selection into the player detail pane.
+- Custom group manager with counts, add, rename, delete, import/export CSV, hidden/locked audit restore actions, undo, batch actions, select-all/clear-selection, duplicate-channel preview/hide dialog, advanced smart group rules/presets, and drag/drop or up/down custom ordering.
 - Import/export for channel organization backups and smart group presets without raw stream URLs.
 - Automatic per-playlist/source organization matching, editable source profile names, provider playback retry/buffer profiles, manual refresh reminders, refresh reconciliation summaries, safe channel details, selected-channel logo caching, visible-logo prefetch, view density, and large-library mode for compact 10k-result browsing.
-- Fallback stream list for same-name alternate entries plus a 50k-channel search benchmark UI/tool for large playlist checks.
+- Scored fallback stream list for same-name alternate entries plus a 50k-channel search benchmark UI/tool for large playlist checks.
 - PIN-gated group locks for hiding restricted groups until unlocked locally.
 - VOD/series detail panel with playlist-provided poster/backdrop preview and quick resume markers.
 - Stream health dashboard based on playback success/failure/buffering events.
 - Release packaging helper for publish/zip output plus optional MSIX staging, packaging, and signing via Windows SDK tools.
 - GitHub Actions workflow for Windows Release build/test/MSIX packaging, with optional PFX signing through repository secrets.
+- MSIX signing setup is documented in `docs/windows-msix-signing.md`.
+- GUI smoke can capture window/fullscreen screenshots into ignored `artifacts/gui-smoke/` for layout regression review.
 - LibVLC playback with fullscreen toggle, volume, buffering presets, and startup timeout guidance.
 - Optional clock overlay with position, size, background, opacity, 24-hour, and seconds settings.
 - True app-managed fullscreen with video overlay clock, mini-HUD controls, auto-hide, double-click toggle, and monitor preference.

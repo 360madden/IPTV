@@ -23,7 +23,7 @@ public sealed class PlaylistDialogService : IPlaylistDialogService
         var dialog = new OpenFileDialog
         {
             Title = "Import XMLTV guide",
-            Filter = "XMLTV files (*.xml;*.xmltv)|*.xml;*.xmltv|All files (*.*)|*.*",
+            Filter = "XMLTV files (*.xml;*.xmltv;*.gz;*.zip)|*.xml;*.xmltv;*.gz;*.zip|All files (*.*)|*.*",
             CheckFileExists = true,
             Multiselect = false
         };
@@ -137,6 +137,16 @@ public sealed class PlaylistDialogService : IPlaylistDialogService
         };
 
         return dialog.ShowDialog() == true ? dialog.PlaylistUrl : null;
+    }
+
+    public bool ConfirmDuplicateHide(string title, IReadOnlyList<string> previewLines)
+    {
+        var dialog = new DuplicatePreviewWindow(title, previewLines)
+        {
+            Owner = Application.Current.MainWindow
+        };
+
+        return dialog.ShowDialog() == true;
     }
 
     public void ShowError(string title, string message)

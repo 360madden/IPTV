@@ -168,6 +168,19 @@
                               Foreground="Black"
                               AutomationProperties.Name="Channel Sort Mode" />
 
+                    <TextBlock Text="Saved smart view"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="0,0,0,6" />
+                    <ComboBox ItemsSource="{Binding SmartViewOptions}"
+                              DisplayMemberPath="Label"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding SelectedSmartView}"
+                              Margin="0,0,0,16"
+                              Padding="8"
+                              Background="{StaticResource PanelAltBrush}"
+                              Foreground="Black"
+                              AutomationProperties.Name="Saved Smart View" />
+
                     <CheckBox Content="Large library mode"
                               IsChecked="{Binding LargeLibraryMode}"
                               Foreground="{StaticResource TextPrimaryBrush}"
@@ -233,12 +246,15 @@
                                 <ListBox ItemsSource="{Binding CustomGroupSummaries}"
                                          SelectedValuePath="Name"
                                          SelectedValue="{Binding SelectedManagedCustomGroup}"
+                                         AllowDrop="True"
                                          MaxHeight="120"
                                          Background="Transparent"
                                          BorderBrush="#334056"
                                          Foreground="{StaticResource TextSecondaryBrush}"
                                          ScrollViewer.CanContentScroll="True"
                                          VirtualizingPanel.IsVirtualizing="True"
+                                         DragOver="CustomGroups_DragOver"
+                                         Drop="CustomGroups_Drop"
                                          AutomationProperties.Name="Custom Group List">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
@@ -387,7 +403,8 @@
                                             Margin="0,0,8,8" />
                                     <Button Content="Hide Duplicates"
                                             Command="{Binding HideSelectedDuplicateGroupCommand}"
-                                            Margin="0,0,8,8" />
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Hide Duplicates" />
                                 </WrapPanel>
                                 <ListBox ItemsSource="{Binding DuplicateChannelGroups}"
                                          SelectedItem="{Binding SelectedDuplicateGroup}"
@@ -776,6 +793,10 @@
                                               Margin="0,6,0,8"
                                               Foreground="Black"
                                               AutomationProperties.Name="EPG Timeline Window" />
+                                    <TextBox Text="{Binding EpgSearchText, UpdateSourceTrigger=PropertyChanged, Delay=250}"
+                                             Margin="0,0,0,8"
+                                             AutomationProperties.Name="EPG Search"
+                                             ToolTip="Search EPG titles and descriptions" />
                                     <DataGrid ItemsSource="{Binding EpgTimelineRows}"
                                               AutoGenerateColumns="False"
                                               IsReadOnly="True"
@@ -1076,44 +1097,67 @@
                                   Margin="0,8,0,0"
                                   IsExpanded="False"
                                   AutomationProperties.Name="VOD Library">
-                            <ListBox ItemsSource="{Binding VodLibraryItems}"
-                                     SelectedItem="{Binding SelectedVodLibraryItem}"
-                                     MaxHeight="170"
-                                     Background="Transparent"
-                                     BorderBrush="#334056"
-                                     Foreground="{StaticResource TextSecondaryBrush}"
-                                     ScrollViewer.CanContentScroll="True"
-                                     VirtualizingPanel.IsVirtualizing="True"
-                                     VirtualizingPanel.VirtualizationMode="Recycling">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <DockPanel Margin="0,0,0,8"
-                                                   LastChildFill="True">
-                                            <Border DockPanel.Dock="Left"
-                                                    Width="42"
-                                                    Height="58"
-                                                    CornerRadius="5"
-                                                    Background="#111827"
-                                                    Margin="0,0,8,0"
-                                                    ClipToBounds="True">
-                                                <Image Source="{Binding PosterPath}"
-                                                       Stretch="UniformToFill" />
+                            <StackPanel>
+                                <WrapPanel Margin="0,6,0,8">
+                                    <Button Content="Previous"
+                                            Command="{Binding PreviousVodPageCommand}"
+                                            Margin="0,0,8,8" />
+                                    <Button Content="Next"
+                                            Command="{Binding NextVodPageCommand}"
+                                            Margin="0,0,8,8" />
+                                </WrapPanel>
+                                <ListBox ItemsSource="{Binding VodLibraryItems}"
+                                         SelectedItem="{Binding SelectedVodLibraryItem}"
+                                         MaxHeight="260"
+                                         Background="Transparent"
+                                         BorderBrush="#334056"
+                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         ScrollViewer.CanContentScroll="True"
+                                         VirtualizingPanel.IsVirtualizing="True"
+                                         VirtualizingPanel.VirtualizationMode="Recycling"
+                                         AutomationProperties.Name="VOD Poster Grid">
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel IsItemsHost="True" />
+                                        </ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Width="152"
+                                                    MinHeight="220"
+                                                    Margin="0,0,10,10"
+                                                    Padding="8"
+                                                    CornerRadius="8"
+                                                    Background="#111827">
+                                                <StackPanel>
+                                                    <Border Height="128"
+                                                            CornerRadius="6"
+                                                            Background="#050607"
+                                                            ClipToBounds="True">
+                                                        <Image Source="{Binding PosterPath}"
+                                                               Stretch="UniformToFill" />
+                                                    </Border>
+                                                    <TextBlock Text="{Binding Title}"
+                                                               FontWeight="SemiBold"
+                                                               TextWrapping="Wrap"
+                                                               Margin="0,8,0,3" />
+                                                    <TextBlock Text="{Binding ResumeText}"
+                                                               Foreground="{StaticResource AccentBrush}"
+                                                               FontSize="12" />
+                                                    <TextBlock Text="{Binding GroupName}"
+                                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                                               TextWrapping="Wrap"
+                                                               FontSize="11" />
+                                                    <TextBlock Text="{Binding PosterStatusText}"
+                                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                                               TextWrapping="Wrap"
+                                                               FontSize="11" />
+                                                </StackPanel>
                                             </Border>
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding Title}"
-                                                           FontWeight="SemiBold"
-                                                           TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding DisplayText}"
-                                                           TextWrapping="Wrap"
-                                                           FontSize="12" />
-                                                <TextBlock Text="{Binding PosterStatusText}"
-                                                           Foreground="{StaticResource TextSecondaryBrush}"
-                                                           FontSize="11" />
-                                            </StackPanel>
-                                        </DockPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
                         </Expander>
                     </StackPanel>
                 </Grid>
@@ -1251,6 +1295,11 @@
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    Margin="0,4,0,0"
                                    TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding PlaybackProgressText}"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"
+                                   AutomationProperties.Name="Playback Progress" />
                         <TextBlock Text="{Binding SelectedChannelDetails}"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    Margin="0,6,0,0"

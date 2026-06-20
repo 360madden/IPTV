@@ -205,6 +205,29 @@ public partial class MainWindow : Window
         }
     }
 
+    private void CustomGroups_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = DragDropEffects.None;
+        if (e.Data.GetDataPresent(typeof(Channel)) &&
+            FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject) is { DataContext: CustomGroupSummaryViewModel })
+        {
+            e.Effects = DragDropEffects.Move;
+        }
+
+        e.Handled = true;
+    }
+
+    private void CustomGroups_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(typeof(Channel)) &&
+            e.Data.GetData(typeof(Channel)) is Channel dragged &&
+            FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject) is { DataContext: CustomGroupSummaryViewModel targetGroup })
+        {
+            viewModel.AssignDraggedChannelsToCustomGroup(dragged.Id, targetGroup.Name);
+            e.Handled = true;
+        }
+    }
+
     private async void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         fullscreenControlsHideTimer.Stop();

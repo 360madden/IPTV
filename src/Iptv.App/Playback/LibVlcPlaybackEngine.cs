@@ -16,6 +16,9 @@ public sealed class LibVlcPlaybackEngine : PlaybackEngineBase
     private Channel? currentChannel;
     private BufferingPreset bufferingPreset = BufferingPreset.Balanced;
     private int playAttemptVersion;
+    private long lastKnownTimeMilliseconds = -1;
+    private long lastKnownLengthMilliseconds = -1;
+    private float lastKnownPosition = -1;
     private bool disposed;
 
     public LibVlcPlaybackEngine(VideoView videoView)
@@ -42,6 +45,21 @@ public sealed class LibVlcPlaybackEngine : PlaybackEngineBase
         mediaPlayer.Buffering += (_, _) => PublishOnUi(PlaybackStatus.Buffering, currentChannel, "Buffering...");
         mediaPlayer.EndReached += (_, _) => PublishOnUi(PlaybackStatus.Stopped, currentChannel, "Stream ended.");
         mediaPlayer.EncounteredError += (_, _) => PublishOnUi(PlaybackStatus.Failed, currentChannel, "Playback failed. Try another stream or retry later.");
+        mediaPlayer.TimeChanged += (_, args) =>
+        {
+            lastKnownTimeMilliseconds = args.Time;
+            PublishProgressOnUi();
+        };
+        mediaPlayer.LengthChanged += (_, args) =>
+        {
+            lastKnownLengthMilliseconds = args.Length;
+            PublishProgressOnUi();
+        };
+        mediaPlayer.PositionChanged += (_, args) =>
+        {
+            lastKnownPosition = args.Position;
+            PublishProgressOnUi();
+        };
 
         videoView.MediaPlayer = mediaPlayer;
     }
@@ -53,6 +71,9 @@ public sealed class LibVlcPlaybackEngine : PlaybackEngineBase
         cancellationToken.ThrowIfCancellationRequested();
 
         currentChannel = channel;
+        lastKnownTimeMilliseconds = -1;
+        lastKnownLengthMilliseconds = -1;
+        lastKnownPosition = -1;
         int attempt = Interlocked.Increment(ref playAttemptVersion);
         Publish(PlaybackStatus.Loading, channel, "Opening stream...");
 
@@ -119,6 +140,24 @@ public sealed class LibVlcPlaybackEngine : PlaybackEngineBase
         return Task.CompletedTask;
     }
 
+    public override Task SeekToProgressAsync(int progressPercent, CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        int clamped = Math.Clamp(progressPercent, 0, 100);
+        if (lastKnownLengthMilliseconds > 0)
+        {
+            mediaPlayer.Time = (long)Math.Round(lastKnownLengthMilliseconds * (clamped / 100d));
+        }
+        else
+        {
+            mediaPlayer.Position = clamped / 100f;
+        }
+
+        PublishProgressOnUi();
+        return Task.CompletedTask;
+    }
+
     public override ValueTask DisposeAsync()
     {
         if (disposed)
@@ -172,5 +211,24 @@ public sealed class LibVlcPlaybackEngine : PlaybackEngineBase
         }
 
         dispatcher.BeginInvoke(() => Publish(status, channel, message));
+    }
+
+    private void PublishProgressOnUi()
+    {
+        if (currentChannel is null)
+        {
+            return;
+        }
+
+        long time = lastKnownTimeMilliseconds >= 0 ? lastKnownTimeMilliseconds : mediaPlayer.Time;
+        long length = lastKnownLengthMilliseconds > 0 ? lastKnownLengthMilliseconds : mediaPlayer.Length;
+        float position = lastKnownPosition >= 0 ? lastKnownPosition : mediaPlayer.Position;
+        if (dispatcher.CheckAccess())
+        {
+            PublishProgress(currentChannel, time, length, position);
+            return;
+        }
+
+        dispatcher.BeginInvoke(() => PublishProgress(currentChannel, time, length, position));
     }
 }
