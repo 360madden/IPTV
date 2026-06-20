@@ -89,11 +89,51 @@ public sealed class PlaylistDialogService : IPlaylistDialogService
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
+    public string? PickCustomGroupCsvImportFile()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import custom group CSV",
+            Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
+    public string? PickCustomGroupCsvExportFile()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export custom group CSV",
+            Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+            DefaultExt = ".csv",
+            AddExtension = true,
+            CheckPathExists = true,
+            OverwritePrompt = true,
+            FileName = $"iptv-custom-groups-{DateTime.Now:yyyyMMdd-HHmmss}.csv"
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
     public string? PromptPlaylistUrl()
     {
         var dialog = new UrlPromptWindow
         {
             Owner = Application.Current.MainWindow
+        };
+
+        return dialog.ShowDialog() == true ? dialog.PlaylistUrl : null;
+    }
+
+    public string? PromptXmltvUrl()
+    {
+        var dialog = new UrlPromptWindow
+        {
+            Owner = Application.Current.MainWindow,
+            Title = "Import XMLTV URL"
         };
 
         return dialog.ShowDialog() == true ? dialog.PlaylistUrl : null;

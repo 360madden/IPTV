@@ -8,7 +8,9 @@ param(
     [switch]$SkipBuild,
     [switch]$RequirePlayback,
     [switch]$RequireClockOverlay,
-    [switch]$UseDialogImport
+    [switch]$UseDialogImport,
+    [switch]$ExerciseMutatingOrganization,
+    [switch]$UseRealUserProfile
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,6 +36,8 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $appProject = Join-Path $repoRoot "src\Iptv.App\Iptv.App.csproj"
 $appExe = Join-Path $repoRoot "src\Iptv.App\bin\Debug\net10.0-windows\Iptv.App.exe"
 $process = $null
+$originalLocalAppData = $env:LOCALAPPDATA
+$isolatedProfileRoot = $null
 
 function Wait-Until {
     param(
@@ -152,6 +156,22 @@ function Set-CheckboxOn {
     }
 }
 
+function Expand-Element {
+    param([System.Windows.Automation.AutomationElement]$Element)
+
+    try {
+        $pattern = $Element.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+        if ($pattern.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Collapsed) {
+            $pattern.Expand()
+            Start-Sleep -Milliseconds 250
+        }
+    }
+    catch {
+        # Some controls expose only mouse invocation. Click as a fallback.
+        Invoke-Element $Element
+    }
+}
+
 function Select-Element {
     param([System.Windows.Automation.AutomationElement]$Element)
 
@@ -210,6 +230,13 @@ function Assert-Fullscreen {
 }
 
 try {
+    if (-not $UseRealUserProfile) {
+        $isolatedProfileRoot = Join-Path ([System.IO.Path]::GetTempPath()) "iptv-gui-smoke-$([Guid]::NewGuid().ToString('N'))"
+        New-Item -ItemType Directory -Force -Path $isolatedProfileRoot | Out-Null
+        $env:LOCALAPPDATA = $isolatedProfileRoot
+        Write-Host "Using isolated LOCALAPPDATA: $isolatedProfileRoot"
+    }
+
     if (-not $SkipBuild) {
         Write-Host "Building app..."
         & dotnet build $appProject --no-restore
@@ -256,9 +283,54 @@ try {
     Wait-Until { Find-ByName $main "Smart Group Rule Mode" } $TimeoutSeconds "smart group rule mode selector" | Out-Null
     Wait-Until { Find-ByName $main "Duplicate Channel Groups" } $TimeoutSeconds "duplicate channel groups list" | Out-Null
     Wait-Until { Find-ByName $main "Parental PIN" } $TimeoutSeconds "parental PIN field" | Out-Null
+    Wait-Until { Find-ByName $main "Hidden Locked Audit" } $TimeoutSeconds "hidden locked audit list" | Out-Null
+    Wait-Until { Find-ByName $main "Import Custom Group CSV" } $TimeoutSeconds "custom group CSV import button" | Out-Null
     Wait-Until { Find-ByName $main "Source Profiles" } $TimeoutSeconds "source profiles panel" | Out-Null
     Wait-Until { Find-ByName $main "EPG Timeline" } $TimeoutSeconds "EPG timeline panel" | Out-Null
     Wait-Until { Find-ByName $main "VOD Detail Page" } $TimeoutSeconds "VOD detail page panel" | Out-Null
+    Wait-Until { Find-ByName $main "VOD Library" } $TimeoutSeconds "VOD library panel" | Out-Null
+    Wait-Until { Find-ByName $main "Fallback Streams" } $TimeoutSeconds "fallback streams panel" | Out-Null
+    Wait-Until { Find-ByName $main "Refresh Approval" } $TimeoutSeconds "refresh approval panel" | Out-Null
+    Wait-Until { Find-ByName $main "Search Benchmark" } $TimeoutSeconds "search benchmark panel" | Out-Null
+
+    Expand-Element (Wait-Until { Find-ByName $main "Source Profiles" } $TimeoutSeconds "source profiles panel")
+    Wait-Until { Find-ByName $main "XMLTV Guide URL" } $TimeoutSeconds "XMLTV guide URL field" | Out-Null
+
+    Expand-Element (Wait-Until { Find-ByName $main "EPG Timeline" } $TimeoutSeconds "EPG timeline panel")
+    Wait-Until { Find-ByName $main "EPG Timeline Window" } $TimeoutSeconds "EPG timeline window selector" | Out-Null
+
+    Expand-Element (Wait-Until { Find-ByName $main "Search Benchmark" } $TimeoutSeconds "search benchmark panel")
+    Wait-Until { Find-ByName $main "Search Benchmark Results" } $TimeoutSeconds "search benchmark results list" | Out-Null
+
+    if ($ExerciseMutatingOrganization) {
+        Write-Host "Exercising isolated PIN lock/unlock workflow..."
+        $pinBox = Wait-Until { Find-ByName $main "Parental PIN" } $TimeoutSeconds "parental PIN field"
+        Set-ElementValue $pinBox "1234"
+        Invoke-Element (Wait-Until { Find-ByName $main "Set PIN" } $TimeoutSeconds "Set PIN button")
+        Wait-Until { Find-ByNameContains $main "Parental lock: unlocked" } $TimeoutSeconds "PIN unlocked status" | Out-Null
+        Invoke-Element (Wait-Until { Find-ByName $main "Lock Now" } $TimeoutSeconds "Lock Now button")
+        Wait-Until { Find-ByNameContains $main "Parental lock: locked" } $TimeoutSeconds "PIN locked status" | Out-Null
+        Set-ElementValue $pinBox "1234"
+        Invoke-Element (Wait-Until { Find-ByName $main "Unlock" } $TimeoutSeconds "Unlock button")
+        Wait-Until { Find-ByNameContains $main "Parental lock: unlocked" } $TimeoutSeconds "PIN re-unlocked status" | Out-Null
+        Invoke-Element (Wait-Until { Find-ByName $main "Clear PIN" } $TimeoutSeconds "Clear PIN button")
+        Wait-Until { Find-ByNameContains $main "Parental lock: not configured" } $TimeoutSeconds "PIN cleared status" | Out-Null
+
+        Write-Host "Exercising duplicate-hide workflow when duplicates are available..."
+        Invoke-Element (Wait-Until { Find-ByName $main "Refresh Duplicates" } $TimeoutSeconds "Refresh Duplicates button")
+        $hideDuplicates = Wait-Until { Find-ByName $main "Hide Duplicates" } $TimeoutSeconds "Hide Duplicates button"
+        if ($hideDuplicates.Current.IsEnabled) {
+            Invoke-Element $hideDuplicates
+            Wait-Until { Find-ByNameContains $main "Hid " } $TimeoutSeconds "duplicate hide status" | Out-Null
+            $undo = Find-ByName $main "Undo Org"
+            if ($null -ne $undo -and $undo.Current.IsEnabled) {
+                Invoke-Element $undo
+            }
+        }
+        else {
+            Write-Warning "No duplicate group was available in this playlist; duplicate-hide command surface verified but mutation skipped."
+        }
+    }
 
     Write-Host "Starting playback..."
     Invoke-Element (Wait-Until { Find-ByName $main "Play" } $TimeoutSeconds "Play button")
@@ -329,6 +401,17 @@ finally {
         $process.CloseMainWindow() | Out-Null
         if (-not $process.WaitForExit(3000)) {
             Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    if (-not $UseRealUserProfile) {
+        $env:LOCALAPPDATA = $originalLocalAppData
+        if ($null -ne $isolatedProfileRoot -and (Test-Path -LiteralPath $isolatedProfileRoot)) {
+            $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
+            $resolvedProfile = [System.IO.Path]::GetFullPath($isolatedProfileRoot)
+            if ($resolvedProfile.StartsWith($tempRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+                Remove-Item -LiteralPath $resolvedProfile -Recurse -Force -ErrorAction SilentlyContinue
+            }
         }
     }
 }

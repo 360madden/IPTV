@@ -132,7 +132,8 @@ public sealed class JsonChannelOrganizationBackupService : IChannelOrganizationB
             RefreshIntervalMinutes = NormalizeRefreshInterval(preferences.RefreshIntervalMinutes),
             LockedGroups = lockedGroups,
             ParentalPinSalt = NormalizeSecret(preferences.ParentalPinSalt),
-            ParentalPinHash = NormalizeSecret(preferences.ParentalPinHash)
+            ParentalPinHash = NormalizeSecret(preferences.ParentalPinHash),
+            XmltvGuideUrl = NormalizeRemoteUrl(preferences.XmltvGuideUrl)
         };
     }
 
@@ -265,5 +266,18 @@ public sealed class JsonChannelOrganizationBackupService : IChannelOrganizationB
     private static string? NormalizeSecret(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string? NormalizeRemoteUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return Uri.TryCreate(value.Trim(), UriKind.Absolute, out Uri? uri) &&
+            uri.Scheme is "http" or "https"
+            ? uri.ToString()
+            : null;
     }
 }

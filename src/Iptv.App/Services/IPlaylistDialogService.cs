@@ -14,7 +14,13 @@ public interface IPlaylistDialogService
 
     string? PickSmartGroupPresetExportFile();
 
+    string? PickCustomGroupCsvImportFile();
+
+    string? PickCustomGroupCsvExportFile();
+
     string? PromptPlaylistUrl();
+
+    string? PromptXmltvUrl();
 
     void ShowError(string title, string message);
 }

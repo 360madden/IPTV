@@ -38,7 +38,9 @@ public sealed class JsonChannelOrganizationBackupServiceTests
                         RefreshIntervalMinutes = 120,
                         ParentalPinSalt = "salt",
                         ParentalPinHash = "hash",
-                        LockedGroups = ["Kids", "Kids", "Sports"]
+                        LockedGroups = ["Kids", "Kids", "Sports"],
+                        XmltvGuideUrl = "https://example.com/guide.xml",
+                        AutoLoadXmltvOnPlaylistImport = true
                     },
                     ChannelStates =
                     [
@@ -71,6 +73,8 @@ public sealed class JsonChannelOrganizationBackupServiceTests
             Assert.Equal("salt", imported.Preferences.ParentalPinSalt);
             Assert.Equal("hash", imported.Preferences.ParentalPinHash);
             Assert.Equal(["Kids", "Sports"], imported.Preferences.LockedGroups);
+            Assert.Equal("https://example.com/guide.xml", imported.Preferences.XmltvGuideUrl);
+            Assert.True(imported.Preferences.AutoLoadXmltvOnPlaylistImport);
             ChannelUserState state = Assert.Single(imported.ChannelStates);
             Assert.Equal(channelId, state.ChannelId);
             Assert.True(state.IsFavorite);

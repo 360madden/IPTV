@@ -17,6 +17,7 @@
     <Project Path="tests/Iptv.Search.Tests/Iptv.Search.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
+    <Project Path="tools/Iptv.SearchBench/Iptv.SearchBench.csproj" />
     <Project Path="tools/Iptv.Smoke/Iptv.Smoke.csproj" />
   </Folder>
 </Solution>

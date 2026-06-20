@@ -19,6 +19,7 @@ dotnet build .\Iptv.slnx --no-restore
 dotnet test .\Iptv.slnx --no-build
 dotnet run --project .\src\Iptv.App\Iptv.App.csproj
 dotnet run --project .\src\Iptv.App\Iptv.App.csproj -- --playlist-url https://www.apsattv.com/xumo.m3u
+dotnet run --project .\tools\Iptv.SearchBench\Iptv.SearchBench.csproj -- --count 50000
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -DryRun
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -CreateMsix
 ```
@@ -39,22 +40,28 @@ For a GUI regression pass against the public Xumo playlist:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\xumo-gui-smoke.ps1 -SkipBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\xumo-gui-smoke.ps1 -SkipBuild -ExerciseMutatingOrganization
 ```
+
+The GUI smoke uses an isolated local app-data profile by default. Add `-UseRealUserProfile` only when intentionally testing current user settings.
 
 ## Current Features
 
 - Local and remote M3U/M3U8 import.
-- Playlist refresh with added/removed/unchanged diff summary and a removable/new-channel review list.
-- XMLTV file import with channel/program counts, basic channel matching, selected-channel EPG guide preview, and a virtualized EPG timeline.
+- Playlist refresh with added/removed/unchanged diff summary, removable/new-channel review, and explicit apply/discard approval before replacing the loaded library.
+- XMLTV file or URL import with size/time limits, optional auto-load after playlist import, channel/program counts, basic channel matching, selected-channel EPG guide preview, and virtualized timeline windows for now, +2 hours, tonight, and tomorrow.
 - Search, group/category/content/VOD-year/visibility filters, sort modes, favorites, hidden channels, and custom group assignment.
 - Local channel organization persistence for favorites, hidden channels, custom groups, custom order, recently watched sorting, and VOD/series resume progress.
-- Custom group manager with counts, add, rename, delete, undo, batch actions, select-all/clear-selection, duplicate-channel hiding, advanced smart group rules/presets, and drag/drop or up/down custom ordering.
+- VOD/series library mode with a capped virtualized list, poster status, resume-first sorting, and quick selection into the player detail pane.
+- Custom group manager with counts, add, rename, delete, import/export CSV, hidden/locked audit restore actions, undo, batch actions, select-all/clear-selection, duplicate-channel hiding, advanced smart group rules/presets, and drag/drop or up/down custom ordering.
 - Import/export for channel organization backups and smart group presets without raw stream URLs.
 - Automatic per-playlist/source organization matching, editable source profile names, provider playback retry/buffer profiles, manual refresh reminders, refresh reconciliation summaries, safe channel details, selected-channel logo caching, visible-logo prefetch, view density, and large-library mode for compact 10k-result browsing.
+- Fallback stream list for same-name alternate entries plus a 50k-channel search benchmark UI/tool for large playlist checks.
 - PIN-gated group locks for hiding restricted groups until unlocked locally.
 - VOD/series detail panel with playlist-provided poster/backdrop preview and quick resume markers.
 - Stream health dashboard based on playback success/failure/buffering events.
 - Release packaging helper for publish/zip output plus optional MSIX staging, packaging, and signing via Windows SDK tools.
+- GitHub Actions workflow for Windows Release build/test/MSIX packaging, with optional PFX signing through repository secrets.
 - LibVLC playback with fullscreen toggle, volume, buffering presets, and startup timeout guidance.
 - Optional clock overlay with position, size, background, opacity, 24-hour, and seconds settings.
 - True app-managed fullscreen with video overlay clock, mini-HUD controls, auto-hide, double-click toggle, and monitor preference.

@@ -40,4 +40,8 @@ public sealed record ChannelOrganizationPreferences
     public string? ParentalPinHash { get; init; }
 
     public string[] LockedGroups { get; init; } = [];
+
+    public string? XmltvGuideUrl { get; init; }
+
+    public bool AutoLoadXmltvOnPlaylistImport { get; init; }
 }

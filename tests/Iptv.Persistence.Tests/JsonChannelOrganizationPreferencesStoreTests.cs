@@ -32,7 +32,9 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
                     RefreshIntervalMinutes = 3,
                     ParentalPinSalt = " salt ",
                     ParentalPinHash = " hash ",
-                    LockedGroups = [" Kids ", "Kids", "Sports"]
+                    LockedGroups = [" Kids ", "Kids", "Sports"],
+                    XmltvGuideUrl = " https://example.com/guide.xml?token=secret ",
+                    AutoLoadXmltvOnPlaylistImport = true
                 },
                 CancellationToken.None);
 
@@ -50,6 +52,8 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
             Assert.Equal("salt", loaded.ParentalPinSalt);
             Assert.Equal("hash", loaded.ParentalPinHash);
             Assert.Equal(["Kids", "Sports"], loaded.LockedGroups);
+            Assert.Equal("https://example.com/guide.xml?token=secret", loaded.XmltvGuideUrl);
+            Assert.True(loaded.AutoLoadXmltvOnPlaylistImport);
         }
         finally
         {
@@ -74,6 +78,8 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
             Assert.False(loaded.LargeLibraryMode);
             Assert.Equal(ChannelViewDensity.Comfortable, loaded.ChannelViewDensity);
             Assert.Equal(60, loaded.RefreshIntervalMinutes);
+            Assert.Null(loaded.XmltvGuideUrl);
+            Assert.False(loaded.AutoLoadXmltvOnPlaylistImport);
         }
         finally
         {
