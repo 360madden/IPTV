@@ -50,6 +50,40 @@ function New-LogoPng {
     }
 }
 
+function Resolve-WindowsSdkTool {
+    param([string]$ToolName)
+
+    $pathCommand = Get-Command $ToolName -ErrorAction SilentlyContinue
+    if ($pathCommand) {
+        return $pathCommand.Source
+    }
+
+    $candidateRoots = @(${env:ProgramFiles(x86)}, $env:ProgramFiles) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object { Join-Path $_ "Windows Kits\10\bin" } |
+        Where-Object { Test-Path $_ }
+
+    foreach ($root in $candidateRoots) {
+        $versionDirectories = Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue |
+            Sort-Object -Property Name -Descending
+
+        foreach ($versionDirectory in $versionDirectories) {
+            $architectureCandidates = @(
+                (Join-Path $versionDirectory.FullName "x64\$ToolName"),
+                (Join-Path $versionDirectory.FullName "x86\$ToolName")
+            )
+
+            foreach ($candidate in $architectureCandidates) {
+                if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                    return $candidate
+                }
+            }
+        }
+    }
+
+    return $null
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $repoRoot "src\Iptv.App\Iptv.App.csproj"
 $manifestTemplate = Join-Path $repoRoot "packaging\msix\AppxManifest.xml"
@@ -120,7 +154,7 @@ if (-not $CreateMsix) {
     return
 }
 
-$makeAppx = Get-Command "makeappx.exe" -ErrorAction SilentlyContinue
+$makeAppx = Resolve-WindowsSdkTool -ToolName "makeappx.exe"
 if (-not $makeAppx) {
     throw "makeappx.exe not found. Install Windows SDK tooling or omit -CreateMsix."
 }
@@ -152,13 +186,13 @@ Set-Content -LiteralPath (Join-Path $msixStageDir "AppxManifest.xml") -Value $ma
 if (Test-Path $msixPath) {
     Remove-Item -LiteralPath $msixPath -Force
 }
-& $makeAppx.Source pack /d $msixStageDir /p $msixPath /o
+& $makeAppx pack /d $msixStageDir /p $msixPath /o
 if ($LASTEXITCODE -ne 0) {
     throw "makeappx pack failed with exit code $LASTEXITCODE"
 }
 
 if (-not [string]::IsNullOrWhiteSpace($SignCertificatePath)) {
-    $signtool = Get-Command "signtool.exe" -ErrorAction SilentlyContinue
+    $signtool = Resolve-WindowsSdkTool -ToolName "signtool.exe"
     if (-not $signtool) {
         throw "signtool.exe not found. MSIX was created but not signed: $msixPath"
     }
@@ -169,7 +203,7 @@ if (-not [string]::IsNullOrWhiteSpace($SignCertificatePath)) {
     }
 
     $signArgs += $msixPath
-    & $signtool.Source @signArgs
+    & $signtool @signArgs
     if ($LASTEXITCODE -ne 0) {
         throw "signtool sign failed with exit code $LASTEXITCODE"
     }
