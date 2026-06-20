@@ -1,0 +1,38 @@
+<Window x:Class="Iptv.App.UrlPromptWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Import Playlist URL"
+        Width="520"
+        Height="190"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource AppBackgroundBrush}">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Enter a user-provided M3U/M3U8 playlist URL"
+                   FontSize="17"
+                   FontWeight="SemiBold" />
+
+        <TextBox x:Name="UrlTextBox"
+                 Grid.Row="1"
+                 Margin="0,16,0,16"
+                 MinWidth="460"
+                 Text="https://"
+                 AutomationProperties.Name="Playlist URL" />
+
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Cancel"
+                    Click="Cancel_Click" />
+            <Button Content="Import"
+                    Background="{StaticResource AccentBrush}"
+                    Click="Import_Click" />
+        </StackPanel>
+    </Grid>
+</Window>
