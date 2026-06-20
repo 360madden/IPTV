@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="LibVLCSharp.WPF" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Iptv.Core\Iptv.Core.csproj" />
+    <ProjectReference Include="..\Iptv.Epg\Iptv.Epg.csproj" />
+    <ProjectReference Include="..\Iptv.Playlists\Iptv.Playlists.csproj" />
+    <ProjectReference Include="..\Iptv.Search\Iptv.Search.csproj" />
+    <ProjectReference Include="..\Iptv.Playback\Iptv.Playback.csproj" />
+    <ProjectReference Include="..\Iptv.Persistence\Iptv.Persistence.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\assets\sample-playlists\synthetic-news-sports.m3u" Link="Samples\synthetic-news-sports.m3u" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\sample-playlists\duplicate-channels.m3u" Link="Samples\duplicate-channels.m3u" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\sample-playlists\public-vod-resume.m3u" Link="Samples\public-vod-resume.m3u" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+</Project>

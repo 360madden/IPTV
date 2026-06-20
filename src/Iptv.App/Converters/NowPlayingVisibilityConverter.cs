@@ -1,0 +1,27 @@
+using System.Globalization;
+using System.Windows;
+using System.Windows.Data;
+
+namespace Iptv.App.Converters;
+
+public sealed class NowPlayingVisibilityConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (values.Length < 2 ||
+            values[0] is not Guid channelId ||
+            values[1] is not Guid nowPlayingChannelId)
+        {
+            return Visibility.Collapsed;
+        }
+
+        return channelId == nowPlayingChannelId
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+    {
+        throw new NotSupportedException();
+    }
+}

@@ -1,0 +1,83 @@
+name: Windows MSIX
+
+on:
+  workflow_dispatch:
+    inputs:
+      packageVersion:
+        description: "MSIX package version"
+        required: false
+        default: "1.0.0.0"
+  push:
+    branches: [master, main]
+    paths:
+      - "src/**"
+      - "packaging/**"
+      - "tools/package-release.ps1"
+      - "Iptv.slnx"
+      - "Directory.*.props"
+      - "global.json"
+      - ".github/workflows/windows-msix.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package Windows Release
+    runs-on: windows-latest
+    env:
+      IPTV_MSIX_CERT_BASE64: ${{ secrets.IPTV_MSIX_CERT_BASE64 }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore .\Iptv.slnx
+
+      - name: Build
+        run: dotnet build .\Iptv.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test .\Iptv.slnx --configuration Release --no-build
+
+      - name: Decode signing certificate
+        if: ${{ env.IPTV_MSIX_CERT_BASE64 != '' }}
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\iptv-msix.pfx", [Convert]::FromBase64String($env:IPTV_MSIX_CERT_BASE64))
+
+      - name: Package MSIX
+        shell: pwsh
+        env:
+          IPTV_MSIX_CERT_PASSWORD: ${{ secrets.IPTV_MSIX_CERT_PASSWORD }}
+        run: |
+          $version = "${{ github.event.inputs.packageVersion }}"
+          if ([string]::IsNullOrWhiteSpace($version)) { $version = "1.0.0.0" }
+          $cert = "$env:RUNNER_TEMP\iptv-msix.pfx"
+          $args = @(
+            "-Configuration", "Release",
+            "-Runtime", "win-x64",
+            "-OutputRoot", ".\artifacts\release",
+            "-CreateMsix",
+            "-Version", $version
+          )
+          if (Test-Path $cert) {
+            $args += @("-SignCertificatePath", $cert)
+          }
+          & .\tools\package-release.ps1 @args
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: iptv-viewer-win-x64
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: |
+            artifacts/release/IptvViewer-win-x64.zip
+            artifacts/release/IptvViewer-win-x64.msix
