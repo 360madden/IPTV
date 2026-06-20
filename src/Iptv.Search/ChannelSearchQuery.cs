@@ -12,6 +12,8 @@ public sealed record ChannelSearchQuery
 
     public ContentKind? ContentKind { get; init; }
 
+    public int? VodYear { get; init; }
+
     public bool FavoritesOnly { get; init; }
 
     public HiddenChannelFilter HiddenFilter { get; init; } = HiddenChannelFilter.VisibleOnly;

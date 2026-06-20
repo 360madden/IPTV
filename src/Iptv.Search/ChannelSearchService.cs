@@ -35,6 +35,13 @@ public sealed class ChannelSearchService : IChannelSearchService
             filtered = filtered.Where(channel => channel.ContentKind == contentKind);
         }
 
+        if (query.VodYear is int vodYear)
+        {
+            filtered = filtered.Where(channel =>
+                channel.ContentKind is ContentKind.Vod or ContentKind.Series &&
+                ChannelMetadataExtractor.TryInferReleaseYear(channel.DisplayName) == vodYear);
+        }
+
         if (query.FavoritesOnly)
         {
             filtered = filtered.Where(channel => channel.IsFavorite);

@@ -17,7 +17,12 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
                 {
                     SortMode = ChannelSortMode.CustomOrder,
                     CustomGroups = ["Sports", "Sports", "  News  "],
-                    LargeLibraryMode = true
+                    LargeLibraryMode = true,
+                    ChannelViewDensity = ChannelViewDensity.Dense,
+                    SourceProfileNames = new Dictionary<string, string>
+                    {
+                        [" source-a "] = " Provider A "
+                    }
                 },
                 CancellationToken.None);
 
@@ -26,6 +31,8 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
             Assert.Equal(ChannelSortMode.CustomOrder, loaded.SortMode);
             Assert.Equal(["News", "Sports"], loaded.CustomGroups);
             Assert.True(loaded.LargeLibraryMode);
+            Assert.Equal(ChannelViewDensity.Dense, loaded.ChannelViewDensity);
+            Assert.Equal("Provider A", loaded.SourceProfileNames["source-a"]);
         }
         finally
         {
@@ -48,6 +55,7 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
 
             Assert.Equal(ChannelSortMode.FavoritesFirst, loaded.SortMode);
             Assert.False(loaded.LargeLibraryMode);
+            Assert.Equal(ChannelViewDensity.Comfortable, loaded.ChannelViewDensity);
         }
         finally
         {

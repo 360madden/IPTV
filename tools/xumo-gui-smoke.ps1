@@ -107,7 +107,13 @@ function Invoke-Element {
     if (-not $rect.IsEmpty -and $rect.Width -gt 0 -and $rect.Height -gt 0) {
         $x = [int]($rect.X + ($rect.Width / 2))
         $y = [int]($rect.Y + ($rect.Height / 2))
-        $Element.SetFocus()
+        try {
+            $Element.SetFocus()
+        }
+        catch {
+            # Some WPF elements report bounding rectangles but cannot receive UIA focus.
+            # Mouse invocation remains valid for visible controls.
+        }
         [NativeMouse]::SetCursorPos($x, $y) | Out-Null
         [NativeMouse]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
         [NativeMouse]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
@@ -163,9 +169,22 @@ function Get-AppWindow {
     $condition = [System.Windows.Automation.PropertyCondition]::new(
         [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
         $ProcessId)
-    return [System.Windows.Automation.AutomationElement]::RootElement.FindFirst(
+    $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
         [System.Windows.Automation.TreeScope]::Children,
         $condition)
+    $best = $null
+    $bestArea = -1
+    for ($i = 0; $i -lt $windows.Count; $i++) {
+        $candidate = $windows.Item($i)
+        $rect = $candidate.Current.BoundingRectangle
+        $area = if ($rect.IsEmpty) { 0 } else { [double]$rect.Width * [double]$rect.Height }
+        if ($area -gt $bestArea) {
+            $best = $candidate
+            $bestArea = $area
+        }
+    }
+
+    return $best
 }
 
 function Assert-Fullscreen {
@@ -247,7 +266,11 @@ try {
 
     Write-Host "Enabling and verifying clock overlay..."
     Set-CheckboxOn (Wait-Until { Find-ByName $main "Clock" } $TimeoutSeconds "Clock checkbox")
-    Wait-Until { Find-ByNameContains $main "Clock Overlay" } $TimeoutSeconds "clock overlay" | Out-Null
+    Wait-Until {
+        $main = Get-AppWindow -ProcessId $process.Id
+        if ($null -eq $main) { return $false }
+        Find-ByNameContains $main "Clock Overlay"
+    } $TimeoutSeconds "clock overlay" | Out-Null
 
     Write-Host "Entering fullscreen with F11..."
     $main.SetFocus()

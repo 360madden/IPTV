@@ -10,6 +10,10 @@ public interface IPlaylistDialogService
 
     string? PickOrganizationExportFile();
 
+    string? PickSmartGroupPresetImportFile();
+
+    string? PickSmartGroupPresetExportFile();
+
     string? PromptPlaylistUrl();
 
     void ShowError(string title, string message);

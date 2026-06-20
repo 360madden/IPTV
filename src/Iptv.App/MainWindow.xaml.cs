@@ -14,6 +14,7 @@ using Iptv.Core.Channels;
 using Iptv.Epg;
 using Iptv.Persistence;
 using Iptv.Persistence.Logos;
+using Iptv.Persistence.SmartGroups;
 using Iptv.Playback;
 using Iptv.Playlists;
 using Iptv.Search;
@@ -63,6 +64,7 @@ public partial class MainWindow : Window
         var organizationPreferencesStore = new JsonChannelOrganizationPreferencesStore();
         var organizationBackupService = new JsonChannelOrganizationBackupService();
         var logoCacheService = new LogoCacheService();
+        var smartGroupPresetFileService = new JsonSmartGroupPresetFileService();
         var uiPreferencesStore = new JsonUiPreferencesStore();
         var epgImportService = new XmltvImportService();
         var dialogService = new PlaylistDialogService();
@@ -75,6 +77,7 @@ public partial class MainWindow : Window
             organizationPreferencesStore,
             organizationBackupService,
             logoCacheService,
+            smartGroupPresetFileService,
             uiPreferencesStore,
             epgImportService,
             dialogService);

@@ -60,6 +60,35 @@ public sealed class PlaylistDialogService : IPlaylistDialogService
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
+    public string? PickSmartGroupPresetImportFile()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import smart group presets",
+            Filter = "IPTV smart group presets (*.json)|*.json|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
+    public string? PickSmartGroupPresetExportFile()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export smart group presets",
+            Filter = "IPTV smart group presets (*.json)|*.json|All files (*.*)|*.*",
+            DefaultExt = ".json",
+            AddExtension = true,
+            CheckPathExists = true,
+            OverwritePrompt = true,
+            FileName = $"iptv-smart-groups-{DateTime.Now:yyyyMMdd-HHmmss}.json"
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
     public string? PromptPlaylistUrl()
     {
         var dialog = new UrlPromptWindow

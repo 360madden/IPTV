@@ -123,6 +123,17 @@
                               Foreground="Black"
                               AutomationProperties.Name="Content Type Filter" />
 
+                    <TextBlock Text="VOD / Series Year"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="0,0,0,6" />
+                    <ComboBox ItemsSource="{Binding VodYears}"
+                              SelectedItem="{Binding SelectedVodYear}"
+                              Margin="0,0,0,14"
+                              Padding="8"
+                              Background="{StaticResource PanelAltBrush}"
+                              Foreground="Black"
+                              AutomationProperties.Name="VOD Year Filter" />
+
                     <CheckBox Content="Favorites only"
                               IsChecked="{Binding FavoritesOnly}"
                               Foreground="{StaticResource TextPrimaryBrush}"
@@ -164,6 +175,19 @@
                                Foreground="{StaticResource TextSecondaryBrush}"
                                FontSize="12"
                                Margin="0,0,0,12" />
+
+                    <TextBlock Text="View density"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="0,0,0,6" />
+                    <ComboBox ItemsSource="{Binding ChannelViewDensityOptions}"
+                              DisplayMemberPath="Label"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding SelectedChannelViewDensity}"
+                              Padding="8"
+                              Margin="0,0,0,14"
+                              Background="{StaticResource PanelAltBrush}"
+                              Foreground="Black"
+                              AutomationProperties.Name="Channel View Density" />
 
                     <Button Content="Clear Filters"
                             Command="{Binding ClearFiltersCommand}"
@@ -281,10 +305,82 @@
                                     <Button Content="Apply Rule"
                                             Command="{Binding ApplySmartGroupCommand}"
                                             Margin="0,0,8,8" />
+                                    <Button Content="Undo"
+                                            Command="{Binding UndoOrganizationActionCommand}"
+                                            Margin="0,0,8,8" />
                                 </WrapPanel>
                                 <TextBlock Text="{Binding SmartGroupPreviewText}"
                                            TextWrapping="Wrap"
-                                           Foreground="{StaticResource TextSecondaryBrush}" />
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,8" />
+                                <TextBlock Text="Preset name"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,4" />
+                                <TextBox Text="{Binding SmartGroupPresetName, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,8"
+                                         AutomationProperties.Name="Smart Group Preset Name" />
+                                <WrapPanel>
+                                    <Button Content="Save Preset"
+                                            Command="{Binding SaveSmartGroupPresetCommand}"
+                                            Margin="0,0,8,8" />
+                                    <Button Content="Use Preset"
+                                            Command="{Binding UseSmartGroupPresetCommand}"
+                                            Margin="0,0,8,8" />
+                                    <Button Content="Import Presets"
+                                            Command="{Binding ImportSmartGroupPresetsCommand}"
+                                            Margin="0,0,8,8" />
+                                    <Button Content="Export Presets"
+                                            Command="{Binding ExportSmartGroupPresetsCommand}"
+                                            Margin="0,0,8,8" />
+                                </WrapPanel>
+                                <ListBox ItemsSource="{Binding SmartGroupPresets}"
+                                         SelectedItem="{Binding SelectedSmartGroupPreset}"
+                                         MaxHeight="100"
+                                         Background="Transparent"
+                                         BorderBrush="#334056"
+                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         ScrollViewer.CanContentScroll="True"
+                                         VirtualizingPanel.IsVirtualizing="True"
+                                         AutomationProperties.Name="Smart Group Presets">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayText}"
+                                                       TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
+                    <Expander Header="Source Profiles"
+                              Foreground="{StaticResource TextPrimaryBrush}"
+                              Background="{StaticResource PanelAltBrush}"
+                              Margin="0,0,0,14"
+                              IsExpanded="False"
+                              AutomationProperties.Name="Source Profiles">
+                        <Border Background="{StaticResource PanelAltBrush}"
+                                CornerRadius="10"
+                                Padding="12"
+                                Margin="0,8,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Rename provider/source profiles without changing stream URLs or channel IDs."
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,8" />
+                                <ListBox ItemsSource="{Binding SourceProfiles}"
+                                         SelectedItem="{Binding SelectedSourceProfile}"
+                                         DisplayMemberPath="DisplayText"
+                                         MaxHeight="100"
+                                         Background="Transparent"
+                                         BorderBrush="#334056"
+                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         AutomationProperties.Name="Source Profile List" />
+                                <TextBox Text="{Binding RenameSourceProfileName, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,8,0,8"
+                                         AutomationProperties.Name="Rename Source Profile" />
+                                <Button Content="Rename Profile"
+                                        Command="{Binding RenameSourceProfileCommand}" />
                             </StackPanel>
                         </Border>
                     </Expander>
@@ -417,6 +513,30 @@
                                        Margin="0,8,0,0"
                                        TextWrapping="Wrap"
                                        Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding ConflictReviewText}"
+                                       Margin="0,8,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                            <Button Content="Clear Removed State"
+                                    Command="{Binding ClearRemovedConflictStatesCommand}"
+                                    Margin="0,8,0,0" />
+                            <ListBox ItemsSource="{Binding RefreshConflicts}"
+                                     MaxHeight="110"
+                                     Margin="0,8,0,0"
+                                     Background="Transparent"
+                                     BorderBrush="#334056"
+                                     Foreground="{StaticResource TextSecondaryBrush}"
+                                     ScrollViewer.CanContentScroll="True"
+                                     VirtualizingPanel.IsVirtualizing="True"
+                                     AutomationProperties.Name="Refresh Conflict Review">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayText}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,6" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
                             <TextBlock Text="{Binding EpgSummaryText}"
                                        Margin="0,8,0,0"
                                        TextWrapping="Wrap"
@@ -470,11 +590,11 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <DockPanel Margin="6,4,0,12">
-                        <StackPanel DockPanel.Dock="Right"
-                                    Orientation="Horizontal">
+                        <WrapPanel DockPanel.Dock="Right">
                             <Button Content="Select All Visible"
                                     Click="SelectAllVisible_Click"
                                     Padding="10,5"
@@ -483,8 +603,13 @@
                             <Button Content="Clear Selection"
                                     Click="ClearSelection_Click"
                                     Padding="10,5"
+                                    Margin="0,0,8,0"
                                     AutomationProperties.Name="Clear Channel Selection" />
-                        </StackPanel>
+                            <Button Content="Prefetch Logos"
+                                    Command="{Binding PrefetchVisibleLogosCommand}"
+                                    Padding="10,5"
+                                    AutomationProperties.Name="Prefetch Visible Logos" />
+                        </WrapPanel>
                         <TextBlock Text="Channels"
                                    FontSize="20"
                                    FontWeight="SemiBold" />
@@ -525,6 +650,14 @@
                                         <Style TargetType="Border">
                                             <Setter Property="Padding" Value="12" />
                                             <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.SelectedChannelViewDensity, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                             Value="{x:Static persistence:ChannelViewDensity.Compact}">
+                                                    <Setter Property="Padding" Value="8" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding DataContext.SelectedChannelViewDensity, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                             Value="{x:Static persistence:ChannelViewDensity.Dense}">
+                                                    <Setter Property="Padding" Value="6" />
+                                                </DataTrigger>
                                                 <DataTrigger Binding="{Binding DataContext.LargeLibraryMode, RelativeSource={RelativeSource AncestorType=Window}}"
                                                              Value="True">
                                                     <Setter Property="Padding" Value="8" />
@@ -539,9 +672,20 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel>
                                             <TextBlock Text="{Binding DisplayName}"
-                                                       FontSize="15"
                                                        FontWeight="SemiBold"
-                                                       TextTrimming="CharacterEllipsis" />
+                                                       TextTrimming="CharacterEllipsis">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="FontSize" Value="15" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding DataContext.SelectedChannelViewDensity, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                         Value="{x:Static persistence:ChannelViewDensity.Dense}">
+                                                                <Setter Property="FontSize" Value="13" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
                                             <TextBlock Text="{Binding EffectiveGroupTitle}"
                                                        Foreground="{StaticResource TextSecondaryBrush}"
                                                        FontSize="12"
@@ -554,8 +698,8 @@
                                                         <Style TargetType="TextBlock">
                                                             <Setter Property="Visibility" Value="Visible" />
                                                             <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding DataContext.LargeLibraryMode, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                             Value="True">
+                                                                <DataTrigger Binding="{Binding DataContext.SelectedChannelViewDensity, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                             Value="{x:Static persistence:ChannelViewDensity.Dense}">
                                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
@@ -629,6 +773,11 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+                    <TextBlock Grid.Row="2"
+                               Text="{Binding LogoPrefetchStatusText}"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextWrapping="Wrap"
+                               Margin="6,8,6,0" />
                 </Grid>
             </Border>
 
@@ -812,6 +961,29 @@
                                            TextWrapping="Wrap" />
                             </Border>
                         </Expander>
+                        <Expander Header="EPG guide"
+                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  Background="{StaticResource PanelAltBrush}"
+                                  Margin="0,8,0,0"
+                                  IsExpanded="False">
+                            <ListBox ItemsSource="{Binding SelectedChannelEpgPrograms}"
+                                     MaxHeight="120"
+                                     Margin="0,6,0,0"
+                                     Background="{StaticResource PanelAltBrush}"
+                                     BorderBrush="#334056"
+                                     Foreground="{StaticResource TextSecondaryBrush}"
+                                     ScrollViewer.CanContentScroll="True"
+                                     VirtualizingPanel.IsVirtualizing="True"
+                                     AutomationProperties.Name="Selected Channel EPG">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayText}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,6" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Expander>
                     </StackPanel>
 
                     <Grid x:Name="PlayerControlsPanel"
@@ -841,6 +1013,8 @@
                                     Command="{Binding MoveChannelUpCommand}" />
                             <Button Content="Down"
                                     Command="{Binding MoveChannelDownCommand}" />
+                            <Button Content="Undo Org"
+                                    Command="{Binding UndoOrganizationActionCommand}" />
                             <CheckBox Content="Clock"
                                       IsChecked="{Binding Clock.IsVisible}"
                                       VerticalAlignment="Center"
@@ -914,12 +1088,41 @@
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
                             <TextBlock Text="Diagnostics"
                                        FontWeight="SemiBold"
                                        Margin="0,0,0,8" />
-                            <ListBox Grid.Row="1"
+                            <Expander Grid.Row="1"
+                                      Header="{Binding StreamHealthSummaryText}"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Background="{StaticResource PanelAltBrush}"
+                                      IsExpanded="False"
+                                      Margin="0,0,0,8">
+                                <StackPanel>
+                                    <Button Content="Clear Stream Health"
+                                            Command="{Binding ClearStreamHealthCommand}"
+                                            HorizontalAlignment="Left"
+                                            Margin="0,0,0,8" />
+                                    <ListBox ItemsSource="{Binding StreamHealthRows}"
+                                             MaxHeight="90"
+                                             Background="Transparent"
+                                             BorderBrush="#334056"
+                                             Foreground="{StaticResource TextSecondaryBrush}"
+                                             ScrollViewer.CanContentScroll="True"
+                                             VirtualizingPanel.IsVirtualizing="True">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding DisplayText}"
+                                                           TextWrapping="Wrap"
+                                                           Margin="0,0,0,6" />
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                            </Expander>
+                            <ListBox Grid.Row="2"
                                      ItemsSource="{Binding Diagnostics}"
                                      Background="Transparent"
                                      BorderThickness="0"

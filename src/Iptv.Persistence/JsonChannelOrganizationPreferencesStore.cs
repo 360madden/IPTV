@@ -95,13 +95,18 @@ public sealed class JsonChannelOrganizationPreferencesStore : IChannelOrganizati
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        Dictionary<string, string> profileNames = NormalizeProfileNames(preferences.SourceProfileNames);
 
         return preferences with
         {
             SortMode = Enum.IsDefined(preferences.SortMode)
                 ? preferences.SortMode
                 : ChannelSortMode.FavoritesFirst,
-            CustomGroups = customGroups
+            CustomGroups = customGroups,
+            ChannelViewDensity = Enum.IsDefined(preferences.ChannelViewDensity)
+                ? preferences.ChannelViewDensity
+                : ChannelViewDensity.Comfortable,
+            SourceProfileNames = profileNames
         };
     }
 
@@ -114,5 +119,30 @@ public sealed class JsonChannelOrganizationPreferencesStore : IChannelOrganizati
 
         string normalized = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
         return normalized.Length == 0 ? null : normalized;
+    }
+
+    private static Dictionary<string, string> NormalizeProfileNames(IDictionary<string, string>? profileNames)
+    {
+        var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (profileNames is null)
+        {
+            return normalized;
+        }
+
+        foreach ((string sourceId, string profileName) in profileNames)
+        {
+            if (string.IsNullOrWhiteSpace(sourceId))
+            {
+                continue;
+            }
+
+            string? name = NormalizeCustomGroup(profileName);
+            if (name is not null)
+            {
+                normalized[sourceId.Trim()] = name;
+            }
+        }
+
+        return normalized;
     }
 }

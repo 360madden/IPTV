@@ -88,6 +88,27 @@ public sealed class ChannelSearchServiceTests
     }
 
     [Fact]
+    public void Search_FiltersVodAndSeriesByInferredYear()
+    {
+        var channels = new[]
+        {
+            CreateChannel("Movie One (2024)", "Movies", contentKind: ContentKind.Vod),
+            CreateChannel("Series One 2024", "Series", contentKind: ContentKind.Series),
+            CreateChannel("Live News 2024", "News", contentKind: ContentKind.LiveTv),
+            CreateChannel("Movie Two (2023)", "Movies", contentKind: ContentKind.Vod)
+        };
+        var service = new ChannelSearchService();
+
+        IReadOnlyList<Channel> results = service.Search(channels, new ChannelSearchQuery
+        {
+            VodYear = 2024,
+            SortMode = ChannelSortMode.PlaylistOrder
+        });
+
+        Assert.Equal(["Movie One (2024)", "Series One 2024"], results.Select(channel => channel.DisplayName));
+    }
+
+    [Fact]
     public void Search_SortsByPlaylistOrder()
     {
         var channels = new[]

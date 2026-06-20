@@ -23,7 +23,12 @@ public sealed class JsonChannelOrganizationBackupServiceTests
                     {
                         SortMode = ChannelSortMode.CustomOrder,
                         CustomGroups = ["  News  ", "News", "Sports"],
-                        LargeLibraryMode = true
+                        LargeLibraryMode = true,
+                        ChannelViewDensity = ChannelViewDensity.Compact,
+                        SourceProfileNames = new Dictionary<string, string>
+                        {
+                            ["source-a"] = "Provider A"
+                        }
                     },
                     ChannelStates =
                     [
@@ -46,6 +51,8 @@ public sealed class JsonChannelOrganizationBackupServiceTests
             Assert.Equal(ChannelSortMode.CustomOrder, imported.Preferences.SortMode);
             Assert.Equal(["News", "Sports"], imported.Preferences.CustomGroups);
             Assert.True(imported.Preferences.LargeLibraryMode);
+            Assert.Equal(ChannelViewDensity.Compact, imported.Preferences.ChannelViewDensity);
+            Assert.Equal("Provider A", imported.Preferences.SourceProfileNames["source-a"]);
             ChannelUserState state = Assert.Single(imported.ChannelStates);
             Assert.Equal(channelId, state.ChannelId);
             Assert.True(state.IsFavorite);

@@ -32,7 +32,7 @@ User playlist file or URL
 
 XMLTV files flow through `Iptv.Epg` and stay independent from playlist parsing. The app matches EPG channels by `tvg-id` or normalized channel name.
 
-Channel organization state is local-only. `Iptv.Persistence` stores favorites, hidden flags, custom group assignments, custom sort indexes, and recently watched timestamps by stable channel ID, then `Iptv.App` reapplies that state after each playlist import. Sort-mode, empty custom-group preferences, and large-library mode are stored separately so clock/UI settings cannot overwrite organization choices. Organization backup files contain stable channel IDs and user organization metadata only, not raw stream URLs. Logo caching is selected-channel only, size-limited, and failure-isolated.
+Channel organization state is local-only. `Iptv.Persistence` stores favorites, hidden flags, custom group assignments, custom sort indexes, and recently watched timestamps by stable channel ID, then `Iptv.App` reapplies that state after each playlist import. Sort-mode, empty custom-group preferences, source profile names, view density, and large-library mode are stored separately so clock/UI settings cannot overwrite organization choices. Organization backup files contain stable channel IDs and user organization metadata only, not raw stream URLs. Smart group preset files store only rule text and destination group names. Logo caching is selected-channel or explicit visible-prefetch only, size-limited, throttled, and failure-isolated.
 
 ## Privacy Boundary
 
@@ -48,5 +48,8 @@ Raw stream URLs are represented with `SensitiveUri`. Its `ToString()` returns a 
 - Apply batch channel updates with hash-set selection lookups and one persistence write per action.
 - Keep organization operations source-profile-safe by matching saved state through stable channel IDs and reporting refresh reconciliation counts.
 - Use large-library mode to cap visible results to 10,000 compact rows when browsing 50k+ channel/VOD catalogs.
+- Keep logo prefetch explicit and bounded; do not auto-download every provider logo on import.
+- Track stream health from playback events rather than probing every stream automatically.
 - Keep playback backend details isolated from view models.
 - Use `tools/Iptv.Smoke` for safe URL import/probe checks before GUI testing.
+- Use `tools/package-release.ps1` for repeatable publish/zip output; signed MSIX packaging requires Windows SDK tooling and signing material.
