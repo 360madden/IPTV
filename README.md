@@ -19,12 +19,14 @@ dotnet build .\Iptv.slnx --no-restore
 dotnet test .\Iptv.slnx --no-build
 dotnet run --project .\src\Iptv.App\Iptv.App.csproj
 dotnet run --project .\src\Iptv.App\Iptv.App.csproj -- --playlist-url https://www.apsattv.com/xumo.m3u
+.\launch-iptv.cmd
+.\launch-iptv.cmd https://www.apsattv.com/xumo.m3u
 dotnet run --project .\tools\Iptv.SearchBench\Iptv.SearchBench.csproj -- --count 50000
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -DryRun
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -CreateMsix
 ```
 
-Use **Load Sample** in the app to verify import/search/playback plumbing before importing a private playlist.
+Use **Load Sample** in the app to verify import/search/playback plumbing before importing a private playlist. On Windows, `launch-iptv.cmd` starts the WPF app from the repository root and forwards advanced arguments unchanged; a single `http://` or `https://` argument is treated as `--playlist-url`.
 
 ## Live Playlist Smoke Test
 
