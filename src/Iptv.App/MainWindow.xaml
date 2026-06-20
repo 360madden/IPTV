@@ -1,6 +1,7 @@
 <Window x:Class="Iptv.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:persistence="clr-namespace:Iptv.Persistence;assembly=Iptv.Persistence"
         xmlns:vlc="clr-namespace:LibVLCSharp.WPF;assembly=LibVLCSharp.WPF"
         Title="IPTV Viewer"
         Height="820"
@@ -69,7 +70,9 @@
                     CornerRadius="14"
                     Padding="18"
                     Margin="0,0,14,0">
-                <StackPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
                     <TextBlock Text="Library"
                                FontSize="20"
                                FontWeight="SemiBold"
@@ -80,7 +83,8 @@
                                Margin="0,0,0,6" />
                     <TextBox x:Name="SearchBox"
                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,0,14" />
+                             Margin="0,0,0,14"
+                             AutomationProperties.Name="Channel Search" />
 
                     <TextBlock Text="Group"
                                Foreground="{StaticResource TextSecondaryBrush}"
@@ -110,6 +114,99 @@
                     <Button Content="Clear Filters"
                             Command="{Binding ClearFiltersCommand}"
                             Margin="0,0,0,18" />
+
+                    <Expander Header="UI Settings"
+                              Foreground="{StaticResource TextPrimaryBrush}"
+                              Background="{StaticResource PanelAltBrush}"
+                              Margin="0,0,0,14"
+                              IsExpanded="False"
+                              AutomationProperties.Name="UI Settings">
+                        <Border Background="{StaticResource PanelAltBrush}"
+                                CornerRadius="10"
+                                Padding="12"
+                                Margin="0,8,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Clock overlay"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,8" />
+                                <CheckBox Content="Show clock"
+                                          IsChecked="{Binding Clock.IsVisible}"
+                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Margin="0,0,0,6"
+                                          AutomationProperties.Name="Show Clock" />
+                                <CheckBox Content="Use 24-hour time"
+                                          IsChecked="{Binding Clock.Use24HourClock}"
+                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Margin="0,0,0,6"
+                                          AutomationProperties.Name="Use 24 Hour Clock" />
+                                <CheckBox Content="Show seconds"
+                                          IsChecked="{Binding Clock.ShowSeconds}"
+                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Margin="0,0,0,12"
+                                          AutomationProperties.Name="Show Clock Seconds" />
+
+                                <TextBlock Text="Position"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,4" />
+                                <ComboBox ItemsSource="{Binding Clock.PositionOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding Clock.Position}"
+                                          Padding="6"
+                                          Margin="0,0,0,10"
+                                          Foreground="Black"
+                                          AutomationProperties.Name="Clock Position" />
+
+                                <TextBlock Text="Size"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,4" />
+                                <ComboBox ItemsSource="{Binding Clock.SizeOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding Clock.Size}"
+                                          Padding="6"
+                                          Margin="0,0,0,10"
+                                          Foreground="Black"
+                                          AutomationProperties.Name="Clock Size" />
+
+                                <DockPanel Margin="0,0,0,4">
+                                    <TextBlock Text="Opacity"
+                                               DockPanel.Dock="Left"
+                                               Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock Text="{Binding Clock.OverlayOpacityPercent}"
+                                               DockPanel.Dock="Right"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               HorizontalAlignment="Right" />
+                                </DockPanel>
+                                <Slider Minimum="0.35"
+                                        Maximum="1"
+                                        TickFrequency="0.05"
+                                        Value="{Binding Clock.OverlayOpacity, UpdateSourceTrigger=PropertyChanged, Delay=200}"
+                                        Margin="0,0,0,12"
+                                        AutomationProperties.Name="Clock Opacity" />
+
+                                <TextBlock Text="Fullscreen"
+                                           FontWeight="SemiBold"
+                                           Margin="0,2,0,8" />
+                                <CheckBox Content="Auto-hide fullscreen controls"
+                                          IsChecked="{Binding Clock.AutoHideFullscreenControls}"
+                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Margin="0,0,0,8"
+                                          AutomationProperties.Name="Auto Hide Fullscreen Controls" />
+
+                                <TextBlock Text="Monitor"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,4" />
+                                <ComboBox ItemsSource="{Binding Clock.FullscreenMonitorOptions}"
+                                          DisplayMemberPath="DisplayName"
+                                          SelectedValuePath="Index"
+                                          SelectedValue="{Binding Clock.FullscreenMonitorIndex}"
+                                          Padding="6"
+                                          Foreground="Black"
+                                          AutomationProperties.Name="Fullscreen Monitor" />
+                            </StackPanel>
+                        </Border>
+                    </Expander>
 
                     <Border Background="{StaticResource PanelAltBrush}"
                             CornerRadius="10"
@@ -165,7 +262,8 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
             </Border>
 
             <Border x:Name="ChannelsPanel"
@@ -281,24 +379,100 @@
                             CornerRadius="12"
                             ClipToBounds="True">
                         <vlc:VideoView x:Name="PlayerView">
-                            <Grid Background="#01000000"
-                                  IsHitTestVisible="False">
-                                <Border HorizontalAlignment="Right"
-                                        VerticalAlignment="Top"
-                                        Margin="0,20,22,0"
-                                        Padding="16,8"
+                            <Grid x:Name="PlayerOverlayGrid"
+                                  Background="#01000000"
+                                  MouseLeftButtonDown="PlayerOverlay_MouseLeftButtonDown"
+                                  MouseMove="PlayerOverlay_MouseMove">
+                                <Border Padding="{Binding Clock.OverlayPadding}"
                                         Background="#B0000000"
                                         BorderBrush="#55FFFFFF"
                                         BorderThickness="1"
-                                        CornerRadius="16"
+                                        CornerRadius="{Binding Clock.OverlayCornerRadius}"
+                                        IsHitTestVisible="False"
+                                        Opacity="{Binding Clock.OverlayOpacity}"
                                         Visibility="{Binding Clock.IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                         AutomationProperties.Name="Clock Overlay">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="HorizontalAlignment" Value="Right" />
+                                            <Setter Property="VerticalAlignment" Value="Top" />
+                                            <Setter Property="Margin" Value="22,22,22,22" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Clock.Position}" Value="{x:Static persistence:ClockOverlayPosition.TopLeft}">
+                                                    <Setter Property="HorizontalAlignment" Value="Left" />
+                                                    <Setter Property="VerticalAlignment" Value="Top" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Clock.Position}" Value="{x:Static persistence:ClockOverlayPosition.BottomRight}">
+                                                    <Setter Property="HorizontalAlignment" Value="Right" />
+                                                    <Setter Property="VerticalAlignment" Value="Bottom" />
+                                                    <Setter Property="Margin" Value="22,22,22,118" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Clock.Position}" Value="{x:Static persistence:ClockOverlayPosition.BottomLeft}">
+                                                    <Setter Property="HorizontalAlignment" Value="Left" />
+                                                    <Setter Property="VerticalAlignment" Value="Bottom" />
+                                                    <Setter Property="Margin" Value="22,22,22,118" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
                                     <TextBlock Text="{Binding Clock.CurrentTime}"
-                                               FontSize="26"
+                                               AutomationProperties.Name="{Binding Clock.CurrentTime, StringFormat=Clock Overlay {0}}"
+                                               FontSize="{Binding Clock.FontSize}"
                                                FontWeight="SemiBold"
                                                Foreground="#FFFFFFFF"
                                                TextOptions.TextFormattingMode="Display"
                                                TextOptions.TextRenderingMode="ClearType" />
+                                </Border>
+
+                                <Border x:Name="FullscreenHudOverlay"
+                                        VerticalAlignment="Bottom"
+                                        HorizontalAlignment="Center"
+                                        MaxWidth="860"
+                                        Margin="24,0,24,28"
+                                        Padding="18,14"
+                                        Background="#D40A0E14"
+                                        BorderBrush="#334EA7FF"
+                                        BorderThickness="1"
+                                        CornerRadius="18"
+                                        Visibility="Collapsed"
+                                        AutomationProperties.Name="Fullscreen Mini HUD">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding SelectedChannel.DisplayName, FallbackValue=No channel selected}"
+                                                       FontSize="18"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding PlaybackStatusText}"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       FontSize="12"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Margin="0,4,0,0" />
+                                            <TextBlock Text="F11 or double-click exits fullscreen · Esc restores window"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       FontSize="11"
+                                                       Margin="0,6,0,0" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal"
+                                                    VerticalAlignment="Center"
+                                                    Margin="18,0,0,0">
+                                            <Button Content="Play"
+                                                    Command="{Binding PlaySelectedCommand}" />
+                                            <Button Content="Pause"
+                                                    Command="{Binding PauseCommand}" />
+                                            <Button Content="Stop"
+                                                    Command="{Binding StopCommand}" />
+                                            <Button Content="Exit"
+                                                    Click="FullscreenExit_Click"
+                                                    Background="{StaticResource AccentBrush}" />
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
                             </Grid>
                         </vlc:VideoView>
@@ -345,6 +519,11 @@
                                       Margin="6,0,10,0" />
                             <CheckBox Content="24h"
                                       IsChecked="{Binding Clock.Use24HourClock}"
+                                      VerticalAlignment="Center"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Margin="0,0,10,0" />
+                            <CheckBox Content="Sec"
+                                      IsChecked="{Binding Clock.ShowSeconds}"
                                       VerticalAlignment="Center"
                                       Foreground="{StaticResource TextPrimaryBrush}"
                                       Margin="0,0,10,0" />

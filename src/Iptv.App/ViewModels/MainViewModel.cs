@@ -268,6 +268,18 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    public async Task ImportPlaylistUrlAsync(string playlistUrl)
+    {
+        if (string.IsNullOrWhiteSpace(playlistUrl))
+        {
+            return;
+        }
+
+        Func<CancellationToken, Task<PlaylistImportResult>> import =
+            ct => playlistImportService.ImportUrlAsync(playlistUrl.Trim(), ct);
+        await ImportAsync(import, rememberForRefresh: true).ConfigureAwait(true);
+    }
+
     public async ValueTask DisposeAsync()
     {
         shutdownCts.Cancel();
@@ -317,8 +329,7 @@ public sealed class MainViewModel : ObservableObject
                 return;
             }
 
-            Func<CancellationToken, Task<PlaylistImportResult>> import = ct => playlistImportService.ImportUrlAsync(url, ct);
-            await ImportAsync(import, rememberForRefresh: true).ConfigureAwait(true);
+            await ImportPlaylistUrlAsync(url).ConfigureAwait(true);
         }
         catch (Exception ex)
         {

@@ -22,7 +22,8 @@
                  Grid.Row="1"
                  Margin="0,16,0,16"
                  MinWidth="460"
-                 Text="https://" />
+                 Text="https://"
+                 AutomationProperties.Name="Playlist URL" />
 
         <StackPanel Grid.Row="2"
                     Orientation="Horizontal"

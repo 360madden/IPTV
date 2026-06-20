@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -5,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Iptv.App.Playback;
 using Iptv.App.Services;
 using Iptv.App.ViewModels;
@@ -19,12 +21,15 @@ namespace Iptv.App;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel viewModel;
+    private readonly DispatcherTimer fullscreenControlsHideTimer;
+    private readonly string? startupPlaylistUrl;
     private WindowState previousWindowState;
     private WindowStyle previousWindowStyle;
     private ResizeMode previousResizeMode;
     private Rect previousWindowBounds;
     private double previousMinHeight;
     private double previousMinWidth;
+    private bool previousTopmost;
     private Thickness previousMainContentMargin;
     private Thickness previousPlayerPanelMargin;
     private Thickness previousPlayerPanelPadding;
@@ -42,8 +47,9 @@ public partial class MainWindow : Window
     private int previousPlayerPanelColumnSpan;
     private bool isFullscreen;
 
-    public MainWindow()
+    public MainWindow(string? startupPlaylistUrl = null)
     {
+        this.startupPlaylistUrl = string.IsNullOrWhiteSpace(startupPlaylistUrl) ? null : startupPlaylistUrl.Trim();
         InitializeComponent();
 
         var parser = new M3uPlaylistParser();
@@ -65,7 +71,14 @@ public partial class MainWindow : Window
             dialogService);
         DataContext = viewModel;
 
-        Loaded += async (_, _) => await viewModel.InitializeAsync().ConfigureAwait(true);
+        fullscreenControlsHideTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromSeconds(3)
+        };
+        fullscreenControlsHideTimer.Tick += (_, _) => HideFullscreenHudIfAutoHide();
+        viewModel.Clock.PropertyChanged += Clock_PropertyChanged;
+
+        Loaded += Window_Loaded;
     }
 
     private IPlaybackEngine CreatePlaybackEngine()
@@ -96,12 +109,34 @@ public partial class MainWindow : Window
 
     private async void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        fullscreenControlsHideTimer.Stop();
+        viewModel.Clock.PropertyChanged -= Clock_PropertyChanged;
         await viewModel.DisposeAsync().ConfigureAwait(true);
     }
 
     private void Fullscreen_Click(object sender, RoutedEventArgs e)
     {
         ToggleFullscreen();
+    }
+
+    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        viewModel.Clock.SetMonitorOptions(MonitorBounds.GetMonitorOptions(this));
+        await viewModel.InitializeAsync().ConfigureAwait(true);
+        viewModel.Clock.SetMonitorOptions(MonitorBounds.GetMonitorOptions(this));
+
+        if (startupPlaylistUrl is not null)
+        {
+            await viewModel.ImportPlaylistUrlAsync(startupPlaylistUrl).ConfigureAwait(true);
+        }
+    }
+
+    private void Clock_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ClockOverlayViewModel.AutoHideFullscreenControls) && isFullscreen)
+        {
+            ShowFullscreenHud();
+        }
     }
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -197,6 +232,7 @@ public partial class MainWindow : Window
             : new Rect(Left, Top, Width, Height);
         previousMinHeight = MinHeight;
         previousMinWidth = MinWidth;
+        previousTopmost = Topmost;
         SaveLayoutState();
 
         WindowStyle = WindowStyle.None;
@@ -204,7 +240,7 @@ public partial class MainWindow : Window
         MinHeight = 0;
         MinWidth = 0;
         WindowState = WindowState.Normal;
-        Rect monitorBounds = MonitorBounds.GetForWindow(this);
+        Rect monitorBounds = MonitorBounds.GetForPreference(this, viewModel.Clock.FullscreenMonitorIndex);
         Left = monitorBounds.Left;
         Top = monitorBounds.Top;
         Width = monitorBounds.Width;
@@ -212,6 +248,7 @@ public partial class MainWindow : Window
         Topmost = true;
         ApplyVideoFullscreenLayout();
         isFullscreen = true;
+        ShowFullscreenHud();
         Activate();
     }
 
@@ -223,7 +260,9 @@ public partial class MainWindow : Window
         }
 
         RestoreLayoutState();
-        Topmost = false;
+        fullscreenControlsHideTimer.Stop();
+        FullscreenHudOverlay.Visibility = Visibility.Collapsed;
+        Topmost = previousTopmost;
         WindowStyle = previousWindowStyle;
         ResizeMode = previousResizeMode;
         MinHeight = previousMinHeight;
@@ -266,6 +305,7 @@ public partial class MainWindow : Window
         PlayerDetailsPanel.Visibility = Visibility.Collapsed;
         PlayerControlsPanel.Visibility = Visibility.Collapsed;
         DiagnosticsPanel.Visibility = Visibility.Collapsed;
+        FullscreenHudOverlay.Visibility = Visibility.Visible;
 
         RootGrid.Background = Brushes.Black;
         MainContentGrid.Margin = new Thickness(0);
@@ -295,6 +335,7 @@ public partial class MainWindow : Window
         PlayerDetailsPanel.Visibility = Visibility.Visible;
         PlayerControlsPanel.Visibility = Visibility.Visible;
         DiagnosticsPanel.Visibility = Visibility.Visible;
+        FullscreenHudOverlay.Visibility = Visibility.Collapsed;
 
         RootGrid.Background = previousRootBackground;
         MainContentGrid.Margin = previousMainContentMargin;
@@ -315,6 +356,61 @@ public partial class MainWindow : Window
         PlayerDiagnosticsRow.Height = previousPlayerDiagnosticsRowHeight;
     }
 
+    private void FullscreenExit_Click(object sender, RoutedEventArgs e)
+    {
+        ExitFullscreen();
+        e.Handled = true;
+    }
+
+    private void PlayerOverlay_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (isFullscreen)
+        {
+            ShowFullscreenHud();
+        }
+    }
+
+    private void PlayerOverlay_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount < 2)
+        {
+            return;
+        }
+
+        if (IsEventFromInteractiveElement(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
+        ToggleFullscreen();
+        e.Handled = true;
+    }
+
+    private void ShowFullscreenHud()
+    {
+        if (!isFullscreen)
+        {
+            FullscreenHudOverlay.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        FullscreenHudOverlay.Visibility = Visibility.Visible;
+        fullscreenControlsHideTimer.Stop();
+        if (viewModel.Clock.AutoHideFullscreenControls)
+        {
+            fullscreenControlsHideTimer.Start();
+        }
+    }
+
+    private void HideFullscreenHudIfAutoHide()
+    {
+        fullscreenControlsHideTimer.Stop();
+        if (isFullscreen && viewModel.Clock.AutoHideFullscreenControls)
+        {
+            FullscreenHudOverlay.Visibility = Visibility.Collapsed;
+        }
+    }
+
     private static bool TryExecute(ICommand command)
     {
         if (!command.CanExecute(null))
@@ -332,6 +428,22 @@ public partial class MainWindow : Window
         while (current is not null)
         {
             if (current is T)
+            {
+                return true;
+            }
+
+            current = GetElementParent(current);
+        }
+
+        return false;
+    }
+
+    private static bool IsEventFromInteractiveElement(DependencyObject? source)
+    {
+        DependencyObject? current = source;
+        while (current is not null)
+        {
+            if (current is ButtonBase or TextBoxBase or PasswordBox or ComboBox or ComboBoxItem or Slider or Thumb)
             {
                 return true;
             }
@@ -369,6 +481,43 @@ public partial class MainWindow : Window
     private static class MonitorBounds
     {
         private const int MonitorDefaultToNearest = 2;
+        private const uint MonitorInfoPrimary = 1;
+
+        public static IReadOnlyList<FullscreenMonitorOption> GetMonitorOptions(Window window)
+        {
+            List<FullscreenMonitorOption> options = [new(-1, "Current window monitor")];
+            List<MonitorRecord> monitors = EnumerateMonitors();
+            for (int index = 0; index < monitors.Count; index++)
+            {
+                MonitorRecord monitor = monitors[index];
+                string primary = monitor.IsPrimary ? " · Primary" : string.Empty;
+                options.Add(new FullscreenMonitorOption(
+                    index,
+                    $"Monitor {index + 1}{primary} · {monitor.Bounds.Width:0}x{monitor.Bounds.Height:0}"));
+            }
+
+            if (options.Count == 1)
+            {
+                Rect current = GetForWindow(window);
+                options.Add(new FullscreenMonitorOption(0, $"Primary monitor · {current.Width:0}x{current.Height:0}"));
+            }
+
+            return options;
+        }
+
+        public static Rect GetForPreference(Window window, int monitorIndex)
+        {
+            if (monitorIndex >= 0)
+            {
+                List<MonitorRecord> monitors = EnumerateMonitors();
+                if (monitorIndex < monitors.Count)
+                {
+                    return monitors[monitorIndex].Bounds;
+                }
+            }
+
+            return GetForWindow(window);
+        }
 
         public static Rect GetForWindow(Window window)
         {
@@ -389,11 +538,64 @@ public partial class MainWindow : Window
             return new Rect(0, 0, SystemParameters.PrimaryScreenWidth, SystemParameters.PrimaryScreenHeight);
         }
 
+        private static List<MonitorRecord> EnumerateMonitors()
+        {
+            List<MonitorRecord> monitors = [];
+            MonitorEnumProc callback = (IntPtr monitor, IntPtr hdcMonitor, ref NativeRect monitorRect, IntPtr data) =>
+            {
+                var monitorInfo = new MonitorInfo
+                {
+                    Size = Marshal.SizeOf<MonitorInfo>()
+                };
+
+                if (monitor != IntPtr.Zero && GetMonitorInfo(monitor, ref monitorInfo))
+                {
+                    monitors.Add(new MonitorRecord(
+                        ToRect(monitorInfo.Monitor),
+                        (monitorInfo.Flags & MonitorInfoPrimary) == MonitorInfoPrimary));
+                }
+
+                return true;
+            };
+
+            if (!EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, callback, IntPtr.Zero) || monitors.Count == 0)
+            {
+                monitors.Clear();
+                monitors.Add(new MonitorRecord(
+                    new Rect(0, 0, SystemParameters.PrimaryScreenWidth, SystemParameters.PrimaryScreenHeight),
+                    true));
+            }
+
+            return monitors
+                .OrderByDescending(monitor => monitor.IsPrimary)
+                .ThenBy(monitor => monitor.Bounds.Left)
+                .ThenBy(monitor => monitor.Bounds.Top)
+                .ToList();
+        }
+
+        private static Rect ToRect(NativeRect nativeRect)
+        {
+            int width = nativeRect.Right - nativeRect.Left;
+            int height = nativeRect.Bottom - nativeRect.Top;
+            return new Rect(nativeRect.Left, nativeRect.Top, width, height);
+        }
+
         [DllImport("user32.dll")]
         private static extern IntPtr MonitorFromWindow(IntPtr hwnd, int dwFlags);
 
+        [DllImport("user32.dll")]
+        private static extern bool EnumDisplayMonitors(
+            IntPtr hdc,
+            IntPtr lprcClip,
+            MonitorEnumProc lpfnEnum,
+            IntPtr dwData);
+
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MonitorInfo lpmi);
+
+        private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref NativeRect lprcMonitor, IntPtr dwData);
+
+        private sealed record MonitorRecord(Rect Bounds, bool IsPrimary);
 
         [StructLayout(LayoutKind.Sequential)]
         private struct MonitorInfo

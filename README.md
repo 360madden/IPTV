@@ -18,6 +18,7 @@ dotnet restore .\Iptv.slnx
 dotnet build .\Iptv.slnx --no-restore
 dotnet test .\Iptv.slnx --no-build
 dotnet run --project .\src\Iptv.App\Iptv.App.csproj
+dotnet run --project .\src\Iptv.App\Iptv.App.csproj -- --playlist-url https://www.apsattv.com/xumo.m3u
 ```
 
 Use **Load Sample** in the app to verify import/search/playback plumbing before importing a private playlist.
@@ -32,6 +33,12 @@ dotnet run --project .\tools\Iptv.Smoke\Iptv.Smoke.csproj -- --url https://www.a
 
 The smoke tool imports the playlist, prints a safe summary, and probes a limited number of streams with dummy audio/video output. It reports channel name, group, host, and probe status without printing full stream URLs.
 
+For a GUI regression pass against the public Xumo playlist:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\xumo-gui-smoke.ps1 -SkipBuild
+```
+
 ## Current Features
 
 - Local and remote M3U/M3U8 import.
@@ -39,7 +46,8 @@ The smoke tool imports the playlist, prints a safe summary, and probes a limited
 - XMLTV file import with channel/program counts and basic channel matching.
 - Search, group/category filters, favorites, and local favorite persistence.
 - LibVLC playback with fullscreen toggle, volume, buffering presets, and startup timeout guidance.
-- Optional clock overlay that remains visible in app-managed video fullscreen.
+- Optional clock overlay with position, size, opacity, 24-hour, and seconds settings.
+- True app-managed fullscreen with video overlay clock, mini-HUD controls, auto-hide, double-click toggle, and monitor preference.
 - Keyboard shortcuts: `Ctrl+F` search, `Ctrl+L` import URL, `Ctrl+O` import file, `Ctrl+R` refresh, `Space` play, `P` pause, `S` stop, `C` clock, `F`/`F11` fullscreen, `Esc` exit fullscreen.
 - Redacted diagnostics panel for import/playback events.
 
