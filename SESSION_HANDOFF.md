@@ -40,8 +40,12 @@ Launcher slice validation on 2026-06-20 passed:
 
 - No private playlists or credentials should be committed.
 - `AGENTS.md` exists but is stale relative to the current app; do not overwrite unless explicitly requested.
-- Check `git remote -v` before push; if no remote exists, push is blocked until an `origin` URL is configured.
+- GitHub `origin` is configured as `https://github.com/360madden/IPTV.git` on the integration branch.
 
+
+## GitHub Setup Update
+
+GitHub repository `360madden/IPTV` already existed with unrelated `main` history containing an old `README.md` and `ph.m3u`. Setup was handled safely by creating branch `codex/github-setup` from `origin/main`, merging the local app history with `--allow-unrelated-histories`, resolving `README.md` in favor of the current app README, and removing `ph.m3u` from the integration branch so the app repository remains content-neutral. Remote `main` was not force-pushed or overwritten.
 ## Best Next Resume Step
 
-Start with `git status --short --branch`, then verify whether this handoff/launcher commit is present and whether a remote has been configured. If continuing feature work, prioritize real VOD resume validation and duplicate-fixture GUI automation.
+Start with `git status --short --branch`, then verify whether branch `codex/github-setup` and its draft PR are still current. If continuing feature work, prioritize real VOD resume validation and duplicate-fixture GUI automation.
