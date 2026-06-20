@@ -39,7 +39,8 @@ The smoke tool imports the playlist, prints a safe summary, and probes a limited
 - XMLTV file import with channel/program counts and basic channel matching.
 - Search, group/category filters, favorites, and local favorite persistence.
 - LibVLC playback with fullscreen toggle, volume, buffering presets, and startup timeout guidance.
-- Keyboard shortcuts: `Ctrl+F` search, `Ctrl+L` import URL, `Ctrl+O` import file, `Ctrl+R` refresh, `Space` play, `P` pause, `S` stop, `F`/`F11` fullscreen, `Esc` exit fullscreen.
+- Optional clock overlay that remains visible in app-managed video fullscreen.
+- Keyboard shortcuts: `Ctrl+F` search, `Ctrl+L` import URL, `Ctrl+O` import file, `Ctrl+R` refresh, `Space` play, `P` pause, `S` stop, `C` clock, `F`/`F11` fullscreen, `Esc` exit fullscreen.
 - Redacted diagnostics panel for import/playback events.
 
 ## Privacy Policy for Development

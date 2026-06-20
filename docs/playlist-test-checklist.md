@@ -7,13 +7,15 @@ Use this checklist before trying a private playlist.
 3. Search for `news` and confirm the list filters without freezing.
 4. Select a channel and click **Play**.
 5. Confirm the selected channel shows a **NOW** badge while loading/playing.
-6. Try shortcuts: `Space` play, `P` pause, `S` stop, `F11` fullscreen, and `Esc` exit fullscreen.
-7. If playback does not start, confirm the app shows a clear timeout/failure message.
-8. Click **Import File** and select a user-provided `.m3u` or `.m3u8`.
-9. Confirm the import summary shows channel, warning, duplicate, and error counts.
-10. Search/filter by group/category.
-11. Mark a channel as favorite, close the app, reopen, and re-import the same playlist to confirm the favorite reappears.
-12. Confirm normal UI does not show full tokenized stream URLs.
+6. Enable **Clock**, then confirm the time appears over the video.
+7. Try shortcuts: `Space` play, `P` pause, `S` stop, `C` clock, `F11` fullscreen, and `Esc` exit fullscreen.
+8. Confirm fullscreen is video-only and the clock remains visible over the video.
+9. If playback does not start, confirm the app shows a clear timeout/failure message.
+10. Click **Import File** and select a user-provided `.m3u` or `.m3u8`.
+11. Confirm the import summary shows channel, warning, duplicate, and error counts.
+12. Search/filter by group/category.
+13. Mark a channel as favorite, close the app, reopen, and re-import the same playlist to confirm the favorite reappears.
+14. Confirm normal UI does not show full tokenized stream URLs.
 
 Optional public smoke command:
 

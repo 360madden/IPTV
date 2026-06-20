@@ -10,14 +10,15 @@
         Background="{StaticResource AppBackgroundBrush}"
         PreviewKeyDown="Window_PreviewKeyDown"
         Closing="Window_Closing">
-    <Grid>
+    <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="72" />
             <RowDefinition Height="*" />
             <RowDefinition Height="34" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0"
+        <Border x:Name="HeaderBar"
+                Grid.Row="0"
                 Background="{StaticResource PanelBrush}"
                 BorderBrush="#283243"
                 BorderThickness="0,0,0,1">
@@ -54,7 +55,8 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="1"
+        <Grid x:Name="MainContentGrid"
+              Grid.Row="1"
               Margin="18">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="260" />
@@ -62,7 +64,8 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Background="{StaticResource PanelBrush}"
+            <Border x:Name="LibraryPanel"
+                    Background="{StaticResource PanelBrush}"
                     CornerRadius="14"
                     Padding="18"
                     Margin="0,0,14,0">
@@ -165,7 +168,8 @@
                 </StackPanel>
             </Border>
 
-            <Border Grid.Column="1"
+            <Border x:Name="ChannelsPanel"
+                    Grid.Column="1"
                     Background="{StaticResource PanelBrush}"
                     CornerRadius="14"
                     Padding="12"
@@ -255,25 +259,53 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="2"
+            <Border x:Name="PlayerPanel"
+                    Grid.Column="2"
                     Background="{StaticResource PanelBrush}"
                     CornerRadius="14"
                     Padding="16">
-                <Grid>
+                <Grid x:Name="PlayerContentGrid">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="170" />
+                        <RowDefinition x:Name="PlayerVideoRow"
+                                       Height="*" />
+                        <RowDefinition x:Name="PlayerDetailsRow"
+                                       Height="Auto" />
+                        <RowDefinition x:Name="PlayerControlsRow"
+                                       Height="Auto" />
+                        <RowDefinition x:Name="PlayerDiagnosticsRow"
+                                       Height="170" />
                     </Grid.RowDefinitions>
 
-                    <Border Background="#050607"
+                    <Border x:Name="PlayerVideoHost"
+                            Background="#050607"
                             CornerRadius="12"
                             ClipToBounds="True">
-                        <vlc:VideoView x:Name="PlayerView" />
+                        <vlc:VideoView x:Name="PlayerView">
+                            <Grid Background="#01000000"
+                                  IsHitTestVisible="False">
+                                <Border HorizontalAlignment="Right"
+                                        VerticalAlignment="Top"
+                                        Margin="0,20,22,0"
+                                        Padding="16,8"
+                                        Background="#B0000000"
+                                        BorderBrush="#55FFFFFF"
+                                        BorderThickness="1"
+                                        CornerRadius="16"
+                                        Visibility="{Binding Clock.IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        AutomationProperties.Name="Clock Overlay">
+                                    <TextBlock Text="{Binding Clock.CurrentTime}"
+                                               FontSize="26"
+                                               FontWeight="SemiBold"
+                                               Foreground="#FFFFFFFF"
+                                               TextOptions.TextFormattingMode="Display"
+                                               TextOptions.TextRenderingMode="ClearType" />
+                                </Border>
+                            </Grid>
+                        </vlc:VideoView>
                     </Border>
 
-                    <StackPanel Grid.Row="1"
+                    <StackPanel x:Name="PlayerDetailsPanel"
+                                Grid.Row="1"
                                 Margin="0,14,0,10">
                         <TextBlock Text="{Binding SelectedChannel.DisplayName, FallbackValue=No channel selected}"
                                    FontSize="22"
@@ -289,7 +321,8 @@
                                    TextWrapping="Wrap" />
                     </StackPanel>
 
-                    <Grid Grid.Row="2">
+                    <Grid x:Name="PlayerControlsPanel"
+                          Grid.Row="2">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -305,6 +338,16 @@
                                     Command="{Binding StopCommand}" />
                             <Button Content="Favorite"
                                     Command="{Binding ToggleFavoriteCommand}" />
+                            <CheckBox Content="Clock"
+                                      IsChecked="{Binding Clock.IsVisible}"
+                                      VerticalAlignment="Center"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Margin="6,0,10,0" />
+                            <CheckBox Content="24h"
+                                      IsChecked="{Binding Clock.Use24HourClock}"
+                                      VerticalAlignment="Center"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Margin="0,0,10,0" />
                             <Button Content="Fullscreen"
                                     Click="Fullscreen_Click" />
                         </StackPanel>
@@ -333,7 +376,8 @@
                         </StackPanel>
                     </Grid>
 
-                    <Border Grid.Row="3"
+                    <Border x:Name="DiagnosticsPanel"
+                            Grid.Row="3"
                             Background="{StaticResource PanelAltBrush}"
                             CornerRadius="10"
                             Padding="12"
@@ -359,7 +403,8 @@
             </Border>
         </Grid>
 
-        <Border Grid.Row="2"
+        <Border x:Name="FooterBar"
+                Grid.Row="2"
                 Background="{StaticResource PanelBrush}"
                 BorderBrush="#283243"
                 BorderThickness="0,1,0,0">

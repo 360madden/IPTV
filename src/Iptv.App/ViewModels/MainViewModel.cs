@@ -51,6 +51,7 @@ public sealed class MainViewModel : ObservableObject
         IChannelSearchService channelSearchService,
         IPlaybackEngine playbackEngine,
         IChannelStateStore channelStateStore,
+        IUiPreferencesStore uiPreferencesStore,
         IXmltvImportService xmltvImportService,
         IPlaylistDialogService dialogService)
     {
@@ -60,6 +61,7 @@ public sealed class MainViewModel : ObservableObject
         this.channelStateStore = channelStateStore;
         this.xmltvImportService = xmltvImportService;
         this.dialogService = dialogService;
+        Clock = new ClockOverlayViewModel(uiPreferencesStore);
 
         ImportFileCommand = new AsyncRelayCommand(_ => ImportFileAsync(), _ => !IsBusy);
         ImportUrlCommand = new AsyncRelayCommand(_ => ImportUrlAsync(), _ => !IsBusy);
@@ -84,6 +86,8 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<ImportIssueViewModel> RecentImportIssues { get; } = [];
 
     public ObservableCollection<string> Diagnostics { get; } = [];
+
+    public ClockOverlayViewModel Clock { get; }
 
     public IReadOnlyList<BufferingPreset> BufferingPresets { get; } =
     [
@@ -256,6 +260,7 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task InitializeAsync()
     {
+        await Clock.InitializeAsync(shutdownCts.Token).ConfigureAwait(true);
         favoriteIds = await channelStateStore.LoadFavoritesAsync(shutdownCts.Token).ConfigureAwait(true);
         if (favoriteIds.Count > 0)
         {
@@ -268,6 +273,7 @@ public sealed class MainViewModel : ObservableObject
         shutdownCts.Cancel();
         searchCts?.Cancel();
         searchCts?.Dispose();
+        Clock.Dispose();
         shutdownCts.Dispose();
         await playbackEngine.DisposeAsync().ConfigureAwait(false);
     }
