@@ -59,17 +59,17 @@ jobs:
           $version = "${{ github.event.inputs.packageVersion }}"
           if ([string]::IsNullOrWhiteSpace($version)) { $version = "1.0.0.0" }
           $cert = "$env:RUNNER_TEMP\iptv-msix.pfx"
-          $args = @(
-            "-Configuration", "Release",
-            "-Runtime", "win-x64",
-            "-OutputRoot", ".\artifacts\release",
-            "-CreateMsix",
-            "-Version", $version
-          )
-          if (Test-Path $cert) {
-            $args += @("-SignCertificatePath", $cert)
+          $packageArgs = @{
+            Configuration = "Release"
+            Runtime = "win-x64"
+            OutputRoot = ".\artifacts\release"
+            CreateMsix = $true
+            Version = $version
           }
-          & .\tools\package-release.ps1 @args
+          if (Test-Path $cert) {
+            $packageArgs["SignCertificatePath"] = $cert
+          }
+          & .\tools\package-release.ps1 @packageArgs
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
