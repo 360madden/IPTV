@@ -8,7 +8,7 @@ Use this checklist before trying a private playlist.
 4. Select a channel and click **Play**.
 5. Confirm the selected channel shows a **NOW** badge while loading/playing.
 6. Enable **Clock**, then confirm the time appears over the video.
-7. Open **UI Settings** and try clock position, size, opacity, 24-hour, and seconds options.
+7. Open **UI Settings** and try clock position, size, background, opacity, 24-hour, and seconds options.
 8. Try shortcuts: `Space` play, `P` pause, `S` stop, `C` clock, `F11` fullscreen, double-click video, and `Esc` exit fullscreen.
 9. Confirm fullscreen is video-only and the clock remains visible over the video.
 10. Move the mouse in fullscreen and confirm the mini-HUD appears, then idles away when auto-hide is enabled.

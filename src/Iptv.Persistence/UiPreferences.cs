@@ -15,6 +15,13 @@ public enum ClockOverlaySize
     Large
 }
 
+public enum ClockOverlayBackground
+{
+    Dark,
+    Blue,
+    Minimal
+}
+
 public sealed record UiPreferences
 {
     public const double DefaultClockOverlayOpacity = 0.86;
@@ -28,6 +35,8 @@ public sealed record UiPreferences
     public ClockOverlayPosition ClockOverlayPosition { get; init; } = ClockOverlayPosition.TopRight;
 
     public ClockOverlaySize ClockOverlaySize { get; init; } = ClockOverlaySize.Normal;
+
+    public ClockOverlayBackground ClockOverlayBackground { get; init; } = ClockOverlayBackground.Dark;
 
     public double ClockOverlayOpacity { get; init; } = DefaultClockOverlayOpacity;
 

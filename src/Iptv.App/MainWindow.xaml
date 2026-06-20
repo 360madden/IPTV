@@ -169,6 +169,18 @@
                                           Foreground="Black"
                                           AutomationProperties.Name="Clock Size" />
 
+                                <TextBlock Text="Background"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,4" />
+                                <ComboBox ItemsSource="{Binding Clock.BackgroundOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding Clock.Background}"
+                                          Padding="6"
+                                          Margin="0,0,0,10"
+                                          Foreground="Black"
+                                          AutomationProperties.Name="Clock Background" />
+
                                 <DockPanel Margin="0,0,0,4">
                                     <TextBlock Text="Opacity"
                                                DockPanel.Dock="Left"
@@ -384,8 +396,8 @@
                                   MouseLeftButtonDown="PlayerOverlay_MouseLeftButtonDown"
                                   MouseMove="PlayerOverlay_MouseMove">
                                 <Border Padding="{Binding Clock.OverlayPadding}"
-                                        Background="#B0000000"
-                                        BorderBrush="#55FFFFFF"
+                                        Background="{Binding Clock.OverlayBackgroundBrush}"
+                                        BorderBrush="{Binding Clock.OverlayBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="{Binding Clock.OverlayCornerRadius}"
                                         IsHitTestVisible="False"

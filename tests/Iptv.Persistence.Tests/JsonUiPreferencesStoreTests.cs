@@ -16,6 +16,7 @@ public sealed class JsonUiPreferencesStoreTests
                 ShowClockSeconds = true,
                 ClockOverlayPosition = ClockOverlayPosition.BottomLeft,
                 ClockOverlaySize = ClockOverlaySize.Large,
+                ClockOverlayBackground = ClockOverlayBackground.Blue,
                 ClockOverlayOpacity = 0.7,
                 AutoHideFullscreenControls = false,
                 FullscreenMonitorIndex = 2
@@ -29,6 +30,7 @@ public sealed class JsonUiPreferencesStoreTests
             Assert.True(loaded.ShowClockSeconds);
             Assert.Equal(ClockOverlayPosition.BottomLeft, loaded.ClockOverlayPosition);
             Assert.Equal(ClockOverlaySize.Large, loaded.ClockOverlaySize);
+            Assert.Equal(ClockOverlayBackground.Blue, loaded.ClockOverlayBackground);
             Assert.Equal(0.7, loaded.ClockOverlayOpacity);
             Assert.False(loaded.AutoHideFullscreenControls);
             Assert.Equal(2, loaded.FullscreenMonitorIndex);
@@ -57,6 +59,7 @@ public sealed class JsonUiPreferencesStoreTests
             Assert.False(loaded.ShowClockSeconds);
             Assert.Equal(ClockOverlayPosition.TopRight, loaded.ClockOverlayPosition);
             Assert.Equal(ClockOverlaySize.Normal, loaded.ClockOverlaySize);
+            Assert.Equal(ClockOverlayBackground.Dark, loaded.ClockOverlayBackground);
             Assert.Equal(UiPreferences.DefaultClockOverlayOpacity, loaded.ClockOverlayOpacity);
             Assert.True(loaded.AutoHideFullscreenControls);
             Assert.Equal(-1, loaded.FullscreenMonitorIndex);
@@ -95,6 +98,7 @@ public sealed class JsonUiPreferencesStoreTests
             Assert.False(loaded.ShowClockSeconds);
             Assert.Equal(ClockOverlayPosition.TopRight, loaded.ClockOverlayPosition);
             Assert.Equal(ClockOverlaySize.Normal, loaded.ClockOverlaySize);
+            Assert.Equal(ClockOverlayBackground.Dark, loaded.ClockOverlayBackground);
             Assert.Equal(UiPreferences.DefaultClockOverlayOpacity, loaded.ClockOverlayOpacity);
             Assert.True(loaded.AutoHideFullscreenControls);
             Assert.Equal(-1, loaded.FullscreenMonitorIndex);

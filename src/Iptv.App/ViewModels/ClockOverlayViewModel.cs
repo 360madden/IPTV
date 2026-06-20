@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Iptv.App.Mvvm;
 using Iptv.Persistence;
@@ -11,6 +12,13 @@ namespace Iptv.App.ViewModels;
 
 public sealed class ClockOverlayViewModel : ObservableObject, IDisposable
 {
+    private static readonly Brush DarkOverlayBrush = CreateFrozenBrush(Color.FromArgb(0xB0, 0x00, 0x00, 0x00));
+    private static readonly Brush BlueOverlayBrush = CreateFrozenBrush(Color.FromArgb(0xD4, 0x08, 0x1F, 0x34));
+    private static readonly Brush MinimalOverlayBrush = CreateFrozenBrush(Color.FromArgb(0x86, 0x00, 0x00, 0x00));
+    private static readonly Brush DefaultBorderBrush = CreateFrozenBrush(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush AccentBorderBrush = CreateFrozenBrush(Color.FromArgb(0x8A, 0x4E, 0xA7, 0xFF));
+    private static readonly Brush MinimalBorderBrush = CreateFrozenBrush(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF));
+
     private readonly IUiPreferencesStore preferencesStore;
     private readonly DispatcherTimer timer;
     private readonly SemaphoreSlim saveGate = new(1, 1);
@@ -19,6 +27,7 @@ public sealed class ClockOverlayViewModel : ObservableObject, IDisposable
     private bool showSeconds;
     private ClockOverlayPosition position = ClockOverlayPosition.TopRight;
     private ClockOverlaySize size = ClockOverlaySize.Normal;
+    private ClockOverlayBackground background = ClockOverlayBackground.Dark;
     private double overlayOpacity = UiPreferences.DefaultClockOverlayOpacity;
     private bool autoHideFullscreenControls = true;
     private int fullscreenMonitorIndex = -1;
@@ -59,6 +68,13 @@ public sealed class ClockOverlayViewModel : ObservableObject, IDisposable
         new(ClockOverlaySize.Normal, "Normal"),
         new(ClockOverlaySize.Compact, "Compact"),
         new(ClockOverlaySize.Large, "Large")
+    ];
+
+    public IReadOnlyList<UiSelectionOption<ClockOverlayBackground>> BackgroundOptions { get; } =
+    [
+        new(ClockOverlayBackground.Dark, "Dark"),
+        new(ClockOverlayBackground.Blue, "Blue"),
+        new(ClockOverlayBackground.Minimal, "Minimal")
     ];
 
     public ObservableCollection<FullscreenMonitorOption> FullscreenMonitorOptions { get; } =
@@ -142,6 +158,25 @@ public sealed class ClockOverlayViewModel : ObservableObject, IDisposable
         }
     }
 
+    public ClockOverlayBackground Background
+    {
+        get => background;
+        set
+        {
+            if (!Enum.IsDefined(value))
+            {
+                value = ClockOverlayBackground.Dark;
+            }
+
+            if (SetProperty(ref background, value))
+            {
+                OnPropertyChanged(nameof(OverlayBackgroundBrush));
+                OnPropertyChanged(nameof(OverlayBorderBrush));
+                _ = SaveAsync();
+            }
+        }
+    }
+
     public double OverlayOpacity
     {
         get => overlayOpacity;
@@ -202,6 +237,20 @@ public sealed class ClockOverlayViewModel : ObservableObject, IDisposable
         _ => new CornerRadius(16)
     };
 
+    public Brush OverlayBackgroundBrush => Background switch
+    {
+        ClockOverlayBackground.Blue => BlueOverlayBrush,
+        ClockOverlayBackground.Minimal => MinimalOverlayBrush,
+        _ => DarkOverlayBrush
+    };
+
+    public Brush OverlayBorderBrush => Background switch
+    {
+        ClockOverlayBackground.Blue => AccentBorderBrush,
+        ClockOverlayBackground.Minimal => MinimalBorderBrush,
+        _ => DefaultBorderBrush
+    };
+
     public string OverlayOpacityPercent => string.Create(
         CultureInfo.CurrentCulture,
         $"{OverlayOpacity:P0}");
@@ -251,6 +300,9 @@ public sealed class ClockOverlayViewModel : ObservableObject, IDisposable
         size = Enum.IsDefined(preferences.ClockOverlaySize)
             ? preferences.ClockOverlaySize
             : ClockOverlaySize.Normal;
+        background = Enum.IsDefined(preferences.ClockOverlayBackground)
+            ? preferences.ClockOverlayBackground
+            : ClockOverlayBackground.Dark;
         overlayOpacity = NormalizeOpacity(preferences.ClockOverlayOpacity);
         autoHideFullscreenControls = preferences.AutoHideFullscreenControls;
         fullscreenMonitorIndex = Math.Max(-1, preferences.FullscreenMonitorIndex);
@@ -290,6 +342,7 @@ public sealed class ClockOverlayViewModel : ObservableObject, IDisposable
                     ShowClockSeconds = ShowSeconds,
                     ClockOverlayPosition = Position,
                     ClockOverlaySize = Size,
+                    ClockOverlayBackground = Background,
                     ClockOverlayOpacity = OverlayOpacity,
                     AutoHideFullscreenControls = AutoHideFullscreenControls,
                     FullscreenMonitorIndex = FullscreenMonitorIndex
@@ -344,6 +397,7 @@ public sealed class ClockOverlayViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowSeconds));
         OnPropertyChanged(nameof(Position));
         OnPropertyChanged(nameof(Size));
+        OnPropertyChanged(nameof(Background));
         OnPropertyChanged(nameof(OverlayOpacity));
         OnPropertyChanged(nameof(OverlayOpacityPercent));
         OnPropertyChanged(nameof(AutoHideFullscreenControls));
@@ -351,6 +405,8 @@ public sealed class ClockOverlayViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(FontSize));
         OnPropertyChanged(nameof(OverlayPadding));
         OnPropertyChanged(nameof(OverlayCornerRadius));
+        OnPropertyChanged(nameof(OverlayBackgroundBrush));
+        OnPropertyChanged(nameof(OverlayBorderBrush));
     }
 
     private static double NormalizeOpacity(double value)
@@ -361,5 +417,12 @@ public sealed class ClockOverlayViewModel : ObservableObject, IDisposable
         }
 
         return Math.Clamp(Math.Round(value, 2), 0.35, 1.0);
+    }
+
+    private static SolidColorBrush CreateFrozenBrush(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
     }
 }

@@ -46,7 +46,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\xumo-gui-smoke.ps1 -
 - XMLTV file import with channel/program counts and basic channel matching.
 - Search, group/category filters, favorites, and local favorite persistence.
 - LibVLC playback with fullscreen toggle, volume, buffering presets, and startup timeout guidance.
-- Optional clock overlay with position, size, opacity, 24-hour, and seconds settings.
+- Optional clock overlay with position, size, background, opacity, 24-hour, and seconds settings.
 - True app-managed fullscreen with video overlay clock, mini-HUD controls, auto-hide, double-click toggle, and monitor preference.
 - Keyboard shortcuts: `Ctrl+F` search, `Ctrl+L` import URL, `Ctrl+O` import file, `Ctrl+R` refresh, `Space` play, `P` pause, `S` stop, `C` clock, `F`/`F11` fullscreen, `Esc` exit fullscreen.
 - Redacted diagnostics panel for import/playback events.
