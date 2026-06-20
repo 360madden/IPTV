@@ -2,42 +2,42 @@
 
 ## Project Structure & Module Organization
 
-This repository currently has no committed source tree, test suite, assets, or package manifests. When adding project files, keep the top level predictable:
+This is a .NET 10 Windows IPTV viewer. Keep feature code modular and avoid large monolithic files.
 
-- `src/` for application code and reusable modules.
-- `tests/` or `__tests__/` for automated tests that mirror `src/` paths.
-- `assets/` for static media, sample playlists, fixtures, or other non-code inputs.
-- `docs/` for architecture notes, setup instructions, and operational runbooks.
-
-Avoid committing generated output, caches, credentials, or machine-specific files unless they are required fixtures.
+- `src/Iptv.App/` contains the WPF UI, composition root, dialogs, playback integration, and view models.
+- `src/Iptv.Core/` contains domain models, normalization, redaction, IDs, EPG models, and playback snapshots.
+- `src/Iptv.Playlists/`, `src/Iptv.Epg/`, `src/Iptv.Search/`, `src/Iptv.Playback/`, and `src/Iptv.Persistence/` contain focused service libraries.
+- `tests/*` mirrors the source projects with xUnit-style unit tests.
+- `tools/` contains smoke, benchmark, GUI-smoke, and release packaging helpers.
+- `assets/sample-playlists/` is for sanitized fixtures only; never add private provider playlists.
 
 ## Build, Test, and Development Commands
 
-No project-specific build or test commands are configured yet. When tooling is added, document the canonical commands in `README.md` and keep them runnable from the repository root. Suggested examples:
+Run from the repository root:
 
-- `npm install` — install dependencies if a `package.json` is introduced.
-- `npm run dev` — start a local development server.
-- `npm test` — run the full automated test suite.
-- `npm run lint` — check formatting and static analysis rules.
+```powershell
+dotnet restore .\Iptv.slnx
+dotnet build .\Iptv.slnx --no-restore
+dotnet test .\Iptv.slnx --no-build
+.\launch-iptv.cmd
+.\launch-iptv.cmd https://www.apsattv.com/xumo.m3u
+dotnet run --project .\tools\Iptv.Smoke\Iptv.Smoke.csproj -- --url https://www.apsattv.com/xumo.m3u --probe-count 3 --timeout-seconds 20
+```
 
-If a different stack is chosen, replace these examples with the actual commands.
+Use `tools\xumo-gui-smoke.ps1 -SkipBuild -CaptureScreenshots` for Windows UI regression checks when needed.
 
 ## Coding Style & Naming Conventions
 
-Match the conventions of the first real implementation added to the repo, and keep style consistent across files. Prefer descriptive names, small modules, and clear boundaries between parsing, I/O, and presentation logic. Use lowercase, hyphenated names for general files and directories where practical, such as `playlist-parser.ts` or `sample-data/`.
-
-Add a formatter or linter early, then make it the source of truth instead of relying on manual style review.
+Follow `.editorconfig`: UTF-8, CRLF, final newline, spaces, four-space C#/XAML indentation. Use nullable-aware C#, file-scoped namespaces, descriptive PascalCase types/members, and camelCase locals/fields. Keep parsing, persistence, playback, search, and UI responsibilities separated. Prefer defensive validation, cancellation support, bounded reads, redacted diagnostics, and explicit user confirmation before destructive organization actions.
 
 ## Testing Guidelines
 
-Place tests close to the behavior they verify and name them after the unit or feature under test, for example `playlist-parser.test.ts`. Cover normal cases, malformed input, and edge cases before adding integration-heavy tests. Each bug fix should include a regression test when feasible.
+Add or update tests with behavior changes. Prefer targeted unit tests for parser, search, persistence, EPG, and playback contracts before GUI smoke tests. For large-playlist work, run the search benchmark or smoke tool with realistic counts. Do not rely on live IPTV streams as the only validation because availability is transient.
 
 ## Commit & Pull Request Guidelines
 
-There is no Git history in this directory to infer existing commit conventions. Until a convention is established, use short imperative commit messages such as `Add playlist parser` or `Document setup workflow`.
-
-Pull requests should include a concise summary, validation performed, linked issues when applicable, and screenshots or sample output for user-visible changes.
+Use short imperative commit messages, e.g. `Add launch wrapper`. PRs should summarize user impact, changed modules, validation commands, and screenshots for visible UI changes. Keep GitHub updates on review branches; do not force-push or overwrite `main` without explicit approval.
 
 ## Security & Configuration Tips
 
-Never commit API keys, account credentials, private IPTV URLs, or personal configuration. Use ignored local environment files for secrets and provide safe examples such as `.env.example` when configuration is required.
+This app is content-neutral. Do not commit credentials, tokenized URLs, private M3U/XMLTV files, provider screenshots, or raw stream logs. Use sanitized fixtures and redacted output only.
