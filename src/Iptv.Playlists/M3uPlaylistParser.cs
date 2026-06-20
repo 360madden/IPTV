@@ -64,7 +64,7 @@ public sealed class M3uPlaylistParser : IPlaylistParser
                 lineNumber);
 
             pendingMetadata = null;
-            AddChannel(source, line, metadata, channels, issues, seen, lineNumber);
+            AddChannel(source, line, metadata, channels, issues, seen, lineNumber, channels.Count);
         }
 
         if (!sawHeader)
@@ -189,7 +189,8 @@ public sealed class M3uPlaylistParser : IPlaylistParser
         ICollection<Channel> channels,
         ICollection<PlaylistImportIssue> issues,
         ISet<string> seen,
-        int lineNumber)
+        int lineNumber,
+        int importIndex)
     {
         if (!SensitiveUri.TryCreate(streamUrl, out SensitiveUri? sensitiveUri, out string? error))
         {
@@ -229,6 +230,7 @@ public sealed class M3uPlaylistParser : IPlaylistParser
             DisplayName = displayName,
             NormalizedName = normalizedName,
             StreamUrl = stream,
+            ImportIndex = importIndex,
             GroupTitle = group,
             Category = ChannelNormalizer.InferCategory(group, displayName),
             TvgId = metadata.Attributes.GetValueOrDefault("tvg-id"),

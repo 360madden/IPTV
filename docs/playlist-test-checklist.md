@@ -17,9 +17,12 @@ Use this checklist before trying a private playlist.
 13. Confirm the import summary shows channel, warning, duplicate, and error counts.
 14. Search/filter by group/category.
 15. Hide a channel, switch **Visibility** to **Hidden only**, and confirm the channel appears there.
-16. Add a custom group, assign the selected channel, and confirm the group appears in the group filter.
-17. Mark a channel as favorite, close the app, reopen, and re-import the same playlist to confirm the favorite/hidden/custom group state reappears.
-18. Confirm normal UI does not show full tokenized stream URLs.
+16. Change **Sort** between playlist order, name, favorites first, recently watched, and custom order.
+17. Add a custom group, assign the selected channel, and confirm the group appears in the group filter.
+18. Rename and delete a test custom group from **Channel Organization**.
+19. Use **Up**/**Down** on a selected channel and confirm **Custom order** preserves the move.
+20. Mark a channel as favorite, close the app, reopen, and re-import the same playlist to confirm favorite/hidden/custom group/sort state reappears.
+21. Confirm normal UI does not show full tokenized stream URLs.
 
 Optional public smoke command:
 

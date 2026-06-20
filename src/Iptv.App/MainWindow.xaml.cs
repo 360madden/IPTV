@@ -57,6 +57,7 @@ public partial class MainWindow : Window
         var searchService = new ChannelSearchService();
         IPlaybackEngine playbackEngine = CreatePlaybackEngine();
         var stateStore = new JsonChannelStateStore();
+        var organizationPreferencesStore = new JsonChannelOrganizationPreferencesStore();
         var uiPreferencesStore = new JsonUiPreferencesStore();
         var epgImportService = new XmltvImportService();
         var dialogService = new PlaylistDialogService();
@@ -66,6 +67,7 @@ public partial class MainWindow : Window
             searchService,
             playbackEngine,
             stateStore,
+            organizationPreferencesStore,
             uiPreferencesStore,
             epgImportService,
             dialogService);

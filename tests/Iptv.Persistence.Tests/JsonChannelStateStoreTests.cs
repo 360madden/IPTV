@@ -40,7 +40,14 @@ public sealed class JsonChannelStateStoreTests
 
             await store.SaveChannelStatesAsync(
                 [
-                    new ChannelUserState { ChannelId = favorite, IsFavorite = true, CustomGroup = "My News" },
+                    new ChannelUserState
+                    {
+                        ChannelId = favorite,
+                        IsFavorite = true,
+                        CustomGroup = "My News",
+                        CustomSortIndex = 3,
+                        LastWatchedAt = DateTimeOffset.UtcNow
+                    },
                     new ChannelUserState { ChannelId = hidden, IsHidden = true }
                 ],
                 CancellationToken.None);
@@ -50,6 +57,8 @@ public sealed class JsonChannelStateStoreTests
             Assert.Equal(2, loaded.Count);
             Assert.True(loaded[favorite].IsFavorite);
             Assert.Equal("My News", loaded[favorite].CustomGroup);
+            Assert.Equal(3, loaded[favorite].CustomSortIndex);
+            Assert.NotNull(loaded[favorite].LastWatchedAt);
             Assert.True(loaded[hidden].IsHidden);
         }
         finally

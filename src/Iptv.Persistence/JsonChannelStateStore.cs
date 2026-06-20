@@ -43,7 +43,9 @@ public sealed class JsonChannelStateStore : IChannelStateStore
                     ChannelId = id,
                     IsFavorite = favoriteIds.Contains(id),
                     IsHidden = existing?.IsHidden ?? false,
-                    CustomGroup = NormalizeCustomGroup(existing?.CustomGroup)
+                    CustomGroup = NormalizeCustomGroup(existing?.CustomGroup),
+                    CustomSortIndex = NormalizeCustomSortIndex(existing?.CustomSortIndex),
+                    LastWatchedAt = existing?.LastWatchedAt
                 };
             })
             .Where(HasUserState)
@@ -152,19 +154,33 @@ public sealed class JsonChannelStateStore : IChannelStateStore
         {
             IsFavorite = snapshot.Any(state => state.IsFavorite),
             IsHidden = snapshot.Any(state => state.IsHidden),
-            CustomGroup = NormalizeCustomGroup(customGroup)
+            CustomGroup = NormalizeCustomGroup(customGroup),
+            CustomSortIndex = snapshot.LastOrDefault(state => state.CustomSortIndex.HasValue)?.CustomSortIndex,
+            LastWatchedAt = snapshot
+                .Where(state => state.LastWatchedAt.HasValue)
+                .Select(state => state.LastWatchedAt)
+                .DefaultIfEmpty()
+                .Max()
         };
     }
 
     private static ChannelUserState NormalizeState(ChannelUserState state)
     {
-        return state with { CustomGroup = NormalizeCustomGroup(state.CustomGroup) };
+        return state with
+        {
+            CustomGroup = NormalizeCustomGroup(state.CustomGroup),
+            CustomSortIndex = NormalizeCustomSortIndex(state.CustomSortIndex)
+        };
     }
 
     private static bool HasUserState(ChannelUserState state)
     {
         return state.ChannelId != Guid.Empty &&
-            (state.IsFavorite || state.IsHidden || !string.IsNullOrWhiteSpace(state.CustomGroup));
+            (state.IsFavorite ||
+                state.IsHidden ||
+                !string.IsNullOrWhiteSpace(state.CustomGroup) ||
+                state.CustomSortIndex.HasValue ||
+                state.LastWatchedAt.HasValue);
     }
 
     private static string? NormalizeCustomGroup(string? value)
@@ -176,6 +192,11 @@ public sealed class JsonChannelStateStore : IChannelStateStore
 
         string normalized = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
         return normalized.Length == 0 ? null : normalized;
+    }
+
+    private static int? NormalizeCustomSortIndex(int? value)
+    {
+        return value < 0 ? null : value;
     }
 
     private sealed class ChannelStateDocument

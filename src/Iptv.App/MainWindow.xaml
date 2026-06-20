@@ -118,11 +118,24 @@
                               DisplayMemberPath="Label"
                               SelectedValuePath="Value"
                               SelectedValue="{Binding SelectedHiddenFilter}"
-                              Margin="0,0,0,16"
+                              Margin="0,0,0,14"
                               Padding="8"
                               Background="{StaticResource PanelAltBrush}"
                               Foreground="Black"
                               AutomationProperties.Name="Channel Visibility Filter" />
+
+                    <TextBlock Text="Sort"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="0,0,0,6" />
+                    <ComboBox ItemsSource="{Binding SortModeOptions}"
+                              DisplayMemberPath="Label"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding SelectedSortMode}"
+                              Margin="0,0,0,16"
+                              Padding="8"
+                              Background="{StaticResource PanelAltBrush}"
+                              Foreground="Black"
+                              AutomationProperties.Name="Channel Sort Mode" />
 
                     <Button Content="Clear Filters"
                             Command="{Binding ClearFiltersCommand}"
@@ -153,12 +166,26 @@
                                         Command="{Binding AddCustomGroupCommand}"
                                         Margin="0,0,0,12" />
                                 <ListBox ItemsSource="{Binding CustomGroups}"
+                                         SelectedItem="{Binding SelectedManagedCustomGroup}"
                                          MaxHeight="120"
                                          Background="Transparent"
                                          BorderBrush="#334056"
                                          Foreground="{StaticResource TextSecondaryBrush}"
                                          ScrollViewer.CanContentScroll="True"
-                                         VirtualizingPanel.IsVirtualizing="True" />
+                                         VirtualizingPanel.IsVirtualizing="True"
+                                         AutomationProperties.Name="Custom Group List" />
+                                <TextBlock Text="Rename selected group"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,10,0,4" />
+                                <TextBox Text="{Binding RenameCustomGroupName, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,8"
+                                         AutomationProperties.Name="Rename Custom Group Name" />
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Rename"
+                                            Command="{Binding RenameCustomGroupCommand}" />
+                                    <Button Content="Delete"
+                                            Command="{Binding DeleteCustomGroupCommand}" />
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                     </Expander>
@@ -588,6 +615,10 @@
                                     Command="{Binding ToggleFavoriteCommand}" />
                             <Button Content="{Binding HideSelectedChannelLabel}"
                                     Command="{Binding ToggleHiddenCommand}" />
+                            <Button Content="Up"
+                                    Command="{Binding MoveChannelUpCommand}" />
+                            <Button Content="Down"
+                                    Command="{Binding MoveChannelDownCommand}" />
                             <CheckBox Content="Clock"
                                       IsChecked="{Binding Clock.IsVisible}"
                                       VerticalAlignment="Center"

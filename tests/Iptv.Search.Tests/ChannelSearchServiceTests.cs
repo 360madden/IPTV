@@ -53,8 +53,8 @@ public sealed class ChannelSearchServiceTests
     {
         var channels = new[]
         {
-            CreateChannel("Visible News", "News"),
-            CreateChannel("Hidden Sports", "Sports", isHidden: true)
+            CreateChannel("Visible News", "News", importIndex: 0),
+            CreateChannel("Hidden Sports", "Sports", isHidden: true, importIndex: 1)
         };
         var service = new ChannelSearchService();
 
@@ -67,12 +67,70 @@ public sealed class ChannelSearchServiceTests
         Assert.Equal("Hidden Sports", result.DisplayName);
     }
 
+    [Fact]
+    public void Search_SortsByPlaylistOrder()
+    {
+        var channels = new[]
+        {
+            CreateChannel("Second", "News", importIndex: 1),
+            CreateChannel("First", "News", importIndex: 0)
+        };
+        var service = new ChannelSearchService();
+
+        IReadOnlyList<Channel> results = service.Search(channels, new ChannelSearchQuery
+        {
+            SortMode = ChannelSortMode.PlaylistOrder
+        });
+
+        Assert.Equal(["First", "Second"], results.Select(channel => channel.DisplayName));
+    }
+
+    [Fact]
+    public void Search_SortsByCustomOrderWithinGroup()
+    {
+        var channels = new[]
+        {
+            CreateChannel("Later", "News", customSortIndex: 20),
+            CreateChannel("Earlier", "News", customSortIndex: 10)
+        };
+        var service = new ChannelSearchService();
+
+        IReadOnlyList<Channel> results = service.Search(channels, new ChannelSearchQuery
+        {
+            SortMode = ChannelSortMode.CustomOrder
+        });
+
+        Assert.Equal(["Earlier", "Later"], results.Select(channel => channel.DisplayName));
+    }
+
+    [Fact]
+    public void Search_SortsByRecentlyWatched()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        var channels = new[]
+        {
+            CreateChannel("Older", "News", lastWatchedAt: now.AddMinutes(-5)),
+            CreateChannel("Newer", "News", lastWatchedAt: now)
+        };
+        var service = new ChannelSearchService();
+
+        IReadOnlyList<Channel> results = service.Search(channels, new ChannelSearchQuery
+        {
+            SortMode = ChannelSortMode.RecentlyWatched
+        });
+
+        Assert.Equal(["Newer", "Older"], results.Select(channel => channel.DisplayName));
+    }
+
     private static Channel CreateChannel(
         string name,
         string group,
         bool isFavorite = false,
         bool isHidden = false,
-        string? customGroup = null)
+        string? customGroup = null,
+        int importIndex = 0,
+        int? customSortIndex = null,
+        DateTimeOffset? lastWatchedAt = null)
     {
         Assert.True(SensitiveUri.TryCreate($"https://stream.example/{Uri.EscapeDataString(name)}.m3u8", out SensitiveUri? uri, out string? error), error);
 
@@ -84,11 +142,14 @@ public sealed class ChannelSearchServiceTests
             DisplayName = name,
             NormalizedName = ChannelNormalizer.NormalizeForSearch(name),
             StreamUrl = uri!,
+            ImportIndex = importIndex,
             GroupTitle = group,
             CustomGroup = customGroup,
+            CustomSortIndex = customSortIndex,
             Category = ChannelNormalizer.InferCategory(group, name),
             IsFavorite = isFavorite,
-            IsHidden = isHidden
+            IsHidden = isHidden,
+            LastWatchedAt = lastWatchedAt
         };
     }
 }

@@ -46,12 +46,50 @@ public sealed class ChannelSearchService : IChannelSearchService
                 ChannelNormalizer.NormalizeForSearch(channel.TvgName).Contains(normalizedText, StringComparison.Ordinal));
         }
 
-        return filtered
-            .OrderByDescending(channel => channel.IsFavorite)
-            .ThenBy(channel => channel.IsHidden)
-            .ThenBy(channel => channel.EffectiveGroupTitle, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(channel => channel.DisplayName, StringComparer.OrdinalIgnoreCase)
+        return ApplySort(filtered, query.SortMode)
             .Take(Math.Max(1, query.Limit))
             .ToArray();
+    }
+
+    private static IOrderedEnumerable<Channel> ApplySort(IEnumerable<Channel> channels, ChannelSortMode sortMode)
+    {
+        return sortMode switch
+        {
+            ChannelSortMode.PlaylistOrder => channels
+                .OrderBy(channel => channel.ImportIndex)
+                .ThenBy(channel => channel.DisplayName, StringComparer.OrdinalIgnoreCase),
+            ChannelSortMode.NameAscending => channels
+                .OrderBy(channel => channel.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(channel => channel.ImportIndex),
+            ChannelSortMode.NameDescending => channels
+                .OrderByDescending(channel => channel.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(channel => channel.ImportIndex),
+            ChannelSortMode.GroupThenName => channels
+                .OrderBy(channel => channel.EffectiveGroupTitle, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(channel => channel.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(channel => channel.ImportIndex),
+            ChannelSortMode.RecentlyWatched => channels
+                .OrderByDescending(channel => channel.LastWatchedAt.HasValue)
+                .ThenByDescending(channel => channel.LastWatchedAt)
+                .ThenBy(channel => channel.DisplayName, StringComparer.OrdinalIgnoreCase),
+            ChannelSortMode.HiddenLast => channels
+                .OrderBy(channel => channel.IsHidden)
+                .ThenBy(channel => channel.EffectiveGroupTitle, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(channel => channel.DisplayName, StringComparer.OrdinalIgnoreCase),
+            ChannelSortMode.CustomOrder => channels
+                .OrderBy(channel => channel.EffectiveGroupTitle, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(channel => channel.CustomSortIndex ?? channel.ImportIndex)
+                .ThenBy(channel => channel.DisplayName, StringComparer.OrdinalIgnoreCase),
+            ChannelSortMode.FavoritesFirst => channels
+                .OrderByDescending(channel => channel.IsFavorite)
+                .ThenBy(channel => channel.IsHidden)
+                .ThenBy(channel => channel.EffectiveGroupTitle, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(channel => channel.DisplayName, StringComparer.OrdinalIgnoreCase),
+            _ => channels
+                .OrderByDescending(channel => channel.IsFavorite)
+                .ThenBy(channel => channel.IsHidden)
+                .ThenBy(channel => channel.EffectiveGroupTitle, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(channel => channel.DisplayName, StringComparer.OrdinalIgnoreCase)
+        };
     }
 }

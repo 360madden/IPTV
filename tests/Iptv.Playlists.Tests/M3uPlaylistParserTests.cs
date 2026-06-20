@@ -24,7 +24,9 @@ public sealed class M3uPlaylistParserTests
         Assert.DoesNotContain(result.Issues, issue => issue.Severity == ImportIssueSeverity.Error);
         Assert.Equal("Example News", result.Channels[0].DisplayName);
         Assert.Equal("News", result.Channels[0].GroupTitle);
+        Assert.Equal(0, result.Channels[0].ImportIndex);
         Assert.Equal("news.us", result.Channels[0].TvgId);
+        Assert.Equal(1, result.Channels[1].ImportIndex);
         Assert.Equal("Sports", result.Channels[1].Category);
     }
 

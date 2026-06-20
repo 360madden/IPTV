@@ -16,11 +16,15 @@ public sealed record Channel
 
     public required SensitiveUri StreamUrl { get; init; }
 
+    public int ImportIndex { get; init; } = int.MaxValue;
+
     public string GroupTitle { get; init; } = "Ungrouped";
 
     public string? CustomGroup { get; init; }
 
     public string EffectiveGroupTitle => string.IsNullOrWhiteSpace(CustomGroup) ? GroupTitle : CustomGroup;
+
+    public int? CustomSortIndex { get; init; }
 
     public string Category { get; init; } = "Other";
 

@@ -26,6 +26,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly IChannelSearchService channelSearchService;
     private readonly IPlaybackEngine playbackEngine;
     private readonly IChannelStateStore channelStateStore;
+    private readonly IChannelOrganizationPreferencesStore organizationPreferencesStore;
     private readonly IXmltvImportService xmltvImportService;
     private readonly IPlaylistDialogService dialogService;
     private readonly List<Channel> allChannels = [];
@@ -33,6 +34,7 @@ public sealed class MainViewModel : ObservableObject
     private CancellationTokenSource? searchCts;
     private Func<CancellationToken, Task<PlaylistImportResult>>? lastPlaylistImport;
     private readonly Dictionary<Guid, ChannelUserState> channelStates = [];
+    private readonly HashSet<string> knownCustomGroups = new(StringComparer.OrdinalIgnoreCase);
 
     private Channel? selectedChannel;
     private string searchText = string.Empty;
@@ -42,6 +44,9 @@ public sealed class MainViewModel : ObservableObject
     private string newCustomGroupName = string.Empty;
     private bool favoritesOnly;
     private HiddenChannelFilter selectedHiddenFilter = HiddenChannelFilter.VisibleOnly;
+    private ChannelSortMode selectedSortMode = ChannelSortMode.FavoritesFirst;
+    private string? selectedManagedCustomGroup;
+    private string renameCustomGroupName = string.Empty;
     private bool isUpdatingSelectedChannelOrganization;
     private bool isBusy;
     private string statusText = "Import a user-provided M3U/M3U8 playlist to begin.";
@@ -59,6 +64,7 @@ public sealed class MainViewModel : ObservableObject
         IChannelSearchService channelSearchService,
         IPlaybackEngine playbackEngine,
         IChannelStateStore channelStateStore,
+        IChannelOrganizationPreferencesStore organizationPreferencesStore,
         IUiPreferencesStore uiPreferencesStore,
         IXmltvImportService xmltvImportService,
         IPlaylistDialogService dialogService)
@@ -67,6 +73,7 @@ public sealed class MainViewModel : ObservableObject
         this.channelSearchService = channelSearchService;
         this.playbackEngine = playbackEngine;
         this.channelStateStore = channelStateStore;
+        this.organizationPreferencesStore = organizationPreferencesStore;
         this.xmltvImportService = xmltvImportService;
         this.dialogService = dialogService;
         Clock = new ClockOverlayViewModel(uiPreferencesStore);
@@ -83,12 +90,16 @@ public sealed class MainViewModel : ObservableObject
         ToggleHiddenCommand = new RelayCommand(_ => ToggleHidden(), _ => SelectedChannel is not null);
         ClearCustomGroupCommand = new RelayCommand(_ => ClearCustomGroup(), _ => SelectedChannel is not null);
         AddCustomGroupCommand = new RelayCommand(_ => AddCustomGroup());
+        RenameCustomGroupCommand = new RelayCommand(_ => RenameCustomGroup(), _ => SelectedManagedCustomGroup is not null);
+        DeleteCustomGroupCommand = new RelayCommand(_ => DeleteCustomGroup(), _ => SelectedManagedCustomGroup is not null);
+        MoveChannelUpCommand = new RelayCommand(_ => MoveSelectedChannel(-1), _ => SelectedChannel is not null);
+        MoveChannelDownCommand = new RelayCommand(_ => MoveSelectedChannel(1), _ => SelectedChannel is not null);
         ClearFiltersCommand = new RelayCommand(_ => ClearFilters());
 
         playbackEngine.StateChanged += (_, state) => UiDispatcher.Run(() => ApplyPlaybackState(state));
     }
 
-    public ObservableCollection<Channel> VisibleChannels { get; } = [];
+    public RangeObservableCollection<Channel> VisibleChannels { get; } = [];
 
     public ObservableCollection<string> Groups { get; } = [AllGroupsOption];
 
@@ -118,6 +129,18 @@ public sealed class MainViewModel : ObservableObject
         new(HiddenChannelFilter.HiddenOnly, "Hidden only")
     ];
 
+    public IReadOnlyList<UiSelectionOption<ChannelSortMode>> SortModeOptions { get; } =
+    [
+        new(ChannelSortMode.FavoritesFirst, "Favorites first"),
+        new(ChannelSortMode.PlaylistOrder, "Playlist order"),
+        new(ChannelSortMode.NameAscending, "Name A-Z"),
+        new(ChannelSortMode.NameDescending, "Name Z-A"),
+        new(ChannelSortMode.GroupThenName, "Group then name"),
+        new(ChannelSortMode.RecentlyWatched, "Recently watched"),
+        new(ChannelSortMode.HiddenLast, "Hidden last"),
+        new(ChannelSortMode.CustomOrder, "Custom order")
+    ];
+
     public ICommand ImportFileCommand { get; }
 
     public ICommand ImportUrlCommand { get; }
@@ -141,6 +164,14 @@ public sealed class MainViewModel : ObservableObject
     public ICommand ClearCustomGroupCommand { get; }
 
     public ICommand AddCustomGroupCommand { get; }
+
+    public ICommand RenameCustomGroupCommand { get; }
+
+    public ICommand DeleteCustomGroupCommand { get; }
+
+    public ICommand MoveChannelUpCommand { get; }
+
+    public ICommand MoveChannelDownCommand { get; }
 
     public ICommand ClearFiltersCommand { get; }
 
@@ -232,6 +263,24 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    public ChannelSortMode SelectedSortMode
+    {
+        get => selectedSortMode;
+        set
+        {
+            if (!Enum.IsDefined(value))
+            {
+                value = ChannelSortMode.FavoritesFirst;
+            }
+
+            if (SetProperty(ref selectedSortMode, value))
+            {
+                ScheduleSearch();
+                _ = SaveOrganizationPreferencesSafelyAsync();
+            }
+        }
+    }
+
     public string SelectedCustomGroupAssignment
     {
         get => selectedCustomGroupAssignment;
@@ -249,6 +298,25 @@ public sealed class MainViewModel : ObservableObject
     {
         get => newCustomGroupName;
         set => SetProperty(ref newCustomGroupName, value);
+    }
+
+    public string? SelectedManagedCustomGroup
+    {
+        get => selectedManagedCustomGroup;
+        set
+        {
+            if (SetProperty(ref selectedManagedCustomGroup, value))
+            {
+                RenameCustomGroupName = value ?? string.Empty;
+                RaiseCustomGroupCommandStates();
+            }
+        }
+    }
+
+    public string RenameCustomGroupName
+    {
+        get => renameCustomGroupName;
+        set => SetProperty(ref renameCustomGroupName, value);
     }
 
     public string HideSelectedChannelLabel => SelectedChannel?.IsHidden == true ? "Unhide" : "Hide";
@@ -335,6 +403,19 @@ public sealed class MainViewModel : ObservableObject
     public async Task InitializeAsync()
     {
         await Clock.InitializeAsync(shutdownCts.Token).ConfigureAwait(true);
+        ChannelOrganizationPreferences preferences = await organizationPreferencesStore
+            .LoadAsync(shutdownCts.Token)
+            .ConfigureAwait(true);
+        selectedSortMode = Enum.IsDefined(preferences.SortMode)
+            ? preferences.SortMode
+            : ChannelSortMode.FavoritesFirst;
+        OnPropertyChanged(nameof(SelectedSortMode));
+        knownCustomGroups.Clear();
+        foreach (string group in preferences.CustomGroups.Select(NormalizeCustomGroup).Where(group => group is not null).Select(group => group!))
+        {
+            knownCustomGroups.Add(group);
+        }
+
         IReadOnlyDictionary<Guid, ChannelUserState> loadedStates = await channelStateStore
             .LoadChannelStatesAsync(shutdownCts.Token)
             .ConfigureAwait(true);
@@ -568,6 +649,7 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             await playbackEngine.PlayAsync(SelectedChannel, shutdownCts.Token).ConfigureAwait(true);
+            UpdateSelectedChannel(channel => channel with { LastWatchedAt = DateTimeOffset.UtcNow }, refreshGroups: false);
             AddDiagnostic($"Playback requested for '{SelectedChannel.DisplayName}' on host {SelectedChannel.StreamUrl.Host}.");
         }
         catch (OperationCanceledException)
@@ -666,11 +748,102 @@ public sealed class MainViewModel : ObservableObject
         }
 
         EnsureCustomGroupChoice(normalized);
+        knownCustomGroups.Add(normalized);
+        _ = SaveOrganizationPreferencesSafelyAsync();
+        SelectedManagedCustomGroup = normalized;
         NewCustomGroupName = string.Empty;
         SelectedCustomGroupAssignment = normalized;
         StatusText = SelectedChannel is null
             ? $"Added custom group '{normalized}' for this session. Select a channel to assign it."
             : $"Assigned '{SelectedChannel.DisplayName}' to custom group '{normalized}'.";
+    }
+
+    private void RenameCustomGroup()
+    {
+        if (SelectedManagedCustomGroup is null)
+        {
+            StatusText = "Select a custom group before renaming.";
+            return;
+        }
+
+        string? normalized = NormalizeCustomGroup(RenameCustomGroupName);
+        if (normalized is null)
+        {
+            StatusText = "Enter a replacement group name.";
+            return;
+        }
+
+        if (normalized.Equals(SelectedManagedCustomGroup, StringComparison.OrdinalIgnoreCase))
+        {
+            StatusText = "Custom group name is unchanged.";
+            return;
+        }
+
+        if (normalized.Equals(AllGroupsOption, StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals(AllCategoriesOption, StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals(SourceGroupAssignmentOption, StringComparison.OrdinalIgnoreCase) ||
+            CustomGroups.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+        {
+            StatusText = $"'{normalized}' is reserved or already exists.";
+            return;
+        }
+
+        knownCustomGroups.Remove(SelectedManagedCustomGroup);
+        knownCustomGroups.Add(normalized);
+        _ = SaveOrganizationPreferencesSafelyAsync();
+        int changed = ReplaceCustomGroup(SelectedManagedCustomGroup, normalized);
+        SelectedManagedCustomGroup = normalized;
+        StatusText = $"Renamed custom group to '{normalized}' for {changed:N0} saved channels.";
+    }
+
+    private void DeleteCustomGroup()
+    {
+        if (SelectedManagedCustomGroup is null)
+        {
+            StatusText = "Select a custom group before deleting.";
+            return;
+        }
+
+        string removedGroup = SelectedManagedCustomGroup;
+        knownCustomGroups.Remove(removedGroup);
+        _ = SaveOrganizationPreferencesSafelyAsync();
+        int changed = ReplaceCustomGroup(removedGroup, null);
+        SelectedManagedCustomGroup = null;
+        StatusText = $"Removed custom group '{removedGroup}' from {changed:N0} saved channels.";
+    }
+
+    private void MoveSelectedChannel(int direction)
+    {
+        if (SelectedChannel is null)
+        {
+            return;
+        }
+
+        string group = SelectedChannel.EffectiveGroupTitle;
+        List<Channel> orderedGroupChannels = allChannels
+            .Where(channel => channel.EffectiveGroupTitle.Equals(group, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(GetCustomOrderIndex)
+            .ThenBy(channel => channel.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        int selectedIndex = orderedGroupChannels.FindIndex(channel => channel.Id == SelectedChannel.Id);
+        int targetIndex = selectedIndex + direction;
+        if (selectedIndex < 0 || targetIndex < 0 || targetIndex >= orderedGroupChannels.Count)
+        {
+            StatusText = "Selected channel cannot move farther in this group.";
+            return;
+        }
+
+        Channel selected = orderedGroupChannels[selectedIndex];
+        Channel target = orderedGroupChannels[targetIndex];
+        int selectedSortIndex = GetCustomOrderIndex(selected);
+        int targetSortIndex = GetCustomOrderIndex(target);
+        UpdateChannelById(selected.Id, channel => channel with { CustomSortIndex = targetSortIndex });
+        UpdateChannelById(target.Id, channel => channel with { CustomSortIndex = selectedSortIndex });
+        SelectedSortMode = ChannelSortMode.CustomOrder;
+        RefreshGroupsAndCategories();
+        ScheduleSearch();
+        _ = SaveChannelStatesSafelyAsync();
+        StatusText = $"Moved '{selected.DisplayName}' {(direction < 0 ? "up" : "down")} in '{group}'.";
     }
 
     private void ClearFilters()
@@ -718,6 +891,7 @@ public sealed class MainViewModel : ObservableObject
             Category = SelectedCategory == AllCategoriesOption ? null : SelectedCategory,
             FavoritesOnly = FavoritesOnly,
             HiddenFilter = SelectedHiddenFilter,
+            SortMode = SelectedSortMode,
             Limit = 10_000
         };
 
@@ -730,11 +904,7 @@ public sealed class MainViewModel : ObservableObject
 
         UiDispatcher.Run(() =>
         {
-            VisibleChannels.Clear();
-            foreach (Channel channel in results)
-            {
-                VisibleChannels.Add(channel);
-            }
+            VisibleChannels.ReplaceAll(results);
 
             if (allChannels.Count > 0)
             {
@@ -790,11 +960,13 @@ public sealed class MainViewModel : ObservableObject
         {
             IsFavorite = state.IsFavorite,
             IsHidden = state.IsHidden,
-            CustomGroup = NormalizeCustomGroup(state.CustomGroup)
+            CustomGroup = NormalizeCustomGroup(state.CustomGroup),
+            CustomSortIndex = NormalizeCustomSortIndex(state.CustomSortIndex),
+            LastWatchedAt = state.LastWatchedAt
         };
     }
 
-    private void UpdateSelectedChannel(Func<Channel, Channel> update)
+    private void UpdateSelectedChannel(Func<Channel, Channel> update, bool refreshGroups = true)
     {
         if (SelectedChannel is null)
         {
@@ -816,7 +988,11 @@ public sealed class MainViewModel : ObservableObject
         allChannels[index] = updated;
         UpdateChannelStateIndex(updated);
         SelectedChannel = updated;
-        RefreshGroupsAndCategories();
+        if (refreshGroups)
+        {
+            RefreshGroupsAndCategories();
+        }
+
         ScheduleSearch();
         _ = SaveChannelStatesSafelyAsync();
     }
@@ -834,7 +1010,9 @@ public sealed class MainViewModel : ObservableObject
             ChannelId = channel.Id,
             IsFavorite = channel.IsFavorite,
             IsHidden = channel.IsHidden,
-            CustomGroup = NormalizeCustomGroup(channel.CustomGroup)
+            CustomGroup = NormalizeCustomGroup(channel.CustomGroup),
+            CustomSortIndex = NormalizeCustomSortIndex(channel.CustomSortIndex),
+            LastWatchedAt = channel.LastWatchedAt
         };
 
         if (HasUserState(state))
@@ -865,12 +1043,112 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private async Task SaveOrganizationPreferencesSafelyAsync()
+    {
+        try
+        {
+            string[] customGroups = knownCustomGroups
+                .Select(NormalizeCustomGroup)
+                .Where(group => group is not null)
+                .Select(group => group!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            await organizationPreferencesStore.SaveAsync(
+                new ChannelOrganizationPreferences
+                {
+                    SortMode = SelectedSortMode,
+                    CustomGroups = customGroups
+                },
+                shutdownCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown.
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            string message = SensitiveTextRedactor.RedactText(ex.Message);
+            UiDispatcher.Run(() => AddDiagnostic($"Organization preference save failed: {message}"));
+        }
+    }
+
+    private int ReplaceCustomGroup(string sourceGroup, string? replacementGroup)
+    {
+        string? normalizedReplacement = NormalizeCustomGroup(replacementGroup);
+        int changed = 0;
+        HashSet<Guid> loadedChannelIds = allChannels.Select(channel => channel.Id).ToHashSet();
+        for (int index = 0; index < allChannels.Count; index++)
+        {
+            Channel channel = allChannels[index];
+            if (!string.Equals(channel.CustomGroup, sourceGroup, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            Channel updated = channel with { CustomGroup = normalizedReplacement };
+            allChannels[index] = updated;
+            UpdateChannelStateIndex(updated);
+            changed++;
+            if (SelectedChannel?.Id == updated.Id)
+            {
+                SelectedChannel = updated;
+            }
+        }
+
+        foreach ((Guid channelId, ChannelUserState state) in channelStates.ToArray())
+        {
+            if (!string.Equals(state.CustomGroup, sourceGroup, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            ChannelUserState updated = state with { CustomGroup = normalizedReplacement };
+            if (HasUserState(updated))
+            {
+                channelStates[channelId] = updated;
+            }
+            else
+            {
+                channelStates.Remove(channelId);
+            }
+
+            if (!loadedChannelIds.Contains(channelId))
+            {
+                changed++;
+            }
+        }
+
+        RefreshGroupsAndCategories();
+        ScheduleSearch();
+        _ = SaveChannelStatesSafelyAsync();
+        return changed;
+    }
+
+    private void UpdateChannelById(Guid channelId, Func<Channel, Channel> update)
+    {
+        int index = allChannels.FindIndex(channel => channel.Id == channelId);
+        if (index < 0)
+        {
+            return;
+        }
+
+        Channel updated = update(allChannels[index]);
+        allChannels[index] = updated;
+        UpdateChannelStateIndex(updated);
+        if (SelectedChannel?.Id == updated.Id)
+        {
+            SelectedChannel = updated;
+        }
+    }
+
     private void RefreshCustomGroupCollections()
     {
         string desiredAssignment = SelectedChannel?.CustomGroup ?? selectedCustomGroupAssignment;
         string[] customGroups = allChannels
             .Select(channel => channel.CustomGroup)
             .Concat(channelStates.Values.Select(state => state.CustomGroup))
+            .Concat(knownCustomGroups)
             .Select(NormalizeCustomGroup)
             .Where(group => group is not null)
             .Select(group => group!)
@@ -893,6 +1171,11 @@ public sealed class MainViewModel : ObservableObject
             SelectedCustomGroupAssignment = CustomGroupAssignments.Contains(desiredAssignment, StringComparer.OrdinalIgnoreCase)
                 ? desiredAssignment
                 : SourceGroupAssignmentOption;
+            if (SelectedManagedCustomGroup is not null &&
+                !CustomGroups.Contains(SelectedManagedCustomGroup, StringComparer.OrdinalIgnoreCase))
+            {
+                SelectedManagedCustomGroup = null;
+            }
         }
         finally
         {
@@ -916,7 +1199,11 @@ public sealed class MainViewModel : ObservableObject
     private static bool HasUserState(ChannelUserState state)
     {
         return state.ChannelId != Guid.Empty &&
-            (state.IsFavorite || state.IsHidden || !string.IsNullOrWhiteSpace(state.CustomGroup));
+            (state.IsFavorite ||
+                state.IsHidden ||
+                !string.IsNullOrWhiteSpace(state.CustomGroup) ||
+                state.CustomSortIndex.HasValue ||
+                state.LastWatchedAt.HasValue);
     }
 
     private static string? NormalizeCustomGroup(string? value)
@@ -928,6 +1215,16 @@ public sealed class MainViewModel : ObservableObject
 
         string normalized = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
         return normalized.Length == 0 ? null : normalized;
+    }
+
+    private static int? NormalizeCustomSortIndex(int? value)
+    {
+        return value < 0 ? null : value;
+    }
+
+    private static int GetCustomOrderIndex(Channel channel)
+    {
+        return channel.CustomSortIndex ?? channel.ImportIndex;
     }
 
     private static string FormatSelectedChannelDetails(Channel channel)
@@ -1008,6 +1305,29 @@ public sealed class MainViewModel : ObservableObject
         if (ClearCustomGroupCommand is RelayCommand clearGroup)
         {
             clearGroup.RaiseCanExecuteChanged();
+        }
+
+        if (MoveChannelUpCommand is RelayCommand moveUp)
+        {
+            moveUp.RaiseCanExecuteChanged();
+        }
+
+        if (MoveChannelDownCommand is RelayCommand moveDown)
+        {
+            moveDown.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void RaiseCustomGroupCommandStates()
+    {
+        if (RenameCustomGroupCommand is RelayCommand rename)
+        {
+            rename.RaiseCanExecuteChanged();
+        }
+
+        if (DeleteCustomGroupCommand is RelayCommand delete)
+        {
+            delete.RaiseCanExecuteChanged();
         }
     }
 

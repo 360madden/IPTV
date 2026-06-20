@@ -1,3 +1,5 @@
+using Iptv.Core.Channels;
+
 namespace Iptv.Search;
 
 public sealed record ChannelSearchQuery
@@ -11,6 +13,8 @@ public sealed record ChannelSearchQuery
     public bool FavoritesOnly { get; init; }
 
     public HiddenChannelFilter HiddenFilter { get; init; } = HiddenChannelFilter.VisibleOnly;
+
+    public ChannelSortMode SortMode { get; init; } = ChannelSortMode.FavoritesFirst;
 
     public int Limit { get; init; } = 5000;
 }
