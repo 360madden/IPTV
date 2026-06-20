@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Iptv.App/Iptv.App.csproj" />
+    <Project Path="src/Iptv.Core/Iptv.Core.csproj" />
+    <Project Path="src/Iptv.Epg/Iptv.Epg.csproj" />
+    <Project Path="src/Iptv.Persistence/Iptv.Persistence.csproj" />
+    <Project Path="src/Iptv.Playback/Iptv.Playback.csproj" />
+    <Project Path="src/Iptv.Playlists/Iptv.Playlists.csproj" />
+    <Project Path="src/Iptv.Search/Iptv.Search.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Iptv.Core.Tests/Iptv.Core.Tests.csproj" />
+    <Project Path="tests/Iptv.Epg.Tests/Iptv.Epg.Tests.csproj" />
+    <Project Path="tests/Iptv.Persistence.Tests/Iptv.Persistence.Tests.csproj" />
+    <Project Path="tests/Iptv.Playback.Tests/Iptv.Playback.Tests.csproj" />
+    <Project Path="tests/Iptv.Playlists.Tests/Iptv.Playlists.Tests.csproj" />
+    <Project Path="tests/Iptv.Search.Tests/Iptv.Search.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Iptv.Smoke/Iptv.Smoke.csproj" />
+  </Folder>
+</Solution>

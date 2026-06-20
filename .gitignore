@@ -1,0 +1,32 @@
+# Build output
+bin/
+obj/
+artifacts/
+TestResults/
+
+# User/local machine state
+.vs/
+.vscode/
+*.user
+*.suo
+*.rsuser
+
+# Logs and diagnostics
+*.log
+*.dmp
+*.trace
+
+# Local secrets and private IPTV data
+.env
+.env.*
+*.private.m3u
+*.private.m3u8
+*.private.xml
+private-playlists/
+local-data/
+
+# OS/editor noise
+Thumbs.db
+Desktop.ini
+*.swp
+*.tmp
