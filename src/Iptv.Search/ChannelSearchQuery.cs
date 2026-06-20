@@ -10,5 +10,7 @@ public sealed record ChannelSearchQuery
 
     public bool FavoritesOnly { get; init; }
 
+    public HiddenChannelFilter HiddenFilter { get; init; } = HiddenChannelFilter.VisibleOnly;
+
     public int Limit { get; init; } = 5000;
 }

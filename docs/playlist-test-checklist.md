@@ -16,8 +16,10 @@ Use this checklist before trying a private playlist.
 12. Click **Import File** and select a user-provided `.m3u` or `.m3u8`.
 13. Confirm the import summary shows channel, warning, duplicate, and error counts.
 14. Search/filter by group/category.
-15. Mark a channel as favorite, close the app, reopen, and re-import the same playlist to confirm the favorite reappears.
-16. Confirm normal UI does not show full tokenized stream URLs.
+15. Hide a channel, switch **Visibility** to **Hidden only**, and confirm the channel appears there.
+16. Add a custom group, assign the selected channel, and confirm the group appears in the group filter.
+17. Mark a channel as favorite, close the app, reopen, and re-import the same playlist to confirm the favorite/hidden/custom group state reappears.
+18. Confirm normal UI does not show full tokenized stream URLs.
 
 Optional public smoke command:
 

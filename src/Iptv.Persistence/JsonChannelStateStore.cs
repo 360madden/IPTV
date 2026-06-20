@@ -10,6 +10,7 @@ public sealed class JsonChannelStateStore : IChannelStateStore
     };
 
     private readonly string filePath;
+    private readonly SemaphoreSlim ioGate = new(1, 1);
 
     public JsonChannelStateStore(string? appDataDirectory = null)
     {
@@ -21,34 +22,166 @@ public sealed class JsonChannelStateStore : IChannelStateStore
 
     public async Task<IReadOnlySet<Guid>> LoadFavoritesAsync(CancellationToken cancellationToken)
     {
-        if (!File.Exists(filePath))
-        {
-            return new HashSet<Guid>();
-        }
-
-        await using FileStream stream = File.OpenRead(filePath);
-        var state = await JsonSerializer.DeserializeAsync<ChannelStateDocument>(stream, JsonOptions, cancellationToken)
-            .ConfigureAwait(false);
-
-        return state?.FavoriteChannelIds.ToHashSet() ?? new HashSet<Guid>();
+        IReadOnlyDictionary<Guid, ChannelUserState> states = await LoadChannelStatesAsync(cancellationToken).ConfigureAwait(false);
+        return states.Values.Where(state => state.IsFavorite).Select(state => state.ChannelId).ToHashSet();
     }
 
     public async Task SaveFavoritesAsync(IEnumerable<Guid> channelIds, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(channelIds);
 
-        var state = new ChannelStateDocument(channelIds.Distinct().Order().ToArray());
+        IReadOnlyDictionary<Guid, ChannelUserState> existingStates = await LoadChannelStatesAsync(cancellationToken).ConfigureAwait(false);
+        HashSet<Guid> favoriteIds = channelIds.Where(id => id != Guid.Empty).ToHashSet();
+        HashSet<Guid> stateIds = existingStates.Keys.Concat(favoriteIds).ToHashSet();
+
+        ChannelUserState[] mergedStates = stateIds
+            .Select(id =>
+            {
+                existingStates.TryGetValue(id, out ChannelUserState? existing);
+                return new ChannelUserState
+                {
+                    ChannelId = id,
+                    IsFavorite = favoriteIds.Contains(id),
+                    IsHidden = existing?.IsHidden ?? false,
+                    CustomGroup = NormalizeCustomGroup(existing?.CustomGroup)
+                };
+            })
+            .Where(HasUserState)
+            .ToArray();
+
+        await SaveChannelStatesAsync(mergedStates, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, ChannelUserState>> LoadChannelStatesAsync(CancellationToken cancellationToken)
+    {
+        if (!File.Exists(filePath))
+        {
+            return new Dictionary<Guid, ChannelUserState>();
+        }
+
+        await ioGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using FileStream stream = File.OpenRead(filePath);
+            var document = await JsonSerializer.DeserializeAsync<ChannelStateDocument>(stream, JsonOptions, cancellationToken)
+                .ConfigureAwait(false);
+
+            var states = new Dictionary<Guid, ChannelUserState>();
+            foreach (ChannelUserState state in document?.ChannelStates ?? [])
+            {
+                ChannelUserState normalized = NormalizeState(state);
+                if (HasUserState(normalized))
+                {
+                    states[normalized.ChannelId] = normalized;
+                }
+            }
+
+            foreach (Guid favoriteId in document?.FavoriteChannelIds ?? [])
+            {
+                if (favoriteId == Guid.Empty)
+                {
+                    continue;
+                }
+
+                states[favoriteId] = states.TryGetValue(favoriteId, out ChannelUserState? existing)
+                    ? existing with { IsFavorite = true }
+                    : new ChannelUserState { ChannelId = favoriteId, IsFavorite = true };
+            }
+
+            return states;
+        }
+        finally
+        {
+            ioGate.Release();
+        }
+    }
+
+    public async Task SaveChannelStatesAsync(IEnumerable<ChannelUserState> states, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(states);
+
+        ChannelUserState[] normalizedStates = states
+            .Select(NormalizeState)
+            .Where(HasUserState)
+            .GroupBy(state => state.ChannelId)
+            .Select(group => MergeStates(group))
+            .OrderBy(state => state.ChannelId)
+            .ToArray();
+
+        var document = new ChannelStateDocument
+        {
+            FavoriteChannelIds = normalizedStates
+                .Where(state => state.IsFavorite)
+                .Select(state => state.ChannelId)
+                .ToArray(),
+            ChannelStates = normalizedStates
+        };
+
         string directory = Path.GetDirectoryName(filePath) ?? ".";
         Directory.CreateDirectory(directory);
 
-        string tempPath = $"{filePath}.tmp";
-        await using (FileStream stream = File.Create(tempPath))
+        string tempPath = $"{filePath}.{Guid.NewGuid():N}.tmp";
+        await ioGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            await JsonSerializer.SerializeAsync(stream, state, JsonOptions, cancellationToken).ConfigureAwait(false);
-        }
+            await using (FileStream stream = File.Create(tempPath))
+            {
+                await JsonSerializer.SerializeAsync(stream, document, JsonOptions, cancellationToken).ConfigureAwait(false);
+            }
 
-        File.Move(tempPath, filePath, overwrite: true);
+            File.Move(tempPath, filePath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+
+            ioGate.Release();
+        }
     }
 
-    private sealed record ChannelStateDocument(Guid[] FavoriteChannelIds);
+    private static ChannelUserState MergeStates(IEnumerable<ChannelUserState> states)
+    {
+        ChannelUserState[] snapshot = states.ToArray();
+        ChannelUserState first = snapshot[0];
+        string? customGroup = snapshot.LastOrDefault(state => !string.IsNullOrWhiteSpace(state.CustomGroup))?.CustomGroup;
+
+        return first with
+        {
+            IsFavorite = snapshot.Any(state => state.IsFavorite),
+            IsHidden = snapshot.Any(state => state.IsHidden),
+            CustomGroup = NormalizeCustomGroup(customGroup)
+        };
+    }
+
+    private static ChannelUserState NormalizeState(ChannelUserState state)
+    {
+        return state with { CustomGroup = NormalizeCustomGroup(state.CustomGroup) };
+    }
+
+    private static bool HasUserState(ChannelUserState state)
+    {
+        return state.ChannelId != Guid.Empty &&
+            (state.IsFavorite || state.IsHidden || !string.IsNullOrWhiteSpace(state.CustomGroup));
+    }
+
+    private static string? NormalizeCustomGroup(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string normalized = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length == 0 ? null : normalized;
+    }
+
+    private sealed class ChannelStateDocument
+    {
+        public Guid[] FavoriteChannelIds { get; init; } = [];
+
+        public ChannelUserState[] ChannelStates { get; init; } = [];
+    }
 }

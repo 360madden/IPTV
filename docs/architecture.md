@@ -32,6 +32,8 @@ User playlist file or URL
 
 XMLTV files flow through `Iptv.Epg` and stay independent from playlist parsing. The app matches EPG channels by `tvg-id` or normalized channel name.
 
+Channel organization state is local-only. `Iptv.Persistence` stores favorites, hidden flags, and custom group assignments by stable channel ID, then `Iptv.App` reapplies that state after each playlist import.
+
 ## Privacy Boundary
 
 Raw stream URLs are represented with `SensitiveUri`. Its `ToString()` returns a redacted value. UI, logs, exceptions, and test snapshots should use redacted values unless the user explicitly performs an advanced diagnostic action.

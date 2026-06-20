@@ -44,7 +44,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\xumo-gui-smoke.ps1 -
 - Local and remote M3U/M3U8 import.
 - Playlist refresh with added/removed/unchanged diff summary.
 - XMLTV file import with channel/program counts and basic channel matching.
-- Search, group/category filters, favorites, and local favorite persistence.
+- Search, group/category/visibility filters, favorites, hidden channels, and custom group assignment.
+- Local channel organization persistence for favorites, hidden channels, and custom groups.
 - LibVLC playback with fullscreen toggle, volume, buffering presets, and startup timeout guidance.
 - Optional clock overlay with position, size, background, opacity, 24-hour, and seconds settings.
 - True app-managed fullscreen with video overlay clock, mini-HUD controls, auto-hide, double-click toggle, and monitor preference.

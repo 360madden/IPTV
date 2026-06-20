@@ -18,6 +18,10 @@ public sealed record Channel
 
     public string GroupTitle { get; init; } = "Ungrouped";
 
+    public string? CustomGroup { get; init; }
+
+    public string EffectiveGroupTitle => string.IsNullOrWhiteSpace(CustomGroup) ? GroupTitle : CustomGroup;
+
     public string Category { get; init; } = "Other";
 
     public string? TvgId { get; init; }

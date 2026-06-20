@@ -12,9 +12,17 @@ public sealed class ChannelSearchService : IChannelSearchService
         string normalizedText = ChannelNormalizer.NormalizeForSearch(query.Text);
         IEnumerable<Channel> filtered = channels;
 
+        filtered = query.HiddenFilter switch
+        {
+            HiddenChannelFilter.VisibleOnly => filtered.Where(channel => !channel.IsHidden),
+            HiddenChannelFilter.HiddenOnly => filtered.Where(channel => channel.IsHidden),
+            HiddenChannelFilter.IncludeHidden => filtered,
+            _ => filtered.Where(channel => !channel.IsHidden)
+        };
+
         if (!string.IsNullOrWhiteSpace(query.Group))
         {
-            filtered = filtered.Where(channel => channel.GroupTitle.Equals(query.Group, StringComparison.OrdinalIgnoreCase));
+            filtered = filtered.Where(channel => channel.EffectiveGroupTitle.Equals(query.Group, StringComparison.OrdinalIgnoreCase));
         }
 
         if (!string.IsNullOrWhiteSpace(query.Category))
@@ -31,6 +39,7 @@ public sealed class ChannelSearchService : IChannelSearchService
         {
             filtered = filtered.Where(channel =>
                 channel.NormalizedName.Contains(normalizedText, StringComparison.Ordinal) ||
+                ChannelNormalizer.NormalizeForSearch(channel.EffectiveGroupTitle).Contains(normalizedText, StringComparison.Ordinal) ||
                 ChannelNormalizer.NormalizeForSearch(channel.GroupTitle).Contains(normalizedText, StringComparison.Ordinal) ||
                 ChannelNormalizer.NormalizeForSearch(channel.Category).Contains(normalizedText, StringComparison.Ordinal) ||
                 ChannelNormalizer.NormalizeForSearch(channel.TvgId).Contains(normalizedText, StringComparison.Ordinal) ||
@@ -39,7 +48,8 @@ public sealed class ChannelSearchService : IChannelSearchService
 
         return filtered
             .OrderByDescending(channel => channel.IsFavorite)
-            .ThenBy(channel => channel.GroupTitle, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(channel => channel.IsHidden)
+            .ThenBy(channel => channel.EffectiveGroupTitle, StringComparer.OrdinalIgnoreCase)
             .ThenBy(channel => channel.DisplayName, StringComparer.OrdinalIgnoreCase)
             .Take(Math.Max(1, query.Limit))
             .ToArray();

@@ -18,6 +18,10 @@ namespace Iptv.App.ViewModels;
 
 public sealed class MainViewModel : ObservableObject
 {
+    private const string AllGroupsOption = "All Groups";
+    private const string AllCategoriesOption = "All Categories";
+    private const string SourceGroupAssignmentOption = "Source group";
+
     private readonly IPlaylistImportService playlistImportService;
     private readonly IChannelSearchService channelSearchService;
     private readonly IPlaybackEngine playbackEngine;
@@ -28,13 +32,17 @@ public sealed class MainViewModel : ObservableObject
     private readonly CancellationTokenSource shutdownCts = new();
     private CancellationTokenSource? searchCts;
     private Func<CancellationToken, Task<PlaylistImportResult>>? lastPlaylistImport;
-    private IReadOnlySet<Guid> favoriteIds = new HashSet<Guid>();
+    private readonly Dictionary<Guid, ChannelUserState> channelStates = [];
 
     private Channel? selectedChannel;
     private string searchText = string.Empty;
-    private string selectedGroup = "All Groups";
-    private string selectedCategory = "All Categories";
+    private string selectedGroup = AllGroupsOption;
+    private string selectedCategory = AllCategoriesOption;
+    private string selectedCustomGroupAssignment = SourceGroupAssignmentOption;
+    private string newCustomGroupName = string.Empty;
     private bool favoritesOnly;
+    private HiddenChannelFilter selectedHiddenFilter = HiddenChannelFilter.VisibleOnly;
+    private bool isUpdatingSelectedChannelOrganization;
     private bool isBusy;
     private string statusText = "Import a user-provided M3U/M3U8 playlist to begin.";
     private string playbackStatusText = "Playback idle.";
@@ -72,6 +80,9 @@ public sealed class MainViewModel : ObservableObject
         PauseCommand = new AsyncRelayCommand(_ => PauseAsync());
         StopCommand = new AsyncRelayCommand(_ => StopAsync());
         ToggleFavoriteCommand = new RelayCommand(_ => ToggleFavorite(), _ => SelectedChannel is not null);
+        ToggleHiddenCommand = new RelayCommand(_ => ToggleHidden(), _ => SelectedChannel is not null);
+        ClearCustomGroupCommand = new RelayCommand(_ => ClearCustomGroup(), _ => SelectedChannel is not null);
+        AddCustomGroupCommand = new RelayCommand(_ => AddCustomGroup());
         ClearFiltersCommand = new RelayCommand(_ => ClearFilters());
 
         playbackEngine.StateChanged += (_, state) => UiDispatcher.Run(() => ApplyPlaybackState(state));
@@ -79,9 +90,13 @@ public sealed class MainViewModel : ObservableObject
 
     public ObservableCollection<Channel> VisibleChannels { get; } = [];
 
-    public ObservableCollection<string> Groups { get; } = ["All Groups"];
+    public ObservableCollection<string> Groups { get; } = [AllGroupsOption];
 
-    public ObservableCollection<string> Categories { get; } = ["All Categories"];
+    public ObservableCollection<string> Categories { get; } = [AllCategoriesOption];
+
+    public ObservableCollection<string> CustomGroups { get; } = [];
+
+    public ObservableCollection<string> CustomGroupAssignments { get; } = [SourceGroupAssignmentOption];
 
     public ObservableCollection<ImportIssueViewModel> RecentImportIssues { get; } = [];
 
@@ -94,6 +109,13 @@ public sealed class MainViewModel : ObservableObject
         BufferingPreset.LowLatency,
         BufferingPreset.Balanced,
         BufferingPreset.PoorNetwork
+    ];
+
+    public IReadOnlyList<UiSelectionOption<HiddenChannelFilter>> VisibilityFilterOptions { get; } =
+    [
+        new(HiddenChannelFilter.VisibleOnly, "Visible channels"),
+        new(HiddenChannelFilter.IncludeHidden, "All channels"),
+        new(HiddenChannelFilter.HiddenOnly, "Hidden only")
     ];
 
     public ICommand ImportFileCommand { get; }
@@ -114,6 +136,12 @@ public sealed class MainViewModel : ObservableObject
 
     public ICommand ToggleFavoriteCommand { get; }
 
+    public ICommand ToggleHiddenCommand { get; }
+
+    public ICommand ClearCustomGroupCommand { get; }
+
+    public ICommand AddCustomGroupCommand { get; }
+
     public ICommand ClearFiltersCommand { get; }
 
     public Channel? SelectedChannel
@@ -125,7 +153,18 @@ public sealed class MainViewModel : ObservableObject
             {
                 SelectedChannelDetails = value is null
                     ? "Select a channel to view safe details."
-                    : $"Group: {value.GroupTitle} | Category: {value.Category} | Host: {value.StreamUrl.Host}";
+                    : FormatSelectedChannelDetails(value);
+                isUpdatingSelectedChannelOrganization = true;
+                try
+                {
+                    SelectedCustomGroupAssignment = value?.CustomGroup ?? SourceGroupAssignmentOption;
+                }
+                finally
+                {
+                    isUpdatingSelectedChannelOrganization = false;
+                }
+
+                OnPropertyChanged(nameof(HideSelectedChannelLabel));
                 RaiseCommandStates();
             }
         }
@@ -148,7 +187,8 @@ public sealed class MainViewModel : ObservableObject
         get => selectedGroup;
         set
         {
-            if (SetProperty(ref selectedGroup, value))
+            string nextValue = string.IsNullOrWhiteSpace(value) ? AllGroupsOption : value;
+            if (SetProperty(ref selectedGroup, nextValue))
             {
                 ScheduleSearch();
             }
@@ -160,7 +200,8 @@ public sealed class MainViewModel : ObservableObject
         get => selectedCategory;
         set
         {
-            if (SetProperty(ref selectedCategory, value))
+            string nextValue = string.IsNullOrWhiteSpace(value) ? AllCategoriesOption : value;
+            if (SetProperty(ref selectedCategory, nextValue))
             {
                 ScheduleSearch();
             }
@@ -178,6 +219,39 @@ public sealed class MainViewModel : ObservableObject
             }
         }
     }
+
+    public HiddenChannelFilter SelectedHiddenFilter
+    {
+        get => selectedHiddenFilter;
+        set
+        {
+            if (SetProperty(ref selectedHiddenFilter, value))
+            {
+                ScheduleSearch();
+            }
+        }
+    }
+
+    public string SelectedCustomGroupAssignment
+    {
+        get => selectedCustomGroupAssignment;
+        set
+        {
+            string nextValue = string.IsNullOrWhiteSpace(value) ? SourceGroupAssignmentOption : value;
+            if (SetProperty(ref selectedCustomGroupAssignment, nextValue) && !isUpdatingSelectedChannelOrganization)
+            {
+                ApplyCustomGroupToSelected(nextValue == SourceGroupAssignmentOption ? null : nextValue);
+            }
+        }
+    }
+
+    public string NewCustomGroupName
+    {
+        get => newCustomGroupName;
+        set => SetProperty(ref newCustomGroupName, value);
+    }
+
+    public string HideSelectedChannelLabel => SelectedChannel?.IsHidden == true ? "Unhide" : "Hide";
 
     public bool IsBusy
     {
@@ -261,10 +335,22 @@ public sealed class MainViewModel : ObservableObject
     public async Task InitializeAsync()
     {
         await Clock.InitializeAsync(shutdownCts.Token).ConfigureAwait(true);
-        favoriteIds = await channelStateStore.LoadFavoritesAsync(shutdownCts.Token).ConfigureAwait(true);
-        if (favoriteIds.Count > 0)
+        IReadOnlyDictionary<Guid, ChannelUserState> loadedStates = await channelStateStore
+            .LoadChannelStatesAsync(shutdownCts.Token)
+            .ConfigureAwait(true);
+        channelStates.Clear();
+        foreach ((Guid channelId, ChannelUserState state) in loadedStates)
         {
-            StatusText = $"Loaded {favoriteIds.Count:N0} saved favorites. Import a playlist to match them.";
+            channelStates[channelId] = state;
+        }
+
+        RefreshCustomGroupCollections();
+
+        int favoriteCount = channelStates.Values.Count(state => state.IsFavorite);
+        int hiddenCount = channelStates.Values.Count(state => state.IsHidden);
+        if (channelStates.Count > 0)
+        {
+            StatusText = $"Loaded saved channel state: {favoriteCount:N0} favorites, {hiddenCount:N0} hidden. Import a playlist to match them.";
         }
     }
 
@@ -383,9 +469,7 @@ public sealed class MainViewModel : ObservableObject
             }
 
             allChannels.Clear();
-            allChannels.AddRange(result.Channels.Select(channel => favoriteIds.Contains(channel.Id)
-                ? channel with { IsFavorite = true }
-                : channel));
+            allChannels.AddRange(result.Channels.Select(ApplyUserState));
             SelectedChannel = null;
             RefreshGroupsAndCategories();
             PopulateImportIssues(result.Issues);
@@ -550,34 +634,52 @@ public sealed class MainViewModel : ObservableObject
 
     private void ToggleFavorite()
     {
-        if (SelectedChannel is null)
+        UpdateSelectedChannel(channel => channel with { IsFavorite = !channel.IsFavorite });
+    }
+
+    private void ToggleHidden()
+    {
+        UpdateSelectedChannel(channel => channel with { IsHidden = !channel.IsHidden });
+    }
+
+    private void ClearCustomGroup()
+    {
+        SelectedCustomGroupAssignment = SourceGroupAssignmentOption;
+        ApplyCustomGroupToSelected(null);
+    }
+
+    private void AddCustomGroup()
+    {
+        string? normalized = NormalizeCustomGroup(NewCustomGroupName);
+        if (normalized is null)
         {
+            StatusText = "Enter a custom group name before adding.";
             return;
         }
 
-        int index = allChannels.FindIndex(channel => channel.Id == SelectedChannel.Id);
-        if (index < 0)
+        if (normalized.Equals(AllGroupsOption, StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals(AllCategoriesOption, StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals(SourceGroupAssignmentOption, StringComparison.OrdinalIgnoreCase))
         {
+            StatusText = $"'{normalized}' is reserved. Choose a different custom group name.";
             return;
         }
 
-        Channel updated = allChannels[index] with { IsFavorite = !allChannels[index].IsFavorite };
-        allChannels[index] = updated;
-        SelectedChannel = updated;
-        ScheduleSearch();
-
-        _ = channelStateStore.SaveFavoritesAsync(
-            allChannels.Where(channel => channel.IsFavorite).Select(channel => channel.Id),
-            shutdownCts.Token);
-        favoriteIds = allChannels.Where(channel => channel.IsFavorite).Select(channel => channel.Id).ToHashSet();
+        EnsureCustomGroupChoice(normalized);
+        NewCustomGroupName = string.Empty;
+        SelectedCustomGroupAssignment = normalized;
+        StatusText = SelectedChannel is null
+            ? $"Added custom group '{normalized}' for this session. Select a channel to assign it."
+            : $"Assigned '{SelectedChannel.DisplayName}' to custom group '{normalized}'.";
     }
 
     private void ClearFilters()
     {
         SearchText = string.Empty;
-        SelectedGroup = "All Groups";
-        SelectedCategory = "All Categories";
+        SelectedGroup = AllGroupsOption;
+        SelectedCategory = AllCategoriesOption;
         FavoritesOnly = false;
+        SelectedHiddenFilter = HiddenChannelFilter.VisibleOnly;
         ScheduleSearch();
     }
 
@@ -612,9 +714,10 @@ public sealed class MainViewModel : ObservableObject
         var query = new ChannelSearchQuery
         {
             Text = SearchText,
-            Group = SelectedGroup == "All Groups" ? null : SelectedGroup,
-            Category = SelectedCategory == "All Categories" ? null : SelectedCategory,
+            Group = SelectedGroup == AllGroupsOption ? null : SelectedGroup,
+            Category = SelectedCategory == AllCategoriesOption ? null : SelectedCategory,
             FavoritesOnly = FavoritesOnly,
+            HiddenFilter = SelectedHiddenFilter,
             Limit = 10_000
         };
 
@@ -633,27 +736,207 @@ public sealed class MainViewModel : ObservableObject
                 VisibleChannels.Add(channel);
             }
 
-            StatusText = allChannels.Count == 0
-                ? StatusText
-                : $"Showing {VisibleChannels.Count:N0} of {allChannels.Count:N0} channels.";
+            if (allChannels.Count > 0)
+            {
+                int hiddenCount = allChannels.Count(channel => channel.IsHidden);
+                string hiddenSummary = hiddenCount > 0 ? $" ({hiddenCount:N0} hidden)" : string.Empty;
+                StatusText = SelectedHiddenFilter == HiddenChannelFilter.HiddenOnly
+                    ? $"Showing {VisibleChannels.Count:N0} hidden channels of {allChannels.Count:N0} total."
+                    : $"Showing {VisibleChannels.Count:N0} of {allChannels.Count:N0} channels{hiddenSummary}.";
+            }
         });
     }
 
     private void RefreshGroupsAndCategories()
     {
+        string previousGroup = SelectedGroup;
+        string previousCategory = SelectedCategory;
+
         Groups.Clear();
-        Groups.Add("All Groups");
-        foreach (string group in allChannels.Select(channel => channel.GroupTitle).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))
+        Groups.Add(AllGroupsOption);
+        foreach (string group in allChannels
+                     .Select(channel => channel.EffectiveGroupTitle)
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .Order(StringComparer.OrdinalIgnoreCase))
         {
             Groups.Add(group);
         }
 
         Categories.Clear();
-        Categories.Add("All Categories");
+        Categories.Add(AllCategoriesOption);
         foreach (string category in allChannels.Select(channel => channel.Category).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))
         {
             Categories.Add(category);
         }
+
+        RefreshCustomGroupCollections();
+
+        SelectedGroup = Groups.Contains(previousGroup, StringComparer.OrdinalIgnoreCase)
+            ? previousGroup
+            : AllGroupsOption;
+        SelectedCategory = Categories.Contains(previousCategory, StringComparer.OrdinalIgnoreCase)
+            ? previousCategory
+            : AllCategoriesOption;
+    }
+
+    private Channel ApplyUserState(Channel channel)
+    {
+        if (!channelStates.TryGetValue(channel.Id, out ChannelUserState? state))
+        {
+            return channel;
+        }
+
+        return channel with
+        {
+            IsFavorite = state.IsFavorite,
+            IsHidden = state.IsHidden,
+            CustomGroup = NormalizeCustomGroup(state.CustomGroup)
+        };
+    }
+
+    private void UpdateSelectedChannel(Func<Channel, Channel> update)
+    {
+        if (SelectedChannel is null)
+        {
+            return;
+        }
+
+        int index = allChannels.FindIndex(channel => channel.Id == SelectedChannel.Id);
+        if (index < 0)
+        {
+            return;
+        }
+
+        Channel updated = update(allChannels[index]);
+        if (updated == allChannels[index])
+        {
+            return;
+        }
+
+        allChannels[index] = updated;
+        UpdateChannelStateIndex(updated);
+        SelectedChannel = updated;
+        RefreshGroupsAndCategories();
+        ScheduleSearch();
+        _ = SaveChannelStatesSafelyAsync();
+    }
+
+    private void ApplyCustomGroupToSelected(string? customGroup)
+    {
+        string? normalized = NormalizeCustomGroup(customGroup);
+        UpdateSelectedChannel(channel => channel with { CustomGroup = normalized });
+    }
+
+    private void UpdateChannelStateIndex(Channel channel)
+    {
+        var state = new ChannelUserState
+        {
+            ChannelId = channel.Id,
+            IsFavorite = channel.IsFavorite,
+            IsHidden = channel.IsHidden,
+            CustomGroup = NormalizeCustomGroup(channel.CustomGroup)
+        };
+
+        if (HasUserState(state))
+        {
+            channelStates[channel.Id] = state;
+        }
+        else
+        {
+            channelStates.Remove(channel.Id);
+        }
+    }
+
+    private async Task SaveChannelStatesSafelyAsync()
+    {
+        try
+        {
+            ChannelUserState[] stateSnapshot = channelStates.Values.ToArray();
+            await channelStateStore.SaveChannelStatesAsync(stateSnapshot, shutdownCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown.
+        }
+        catch (Exception ex)
+        {
+            string message = SensitiveTextRedactor.RedactText(ex.Message);
+            UiDispatcher.Run(() => AddDiagnostic($"Channel state save failed: {message}"));
+        }
+    }
+
+    private void RefreshCustomGroupCollections()
+    {
+        string desiredAssignment = SelectedChannel?.CustomGroup ?? selectedCustomGroupAssignment;
+        string[] customGroups = allChannels
+            .Select(channel => channel.CustomGroup)
+            .Concat(channelStates.Values.Select(state => state.CustomGroup))
+            .Select(NormalizeCustomGroup)
+            .Where(group => group is not null)
+            .Select(group => group!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        isUpdatingSelectedChannelOrganization = true;
+        try
+        {
+            CustomGroups.Clear();
+            CustomGroupAssignments.Clear();
+            CustomGroupAssignments.Add(SourceGroupAssignmentOption);
+            foreach (string group in customGroups)
+            {
+                CustomGroups.Add(group);
+                CustomGroupAssignments.Add(group);
+            }
+
+            SelectedCustomGroupAssignment = CustomGroupAssignments.Contains(desiredAssignment, StringComparer.OrdinalIgnoreCase)
+                ? desiredAssignment
+                : SourceGroupAssignmentOption;
+        }
+        finally
+        {
+            isUpdatingSelectedChannelOrganization = false;
+        }
+    }
+
+    private void EnsureCustomGroupChoice(string group)
+    {
+        if (!CustomGroupAssignments.Contains(group, StringComparer.OrdinalIgnoreCase))
+        {
+            CustomGroupAssignments.Add(group);
+        }
+
+        if (!CustomGroups.Contains(group, StringComparer.OrdinalIgnoreCase))
+        {
+            CustomGroups.Add(group);
+        }
+    }
+
+    private static bool HasUserState(ChannelUserState state)
+    {
+        return state.ChannelId != Guid.Empty &&
+            (state.IsFavorite || state.IsHidden || !string.IsNullOrWhiteSpace(state.CustomGroup));
+    }
+
+    private static string? NormalizeCustomGroup(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string normalized = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length == 0 ? null : normalized;
+    }
+
+    private static string FormatSelectedChannelDetails(Channel channel)
+    {
+        string groupText = channel.CustomGroup is null
+            ? channel.GroupTitle
+            : $"{channel.EffectiveGroupTitle} (source: {channel.GroupTitle})";
+        string hiddenText = channel.IsHidden ? " | Hidden" : string.Empty;
+        return $"Group: {groupText} | Category: {channel.Category} | Host: {channel.StreamUrl.Host}{hiddenText}";
     }
 
     private void ApplyPlaybackState(PlaybackStateSnapshot state)
@@ -715,6 +998,16 @@ public sealed class MainViewModel : ObservableObject
         if (ToggleFavoriteCommand is RelayCommand favorite)
         {
             favorite.RaiseCanExecuteChanged();
+        }
+
+        if (ToggleHiddenCommand is RelayCommand hidden)
+        {
+            hidden.RaiseCanExecuteChanged();
+        }
+
+        if (ClearCustomGroupCommand is RelayCommand clearGroup)
+        {
+            clearGroup.RaiseCanExecuteChanged();
         }
     }
 
