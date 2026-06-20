@@ -2,50 +2,49 @@
 
 Date: 2026-06-20
 Repo: `C:\RIFT MODDING\iptv`
-Branch: `master`
-Base commit before this handoff slice: `212a3cc Add resume tracking and IPTV library refinements`
+Branch: `main`
+Validated code baseline before final handoff/CI update: `47c75d6576b023aad8a12c92fd18fc845fecaf52` (`Merge pull request #2 from 360madden/codex/fix-msix-workflow-args`)
+Remote: `https://github.com/360madden/IPTV.git`
 
 ## Current State
 
-The .NET 10 WPF IPTV viewer is functional for user-supplied M3U/M3U8 playlists. Recent validated work added VOD resume tracking, paged VOD poster grid, compressed XMLTV import, smart views, EPG search, duplicate-hide preview, custom-group drag/drop, fallback scoring, MSIX signing docs, and GUI screenshot smoke coverage.
+The .NET 10 WPF IPTV viewer is functional for user-supplied M3U/M3U8 playlists and is now set up on GitHub. PR #1 merged the app/repo setup, refreshed contributor docs, added CI, release artifact hardening, playlist-file launcher support, duplicate/VOD sample playlists, and playlist fixture tests. PR #2 fixed the MSIX workflow and packaging script after hosted CI exposed PowerShell parameter-binding and Windows SDK tool-discovery issues. The final handoff update also removes path filters from the required Windows CI workflow so protected PRs always receive the `Build and Test` check.
 
-This handoff slice adds a root CMD convenience launcher:
+The repository is content-neutral: do not commit private playlists, provider credentials, or generated user library data.
 
-- `launch-iptv.cmd` starts `src\Iptv.App\Iptv.App.csproj` from the repo root.
-- `launch-iptv.cmd https://www.apsattv.com/xumo.m3u` treats a single HTTP/HTTPS argument as `--playlist-url`.
-- Other arguments are forwarded unchanged to the app.
-- `README.md` documents the wrapper in the command list and launch note.
+## Validated Gates
 
-## Validation To Preserve
+Local validation on 2026-06-20 passed:
 
-Latest full product validation from the preceding completed slice:
-
-- `dotnet format Iptv.slnx --verify-no-changes`
-- `dotnet build Iptv.slnx --no-restore`
-- `dotnet test Iptv.slnx --no-build` — 48/48 passed
-- `git diff --check`
-- `Iptv.SearchBench --count 50000`
-- release dry run with MSIX staging
-- live Xumo smoke: 389 channels imported, 3/3 playback probes reached `Playing`
-- GUI smoke with screenshots succeeded; duplicate mutation skipped because Xumo had no duplicates
-
-Launcher slice validation on 2026-06-20 passed:
-
-- `cmd /c launch-iptv.cmd --help`
-- `dotnet build Iptv.slnx --no-restore`
-- `dotnet test Iptv.slnx --no-build` — 48/48 passed
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -DryRun -CreateMsix`
+- workflow-style hashtable dry-run invocation with `DryRun = $true`
+- local Windows SDK discovery check for `makeappx.exe`
+- `dotnet format .\Iptv.slnx --verify-no-changes`
+- `dotnet build .\Iptv.slnx --no-restore`
+- `dotnet test .\Iptv.slnx --no-build` — 50/50 passed
 - `git diff --check`
 
-## Known Blockers / Cautions
+Remote validation passed:
 
-- No private playlists or credentials should be committed.
-- `AGENTS.md` exists but is stale relative to the current app; do not overwrite unless explicitly requested.
-- GitHub `origin` is configured as `https://github.com/360madden/IPTV.git` on the integration branch.
+- Windows MSIX on PR #2 branch: run `27880620058`
+- Windows MSIX on `main`: run `27880692669`
+- Windows CI on `main`: run `27880753885`
 
+## GitHub Setup
 
-## GitHub Setup Update
+- Repo metadata set for `360madden/IPTV` with IPTV/.NET/WPF/M3U topics.
+- `main` branch protection is enabled.
+- Required check: `Build and Test` with strict up-to-date status checks.
+- Windows CI runs on every PR to `main` and every push to `main` so the required check is always produced.
+- Pull requests are required; force pushes and deletions are disabled.
+- Merged feature branches were deleted and local tracking was pruned.
 
-GitHub repository `360madden/IPTV` already existed with unrelated `main` history containing an old `README.md` and `ph.m3u`. Setup was handled safely by creating branch `codex/github-setup` from `origin/main`, merging the local app history with `--allow-unrelated-histories`, resolving `README.md` in favor of the current app README, and removing `ph.m3u` from the integration branch so the app repository remains content-neutral. Remote `main` was not force-pushed or overwritten. Draft PR: `https://github.com/360madden/IPTV/pull/1`.
+## Known Cautions
+
+- GUI duplicate-dialog smoke was improved but can still be timing-sensitive; CLI fixture coverage passed reliably.
+- MSIX artifacts are unsigned unless `IPTV_MSIX_CERT_BASE64` and `IPTV_MSIX_CERT_PASSWORD` secrets are configured.
+- GitHub Actions currently warns that some pinned actions target Node 20 while the runner forces Node 24; not failing yet, but update actions when upstream versions are available.
+
 ## Best Next Resume Step
 
-Start with `git status --short --branch`, then verify whether branch `codex/github-setup` and its draft PR are still current. If continuing feature work, prioritize real VOD resume validation and duplicate-fixture GUI automation.
+Start with `git status --short --branch`, then use `launch-iptv.cmd "https://www.apsattv.com/xumo.m3u"` or a local `.m3u` file to test playlist import and playback. For development, branch from protected `main` and expect PR validation before merge.
