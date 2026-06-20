@@ -8,6 +8,7 @@
         MinHeight="680"
         MinWidth="1040"
         Background="{StaticResource AppBackgroundBrush}"
+        PreviewKeyDown="Window_PreviewKeyDown"
         Closing="Window_Closing">
     <Grid>
         <Grid.RowDefinitions>
@@ -74,7 +75,8 @@
                     <TextBlock Text="Search"
                                Foreground="{StaticResource TextSecondaryBrush}"
                                Margin="0,0,0,6" />
-                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                    <TextBox x:Name="SearchBox"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,0,0,14" />
 
                     <TextBlock Text="Group"
@@ -195,6 +197,7 @@
                                 <Setter Property="Margin" Value="0,0,0,6" />
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                 <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="AutomationProperties.Name" Value="{Binding DisplayName}" />
                             </Style>
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
@@ -220,11 +223,30 @@
                                                        Foreground="{StaticResource TextSecondaryBrush}"
                                                        FontSize="12" />
                                         </StackPanel>
-                                        <TextBlock Grid.Column="1"
-                                                   Text="★"
-                                                   Foreground="{StaticResource AccentBrush}"
-                                                   FontSize="18"
-                                                   Visibility="{Binding IsFavorite, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        <StackPanel Grid.Column="1"
+                                                    HorizontalAlignment="Right">
+                                            <Border Background="{StaticResource AccentBrush}"
+                                                    CornerRadius="8"
+                                                    Padding="7,3"
+                                                    Margin="0,0,0,6">
+                                                <Border.Visibility>
+                                                    <MultiBinding Converter="{StaticResource NowPlayingVisibilityConverter}">
+                                                        <Binding Path="Id" />
+                                                        <Binding Path="DataContext.NowPlayingChannelId"
+                                                                 RelativeSource="{RelativeSource AncestorType=Window}" />
+                                                    </MultiBinding>
+                                                </Border.Visibility>
+                                                <TextBlock Text="NOW"
+                                                           Foreground="#071018"
+                                                           FontSize="11"
+                                                           FontWeight="Bold" />
+                                            </Border>
+                                            <TextBlock Text="★"
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       FontSize="18"
+                                                       HorizontalAlignment="Right"
+                                                       Visibility="{Binding IsFavorite, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
                             </DataTemplate>

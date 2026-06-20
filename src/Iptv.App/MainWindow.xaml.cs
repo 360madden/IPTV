@@ -1,5 +1,8 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 using Iptv.App.Playback;
 using Iptv.App.Services;
 using Iptv.App.ViewModels;
@@ -76,23 +79,158 @@ public partial class MainWindow : Window
 
     private void Fullscreen_Click(object sender, RoutedEventArgs e)
     {
-        if (!isFullscreen)
+        ToggleFullscreen();
+    }
+
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+
+        if (key == Key.F11 || (key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Alt))
         {
-            previousWindowState = WindowState;
-            previousWindowStyle = WindowStyle;
-            previousResizeMode = ResizeMode;
-            WindowStyle = WindowStyle.None;
-            ResizeMode = ResizeMode.NoResize;
-            WindowState = WindowState.Maximized;
-            Topmost = true;
-            isFullscreen = true;
+            ToggleFullscreen();
+            e.Handled = true;
             return;
         }
 
+        if (key == Key.Escape && isFullscreen)
+        {
+            ExitFullscreen();
+            e.Handled = true;
+            return;
+        }
+
+        bool textInputFocused = IsFocusWithin<TextBoxBase>() || IsFocusWithin<PasswordBox>();
+        if (Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            switch (key)
+            {
+                case Key.F:
+                    SearchBox.Focus();
+                    SearchBox.SelectAll();
+                    e.Handled = true;
+                    return;
+                case Key.L when TryExecute(viewModel.ImportUrlCommand):
+                case Key.O when TryExecute(viewModel.ImportFileCommand):
+                case Key.R when TryExecute(viewModel.RefreshPlaylistCommand):
+                    e.Handled = true;
+                    return;
+            }
+        }
+
+        if (textInputFocused ||
+            IsFocusWithin<ComboBox>() ||
+            IsFocusWithin<ComboBoxItem>() ||
+            IsFocusWithin<Popup>() ||
+            IsFocusWithin<Slider>())
+        {
+            return;
+        }
+
+        if (key == Key.Space && IsFocusWithin<ButtonBase>())
+        {
+            return;
+        }
+
+        if (Keyboard.Modifiers != ModifierKeys.None)
+        {
+            return;
+        }
+
+        switch (key)
+        {
+            case Key.Space when TryExecute(viewModel.PlaySelectedCommand):
+            case Key.P when TryExecute(viewModel.PauseCommand):
+            case Key.S when TryExecute(viewModel.StopCommand):
+                e.Handled = true;
+                break;
+            case Key.F:
+                ToggleFullscreen();
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void ToggleFullscreen()
+    {
+        if (!isFullscreen)
+        {
+            EnterFullscreen();
+            return;
+        }
+
+        ExitFullscreen();
+    }
+
+    private void EnterFullscreen()
+    {
+        previousWindowState = WindowState;
+        previousWindowStyle = WindowStyle;
+        previousResizeMode = ResizeMode;
+        WindowStyle = WindowStyle.None;
+        ResizeMode = ResizeMode.NoResize;
+        WindowState = WindowState.Maximized;
+        Topmost = true;
+        isFullscreen = true;
+    }
+
+    private void ExitFullscreen()
+    {
         Topmost = false;
         WindowStyle = previousWindowStyle;
         ResizeMode = previousResizeMode;
         WindowState = previousWindowState;
         isFullscreen = false;
+    }
+
+    private static bool TryExecute(ICommand command)
+    {
+        if (!command.CanExecute(null))
+        {
+            return false;
+        }
+
+        command.Execute(null);
+        return true;
+    }
+
+    private static bool IsFocusWithin<T>() where T : DependencyObject
+    {
+        DependencyObject? current = Keyboard.FocusedElement as DependencyObject;
+        while (current is not null)
+        {
+            if (current is T)
+            {
+                return true;
+            }
+
+            current = GetElementParent(current);
+        }
+
+        return false;
+    }
+
+    private static DependencyObject? GetElementParent(DependencyObject current)
+    {
+        if (current is Visual)
+        {
+            DependencyObject? visualParent = VisualTreeHelper.GetParent(current);
+            if (visualParent is not null)
+            {
+                return visualParent;
+            }
+        }
+
+        if (current is FrameworkElement frameworkElement && frameworkElement.Parent is not null)
+        {
+            return frameworkElement.Parent;
+        }
+
+        if (current is FrameworkContentElement frameworkContentElement && frameworkContentElement.Parent is not null)
+        {
+            return frameworkContentElement.Parent;
+        }
+
+        return LogicalTreeHelper.GetParent(current);
     }
 }

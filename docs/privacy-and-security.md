@@ -17,3 +17,5 @@ Stream URLs are represented with `SensitiveUri`. Its string form is redacted and
 ## Network Behavior
 
 The app does not validate every stream on import. It parses playlist structure first, then attempts playback only when the user selects a channel.
+
+Playlist logo URLs are treated as untrusted optional metadata. Logo cache plumbing only accepts HTTP/HTTPS URLs, writes hashed filenames under the local app cache, and does not expose tokenized logo URLs in filenames.

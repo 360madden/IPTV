@@ -134,9 +134,11 @@ internal static class StreamProbe
             LibVLCSharp.Shared.Core.Initialize();
             using var libVlc = new LibVLC(
                 "--intf=dummy",
+                "--quiet",
                 "--vout=dummy",
                 "--aout=dummy",
                 "--no-video-title-show",
+                "--no-stats",
                 "--network-caching=1200",
                 "--live-caching=1200");
             using var mediaPlayer = new MediaPlayer(libVlc);

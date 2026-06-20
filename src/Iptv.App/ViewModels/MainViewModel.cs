@@ -43,6 +43,7 @@ public sealed class MainViewModel : ObservableObject
     private string epgSummaryText = "No XMLTV guide imported.";
     private string selectedChannelDetails = "Select a channel to view safe details.";
     private BufferingPreset selectedBufferingPreset = BufferingPreset.Balanced;
+    private Guid? nowPlayingChannelId;
     private int volume = 80;
 
     public MainViewModel(
@@ -232,6 +233,12 @@ public sealed class MainViewModel : ObservableObject
                 _ = SetBufferingPresetSafelyAsync(value);
             }
         }
+    }
+
+    public Guid? NowPlayingChannelId
+    {
+        get => nowPlayingChannelId;
+        private set => SetProperty(ref nowPlayingChannelId, value);
     }
 
     public int Volume
@@ -637,7 +644,36 @@ public sealed class MainViewModel : ObservableObject
         PlaybackStatusText = state.Channel is null
             ? state.Message
             : $"{state.Status}: {state.Channel.DisplayName} — {state.Message}";
+        UpdateNowPlayingMarker(state);
         AddDiagnostic(PlaybackStatusText);
+    }
+
+    private void UpdateNowPlayingMarker(PlaybackStateSnapshot state)
+    {
+        if (state.Channel is null)
+        {
+            return;
+        }
+
+        switch (state.Status)
+        {
+            case PlaybackStatus.Loading:
+            case PlaybackStatus.Buffering:
+            case PlaybackStatus.Playing:
+            case PlaybackStatus.Paused:
+                NowPlayingChannelId = state.Channel.Id;
+                break;
+            case PlaybackStatus.Stopped:
+            case PlaybackStatus.Failed:
+            case PlaybackStatus.Unsupported:
+            case PlaybackStatus.TimedOut:
+                if (NowPlayingChannelId == state.Channel.Id)
+                {
+                    NowPlayingChannelId = null;
+                }
+
+                break;
+        }
     }
 
     private void PopulateImportIssues(IReadOnlyList<PlaylistImportIssue> issues)
