@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$PlaylistUrl = "https://www.apsattv.com/xumo.m3u",
+    [string]$PlaylistFile,
     [string]$ChannelSearch = "LiveNOW",
     [string]$ChannelName = "LiveNOW",
     [int]$TimeoutSeconds = 60,
@@ -15,6 +16,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not [string]::IsNullOrWhiteSpace($PlaylistFile) -and $UseDialogImport) {
+    throw "-PlaylistFile cannot be combined with -UseDialogImport because the dialog smoke path imports URLs only."
+}
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
@@ -111,6 +116,16 @@ function Find-ByNameContains {
 function Invoke-Element {
     param([System.Windows.Automation.AutomationElement]$Element)
 
+    try {
+        $pattern = $Element.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+        $pattern.Invoke()
+        Start-Sleep -Milliseconds 250
+        return
+    }
+    catch {
+        # Fall through to mouse invocation for visible WPF controls that do not expose InvokePattern.
+    }
+
     $rect = $Element.Current.BoundingRectangle
     if (-not $rect.IsEmpty -and $rect.Width -gt 0 -and $rect.Height -gt 0) {
         $x = [int]($rect.X + ($rect.Width / 2))
@@ -129,8 +144,7 @@ function Invoke-Element {
         return
     }
 
-    $pattern = $Element.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
-    $pattern.Invoke()
+    throw "Element '$($Element.Current.Name)' cannot be invoked through UI Automation or mouse bounds."
 }
 
 function Set-ElementValue {
@@ -283,7 +297,16 @@ try {
     }
 
     Write-Host "Launching IPTV app..."
-    $startArguments = if ($UseDialogImport) { @() } else { @("--playlist-url", $PlaylistUrl) }
+    if (-not [string]::IsNullOrWhiteSpace($PlaylistFile)) {
+        $playlistFilePath = (Resolve-Path -LiteralPath $PlaylistFile).Path
+        $startArguments = @("--playlist-file", "`"$playlistFilePath`"")
+    }
+    elseif ($UseDialogImport) {
+        $startArguments = @()
+    }
+    else {
+        $startArguments = @("--playlist-url", $PlaylistUrl)
+    }
     $process = Start-Process -FilePath $appExe -ArgumentList $startArguments -PassThru
     $main = Wait-Until { Get-AppWindow -ProcessId $process.Id } $TimeoutSeconds "main app window"
 
@@ -300,7 +323,8 @@ try {
         Invoke-Element (Wait-Until { Find-ByName $prompt "Import" } $TimeoutSeconds "dialog Import button")
     }
     else {
-        Write-Host "Importing playlist URL through startup argument..."
+        $startupImportKind = if ([string]::IsNullOrWhiteSpace($PlaylistFile)) { "URL" } else { "file" }
+        Write-Host "Importing playlist $startupImportKind through startup argument..."
         Wait-Until { Find-ByNameContains $main "Imported " } $TimeoutSeconds "startup playlist import" | Out-Null
     }
 
@@ -359,13 +383,34 @@ try {
         if ($hideDuplicates.Current.IsEnabled) {
             Invoke-Element $hideDuplicates
             $duplicateDialog = Wait-Until {
-                Find-ByName `
-                    -Root ([System.Windows.Automation.AutomationElement]::RootElement) `
+                $root = [System.Windows.Automation.AutomationElement]::RootElement
+                $dialog = Find-ByName `
+                    -Root $root `
                     -Name "Duplicate Preview Dialog" `
                     -Scope ([System.Windows.Automation.TreeScope]::Children)
+                if ($null -ne $dialog) { return $dialog }
+
+                $dialog = Find-ByName `
+                    -Root $root `
+                    -Name "Duplicate Preview" `
+                    -Scope ([System.Windows.Automation.TreeScope]::Children)
+                if ($null -ne $dialog) { return $dialog }
+
+                Find-ByNameContains `
+                    -Root $root `
+                    -Text "Duplicate Preview" `
+                    -Scope ([System.Windows.Automation.TreeScope]::Descendants)
             } $TimeoutSeconds "duplicate preview dialog"
             Invoke-Element (Wait-Until { Find-ByName $duplicateDialog "Confirm Hide Duplicates" } $TimeoutSeconds "confirm hide duplicates button")
-            Wait-Until { Find-ByNameContains $main "Hid " } $TimeoutSeconds "duplicate hide status" | Out-Null
+            Wait-Until {
+                $main = Get-AppWindow -ProcessId $process.Id
+                if ($null -eq $main) { return $false }
+
+                if (Find-ByNameContains $main "Hid ") { return $true }
+
+                $hideDuplicates = Find-ByName $main "Hide Duplicates"
+                return $null -ne $hideDuplicates -and -not $hideDuplicates.Current.IsEnabled
+            } $TimeoutSeconds "duplicate hide result" | Out-Null
             $undo = Find-ByName $main "Undo Org"
             if ($null -ne $undo -and $undo.Current.IsEnabled) {
                 Invoke-Element $undo

@@ -21,6 +21,7 @@ dotnet build .\Iptv.slnx --no-restore
 dotnet test .\Iptv.slnx --no-build
 .\launch-iptv.cmd
 .\launch-iptv.cmd https://www.apsattv.com/xumo.m3u
+.\launch-iptv.cmd .\assets\sample-playlists\duplicate-channels.m3u
 dotnet run --project .\tools\Iptv.Smoke\Iptv.Smoke.csproj -- --url https://www.apsattv.com/xumo.m3u --probe-count 3 --timeout-seconds 20
 ```
 

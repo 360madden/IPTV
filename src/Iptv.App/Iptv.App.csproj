@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <PackageReference Include="LibVLCSharp.WPF" />
@@ -16,6 +16,8 @@
 
   <ItemGroup>
     <Content Include="..\..\assets\sample-playlists\synthetic-news-sports.m3u" Link="Samples\synthetic-news-sports.m3u" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\sample-playlists\duplicate-channels.m3u" Link="Samples\duplicate-channels.m3u" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\sample-playlists\public-vod-resume.m3u" Link="Samples\public-vod-resume.m3u" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

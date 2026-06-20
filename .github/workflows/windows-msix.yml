@@ -18,8 +18,12 @@ on:
       - "global.json"
       - ".github/workflows/windows-msix.yml"
 
+permissions:
+  contents: read
+
 jobs:
   package:
+    name: Package Windows Release
     runs-on: windows-latest
     env:
       IPTV_MSIX_CERT_BASE64: ${{ secrets.IPTV_MSIX_CERT_BASE64 }}
@@ -71,6 +75,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: iptv-viewer-win-x64
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
           path: |
             artifacts/release/IptvViewer-win-x64.zip
             artifacts/release/IptvViewer-win-x64.msix

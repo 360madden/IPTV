@@ -1,0 +1,49 @@
+name: Windows CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "assets/**"
+      - "src/**"
+      - "tests/**"
+      - "Iptv.slnx"
+      - "Directory.*.props"
+      - "global.json"
+      - ".github/workflows/windows-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "assets/**"
+      - "src/**"
+      - "tests/**"
+      - "Iptv.slnx"
+      - "Directory.*.props"
+      - "global.json"
+      - ".github/workflows/windows-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build and Test
+    runs-on: windows-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore .\Iptv.slnx
+
+      - name: Build
+        run: dotnet build .\Iptv.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test .\Iptv.slnx --configuration Release --no-build

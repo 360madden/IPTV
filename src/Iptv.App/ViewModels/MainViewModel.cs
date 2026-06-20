@@ -1276,6 +1276,18 @@ public sealed class MainViewModel : ObservableObject
         await ImportAsync(import, rememberForRefresh: true).ConfigureAwait(true);
     }
 
+    public async Task ImportPlaylistFileAsync(string playlistPath)
+    {
+        if (string.IsNullOrWhiteSpace(playlistPath))
+        {
+            return;
+        }
+
+        Func<CancellationToken, Task<PlaylistImportResult>> import =
+            ct => playlistImportService.ImportFileAsync(playlistPath.Trim(), ct);
+        await ImportAsync(import, rememberForRefresh: true).ConfigureAwait(true);
+    }
+
     public void SetSelectedChannels(IEnumerable<Channel> channels)
     {
         ArgumentNullException.ThrowIfNull(channels);
@@ -1460,8 +1472,7 @@ public sealed class MainViewModel : ObservableObject
                 return;
             }
 
-            Func<CancellationToken, Task<PlaylistImportResult>> import = ct => playlistImportService.ImportFileAsync(path, ct);
-            await ImportAsync(import, rememberForRefresh: true).ConfigureAwait(true);
+            await ImportPlaylistFileAsync(path).ConfigureAwait(true);
         }
         catch (Exception ex)
         {

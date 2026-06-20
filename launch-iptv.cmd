@@ -40,6 +40,10 @@ if "%~2"=="" if /I "%FIRST_ARG:~0,8%"=="https://" (
     dotnet run --project "%APP_PROJECT%" -- --playlist-url "%~1"
     goto :done
 )
+if "%~2"=="" if exist "%~1" (
+    dotnet run --project "%APP_PROJECT%" -- --playlist-file "%~f1"
+    goto :done
+)
 
 dotnet run --project "%APP_PROJECT%" -- %*
 
@@ -57,7 +61,9 @@ echo.
 echo Usage:
 echo   launch-iptv.cmd
 echo   launch-iptv.cmd https://www.apsattv.com/xumo.m3u
+echo   launch-iptv.cmd assets\sample-playlists\duplicate-channels.m3u
 echo   launch-iptv.cmd --playlist-url https://www.apsattv.com/xumo.m3u
 echo.
-echo Arguments other than a single http/https URL are forwarded to the app unchanged.
+echo A single http/https URL maps to --playlist-url. A single existing file maps to --playlist-file.
+echo Other arguments are forwarded to the app unchanged.
 exit /b 0

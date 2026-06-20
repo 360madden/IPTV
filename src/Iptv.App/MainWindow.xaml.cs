@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     private readonly MainViewModel viewModel;
     private readonly DispatcherTimer fullscreenControlsHideTimer;
     private readonly string? startupPlaylistUrl;
+    private readonly string? startupPlaylistFile;
     private WindowState previousWindowState;
     private WindowStyle previousWindowStyle;
     private ResizeMode previousResizeMode;
@@ -51,9 +52,10 @@ public partial class MainWindow : Window
     private Point channelDragStartPoint;
     private bool isFullscreen;
 
-    public MainWindow(string? startupPlaylistUrl = null)
+    public MainWindow(string? startupPlaylistUrl = null, string? startupPlaylistFile = null)
     {
         this.startupPlaylistUrl = string.IsNullOrWhiteSpace(startupPlaylistUrl) ? null : startupPlaylistUrl.Trim();
+        this.startupPlaylistFile = string.IsNullOrWhiteSpace(startupPlaylistFile) ? null : startupPlaylistFile.Trim();
         InitializeComponent();
 
         var parser = new M3uPlaylistParser();
@@ -246,7 +248,11 @@ public partial class MainWindow : Window
         await viewModel.InitializeAsync().ConfigureAwait(true);
         viewModel.Clock.SetMonitorOptions(MonitorBounds.GetMonitorOptions(this));
 
-        if (startupPlaylistUrl is not null)
+        if (startupPlaylistFile is not null)
+        {
+            await viewModel.ImportPlaylistFileAsync(startupPlaylistFile).ConfigureAwait(true);
+        }
+        else if (startupPlaylistUrl is not null)
         {
             await viewModel.ImportPlaylistUrlAsync(startupPlaylistUrl).ConfigureAwait(true);
         }

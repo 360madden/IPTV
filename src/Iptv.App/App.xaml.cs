@@ -8,7 +8,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        var window = new MainWindow(GetStartupPlaylistUrl(e.Args));
+        var window = new MainWindow(GetStartupPlaylistUrl(e.Args), GetStartupPlaylistFile(e.Args));
         MainWindow = window;
         window.Show();
     }
@@ -24,6 +24,26 @@ public partial class App : Application
             }
 
             if (string.Equals(argument, "--playlist-url", StringComparison.OrdinalIgnoreCase) &&
+                index + 1 < args.Count)
+            {
+                return args[index + 1].Trim();
+            }
+        }
+
+        return null;
+    }
+
+    private static string? GetStartupPlaylistFile(IReadOnlyList<string> args)
+    {
+        for (int index = 0; index < args.Count; index++)
+        {
+            string argument = args[index];
+            if (argument.StartsWith("--playlist-file=", StringComparison.OrdinalIgnoreCase))
+            {
+                return argument["--playlist-file=".Length..].Trim();
+            }
+
+            if (string.Equals(argument, "--playlist-file", StringComparison.OrdinalIgnoreCase) &&
                 index + 1 < args.Count)
             {
                 return args[index + 1].Trim();

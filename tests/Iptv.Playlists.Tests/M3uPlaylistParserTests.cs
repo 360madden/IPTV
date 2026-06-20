@@ -1,5 +1,6 @@
 using System.Text;
 using Iptv.Core;
+using Iptv.Core.Channels;
 using Iptv.Core.PlaylistImport;
 using Iptv.Playlists;
 
@@ -83,6 +84,34 @@ public sealed class M3uPlaylistParserTests
         }
     }
 
+    [Fact]
+    public async Task SampleFixture_DuplicateChannels_ProvidesDuplicateAssistantCoverage()
+    {
+        var service = new PlaylistImportService(new M3uPlaylistParser());
+        string path = GetSamplePlaylistPath("duplicate-channels.m3u");
+
+        PlaylistImportResult result = await service.ImportFileAsync(path, CancellationToken.None);
+
+        Assert.Equal(3, result.Channels.Count);
+        Assert.Contains(
+            result.Channels.GroupBy(channel => $"{channel.ContentKind}|{channel.NormalizedName}|{channel.StreamUrl.Host}"),
+            group => group.Count() > 1);
+    }
+
+    [Fact]
+    public async Task SampleFixture_PublicVodResume_ProvidesVodAndSeriesCoverage()
+    {
+        var service = new PlaylistImportService(new M3uPlaylistParser());
+        string path = GetSamplePlaylistPath("public-vod-resume.m3u");
+
+        PlaylistImportResult result = await service.ImportFileAsync(path, CancellationToken.None);
+
+        Assert.Equal(2, result.Channels.Count);
+        Assert.Contains(result.Channels, channel => channel.ContentKind == ContentKind.Vod);
+        Assert.Contains(result.Channels, channel => channel.ContentKind == ContentKind.Series);
+        Assert.All(result.Channels, channel => Assert.NotNull(ChannelMetadataExtractor.TryInferReleaseYear(channel.DisplayName)));
+    }
+
     private static async Task<PlaylistImportResult> ParseAsync(string playlist)
     {
         await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(playlist));
@@ -95,5 +124,23 @@ public sealed class M3uPlaylistParserTests
         };
 
         return await parser.ParseAsync(stream, source, CancellationToken.None);
+    }
+
+    private static string GetSamplePlaylistPath(string fileName)
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Iptv.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        if (directory is null)
+        {
+            throw new InvalidOperationException("Could not find repository root containing Iptv.slnx.");
+        }
+
+        string path = Path.Combine(directory.FullName, "assets", "sample-playlists", fileName);
+        Assert.True(File.Exists(path), $"Expected fixture at {path}");
+        return path;
     }
 }
