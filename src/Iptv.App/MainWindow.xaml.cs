@@ -10,6 +10,7 @@ using System.Windows.Threading;
 using Iptv.App.Playback;
 using Iptv.App.Services;
 using Iptv.App.ViewModels;
+using Iptv.Core.Channels;
 using Iptv.Epg;
 using Iptv.Persistence;
 using Iptv.Playback;
@@ -58,6 +59,7 @@ public partial class MainWindow : Window
         IPlaybackEngine playbackEngine = CreatePlaybackEngine();
         var stateStore = new JsonChannelStateStore();
         var organizationPreferencesStore = new JsonChannelOrganizationPreferencesStore();
+        var organizationBackupService = new JsonChannelOrganizationBackupService();
         var uiPreferencesStore = new JsonUiPreferencesStore();
         var epgImportService = new XmltvImportService();
         var dialogService = new PlaylistDialogService();
@@ -68,6 +70,7 @@ public partial class MainWindow : Window
             playbackEngine,
             stateStore,
             organizationPreferencesStore,
+            organizationBackupService,
             uiPreferencesStore,
             epgImportService,
             dialogService);
@@ -106,6 +109,14 @@ public partial class MainWindow : Window
         if (viewModel.PlaySelectedCommand.CanExecute(null))
         {
             viewModel.PlaySelectedCommand.Execute(null);
+        }
+    }
+
+    private void Channels_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ListBox listBox)
+        {
+            viewModel.SetSelectedChannels(listBox.SelectedItems.OfType<Channel>());
         }
     }
 

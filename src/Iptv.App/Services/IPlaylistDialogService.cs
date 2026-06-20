@@ -6,6 +6,10 @@ public interface IPlaylistDialogService
 
     string? PickXmltvFile();
 
+    string? PickOrganizationImportFile();
+
+    string? PickOrganizationExportFile();
+
     string? PromptPlaylistUrl();
 
     void ShowError(string title, string message);

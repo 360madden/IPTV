@@ -32,7 +32,7 @@ User playlist file or URL
 
 XMLTV files flow through `Iptv.Epg` and stay independent from playlist parsing. The app matches EPG channels by `tvg-id` or normalized channel name.
 
-Channel organization state is local-only. `Iptv.Persistence` stores favorites, hidden flags, custom group assignments, custom sort indexes, and recently watched timestamps by stable channel ID, then `Iptv.App` reapplies that state after each playlist import. Sort-mode and empty custom-group preferences are stored separately so clock/UI settings cannot overwrite organization choices.
+Channel organization state is local-only. `Iptv.Persistence` stores favorites, hidden flags, custom group assignments, custom sort indexes, and recently watched timestamps by stable channel ID, then `Iptv.App` reapplies that state after each playlist import. Sort-mode and empty custom-group preferences are stored separately so clock/UI settings cannot overwrite organization choices. Organization backup files contain stable channel IDs and user organization metadata only, not raw stream URLs.
 
 ## Privacy Boundary
 
@@ -45,5 +45,6 @@ Raw stream URLs are represented with `SensitiveUri`. Its `ToString()` returns a 
 - Keep search over normalized fields, not raw URLs.
 - Keep WPF channel lists virtualized.
 - Preserve playlist import order and use range-reset collection updates for large channel lists.
+- Apply batch channel updates with hash-set selection lookups and one persistence write per action.
 - Keep playback backend details isolated from view models.
 - Use `tools/Iptv.Smoke` for safe URL import/probe checks before GUI testing.

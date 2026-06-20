@@ -46,7 +46,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\xumo-gui-smoke.ps1 -
 - XMLTV file import with channel/program counts and basic channel matching.
 - Search, group/category/visibility filters, sort modes, favorites, hidden channels, and custom group assignment.
 - Local channel organization persistence for favorites, hidden channels, custom groups, custom order, and recently watched sorting.
-- Custom group manager with add, rename, delete, and selected-channel move up/down controls.
+- Custom group manager with counts, add, rename, delete, batch actions, and selected-channel move up/down controls.
+- Import/export for channel organization backups without raw stream URLs.
 - LibVLC playback with fullscreen toggle, volume, buffering presets, and startup timeout guidance.
 - Optional clock overlay with position, size, background, opacity, 24-hour, and seconds settings.
 - True app-managed fullscreen with video overlay clock, mini-HUD controls, auto-hide, double-click toggle, and monitor preference.

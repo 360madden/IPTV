@@ -21,12 +21,14 @@ public sealed class MainViewModel : ObservableObject
     private const string AllGroupsOption = "All Groups";
     private const string AllCategoriesOption = "All Categories";
     private const string SourceGroupAssignmentOption = "Source group";
+    private const int MaxVisibleChannelResults = 50_000;
 
     private readonly IPlaylistImportService playlistImportService;
     private readonly IChannelSearchService channelSearchService;
     private readonly IPlaybackEngine playbackEngine;
     private readonly IChannelStateStore channelStateStore;
     private readonly IChannelOrganizationPreferencesStore organizationPreferencesStore;
+    private readonly IChannelOrganizationBackupService organizationBackupService;
     private readonly IXmltvImportService xmltvImportService;
     private readonly IPlaylistDialogService dialogService;
     private readonly List<Channel> allChannels = [];
@@ -35,6 +37,7 @@ public sealed class MainViewModel : ObservableObject
     private Func<CancellationToken, Task<PlaylistImportResult>>? lastPlaylistImport;
     private readonly Dictionary<Guid, ChannelUserState> channelStates = [];
     private readonly HashSet<string> knownCustomGroups = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<Guid> selectedChannelIds = [];
 
     private Channel? selectedChannel;
     private string searchText = string.Empty;
@@ -47,6 +50,8 @@ public sealed class MainViewModel : ObservableObject
     private ChannelSortMode selectedSortMode = ChannelSortMode.FavoritesFirst;
     private string? selectedManagedCustomGroup;
     private string renameCustomGroupName = string.Empty;
+    private string selectedBatchGroupAssignment = SourceGroupAssignmentOption;
+    private int selectedChannelCount;
     private bool isUpdatingSelectedChannelOrganization;
     private bool isBusy;
     private string statusText = "Import a user-provided M3U/M3U8 playlist to begin.";
@@ -65,6 +70,7 @@ public sealed class MainViewModel : ObservableObject
         IPlaybackEngine playbackEngine,
         IChannelStateStore channelStateStore,
         IChannelOrganizationPreferencesStore organizationPreferencesStore,
+        IChannelOrganizationBackupService organizationBackupService,
         IUiPreferencesStore uiPreferencesStore,
         IXmltvImportService xmltvImportService,
         IPlaylistDialogService dialogService)
@@ -74,6 +80,7 @@ public sealed class MainViewModel : ObservableObject
         this.playbackEngine = playbackEngine;
         this.channelStateStore = channelStateStore;
         this.organizationPreferencesStore = organizationPreferencesStore;
+        this.organizationBackupService = organizationBackupService;
         this.xmltvImportService = xmltvImportService;
         this.dialogService = dialogService;
         Clock = new ClockOverlayViewModel(uiPreferencesStore);
@@ -94,6 +101,13 @@ public sealed class MainViewModel : ObservableObject
         DeleteCustomGroupCommand = new RelayCommand(_ => DeleteCustomGroup(), _ => SelectedManagedCustomGroup is not null);
         MoveChannelUpCommand = new RelayCommand(_ => MoveSelectedChannel(-1), _ => SelectedChannel is not null);
         MoveChannelDownCommand = new RelayCommand(_ => MoveSelectedChannel(1), _ => SelectedChannel is not null);
+        BatchFavoriteCommand = new RelayCommand(_ => ApplyBatchUpdate(channel => channel with { IsFavorite = true }, "favorited"), _ => HasBatchSelection);
+        BatchHideCommand = new RelayCommand(_ => ApplyBatchUpdate(channel => channel with { IsHidden = true }, "hidden"), _ => HasBatchSelection);
+        BatchUnhideCommand = new RelayCommand(_ => ApplyBatchUpdate(channel => channel with { IsHidden = false }, "unhidden"), _ => HasBatchSelection);
+        BatchAssignGroupCommand = new RelayCommand(_ => AssignBatchGroup(), _ => HasBatchSelection);
+        BatchClearGroupCommand = new RelayCommand(_ => ApplyBatchUpdate(channel => channel with { CustomGroup = null }, "removed from custom groups"), _ => HasBatchSelection);
+        ImportOrganizationCommand = new AsyncRelayCommand(_ => ImportOrganizationAsync(), _ => !IsBusy);
+        ExportOrganizationCommand = new AsyncRelayCommand(_ => ExportOrganizationAsync(), _ => !IsBusy);
         ClearFiltersCommand = new RelayCommand(_ => ClearFilters());
 
         playbackEngine.StateChanged += (_, state) => UiDispatcher.Run(() => ApplyPlaybackState(state));
@@ -106,6 +120,8 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<string> Categories { get; } = [AllCategoriesOption];
 
     public ObservableCollection<string> CustomGroups { get; } = [];
+
+    public ObservableCollection<CustomGroupSummaryViewModel> CustomGroupSummaries { get; } = [];
 
     public ObservableCollection<string> CustomGroupAssignments { get; } = [SourceGroupAssignmentOption];
 
@@ -172,6 +188,20 @@ public sealed class MainViewModel : ObservableObject
     public ICommand MoveChannelUpCommand { get; }
 
     public ICommand MoveChannelDownCommand { get; }
+
+    public ICommand BatchFavoriteCommand { get; }
+
+    public ICommand BatchHideCommand { get; }
+
+    public ICommand BatchUnhideCommand { get; }
+
+    public ICommand BatchAssignGroupCommand { get; }
+
+    public ICommand BatchClearGroupCommand { get; }
+
+    public ICommand ImportOrganizationCommand { get; }
+
+    public ICommand ExportOrganizationCommand { get; }
 
     public ICommand ClearFiltersCommand { get; }
 
@@ -319,7 +349,35 @@ public sealed class MainViewModel : ObservableObject
         set => SetProperty(ref renameCustomGroupName, value);
     }
 
+    public string SelectedBatchGroupAssignment
+    {
+        get => selectedBatchGroupAssignment;
+        set
+        {
+            string nextValue = string.IsNullOrWhiteSpace(value) ? SourceGroupAssignmentOption : value;
+            SetProperty(ref selectedBatchGroupAssignment, nextValue);
+        }
+    }
+
+    public int SelectedChannelCount
+    {
+        get => selectedChannelCount;
+        private set
+        {
+            if (SetProperty(ref selectedChannelCount, value))
+            {
+                OnPropertyChanged(nameof(BatchSelectionText));
+            }
+        }
+    }
+
+    public string BatchSelectionText => SelectedChannelCount == 0
+        ? "No channels selected for batch actions."
+        : $"{SelectedChannelCount:N0} channels selected for batch actions.";
+
     public string HideSelectedChannelLabel => SelectedChannel?.IsHidden == true ? "Unhide" : "Hide";
+
+    private bool HasBatchSelection => selectedChannelIds.Count > 0;
 
     public bool IsBusy
     {
@@ -445,6 +503,20 @@ public sealed class MainViewModel : ObservableObject
         Func<CancellationToken, Task<PlaylistImportResult>> import =
             ct => playlistImportService.ImportUrlAsync(playlistUrl.Trim(), ct);
         await ImportAsync(import, rememberForRefresh: true).ConfigureAwait(true);
+    }
+
+    public void SetSelectedChannels(IEnumerable<Channel> channels)
+    {
+        ArgumentNullException.ThrowIfNull(channels);
+
+        selectedChannelIds.Clear();
+        foreach (Guid channelId in channels.Select(channel => channel.Id).Where(id => id != Guid.Empty))
+        {
+            selectedChannelIds.Add(channelId);
+        }
+
+        SelectedChannelCount = selectedChannelIds.Count;
+        RaiseBatchCommandStates();
     }
 
     public async ValueTask DisposeAsync()
@@ -632,6 +704,78 @@ public sealed class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             ShowSafeError("XMLTV import failed", ex);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task ExportOrganizationAsync()
+    {
+        try
+        {
+            if (IsBusy)
+            {
+                return;
+            }
+
+            string? path = dialogService.PickOrganizationExportFile();
+            if (path is null)
+            {
+                return;
+            }
+
+            await SaveChannelStatesSafelyAsync().ConfigureAwait(true);
+            await SaveOrganizationPreferencesSafelyAsync().ConfigureAwait(true);
+            ChannelOrganizationBackup backup = CreateOrganizationBackup();
+            await organizationBackupService.ExportAsync(path, backup, shutdownCts.Token).ConfigureAwait(true);
+            StatusText = $"Exported channel organization with {backup.ChannelStates.Length:N0} saved channel states.";
+            AddDiagnostic(StatusText);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Organization export cancelled.";
+            AddDiagnostic(StatusText);
+        }
+        catch (Exception ex)
+        {
+            ShowSafeError("Organization export failed", ex);
+        }
+    }
+
+    private async Task ImportOrganizationAsync()
+    {
+        try
+        {
+            if (IsBusy)
+            {
+                return;
+            }
+
+            string? path = dialogService.PickOrganizationImportFile();
+            if (path is null)
+            {
+                return;
+            }
+
+            IsBusy = true;
+            ChannelOrganizationBackup backup = await organizationBackupService.ImportAsync(path, shutdownCts.Token).ConfigureAwait(true);
+            ApplyOrganizationBackup(backup);
+            await channelStateStore.SaveChannelStatesAsync(channelStates.Values.ToArray(), shutdownCts.Token).ConfigureAwait(true);
+            await organizationPreferencesStore.SaveAsync(CreateOrganizationPreferences(), shutdownCts.Token).ConfigureAwait(true);
+            await ApplySearchAsync(shutdownCts.Token).ConfigureAwait(true);
+            StatusText = $"Imported channel organization with {backup.ChannelStates.Length:N0} saved channel states.";
+            AddDiagnostic(StatusText);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Organization import cancelled.";
+            AddDiagnostic(StatusText);
+        }
+        catch (Exception ex)
+        {
+            ShowSafeError("Organization import failed", ex);
         }
         finally
         {
@@ -846,6 +990,69 @@ public sealed class MainViewModel : ObservableObject
         StatusText = $"Moved '{selected.DisplayName}' {(direction < 0 ? "up" : "down")} in '{group}'.";
     }
 
+    private void AssignBatchGroup()
+    {
+        string? normalized = SelectedBatchGroupAssignment == SourceGroupAssignmentOption
+            ? null
+            : NormalizeCustomGroup(SelectedBatchGroupAssignment);
+
+        if (normalized is not null)
+        {
+            knownCustomGroups.Add(normalized);
+            EnsureCustomGroupChoice(normalized);
+            _ = SaveOrganizationPreferencesSafelyAsync();
+        }
+
+        ApplyBatchUpdate(
+            channel => channel with { CustomGroup = normalized },
+            normalized is null ? "removed from custom groups" : $"assigned to '{normalized}'");
+    }
+
+    private void ApplyBatchUpdate(Func<Channel, Channel> update, string actionDescription)
+    {
+        if (selectedChannelIds.Count == 0)
+        {
+            StatusText = "Select channels before using batch actions.";
+            return;
+        }
+
+        HashSet<Guid> selectedIds = selectedChannelIds.ToHashSet();
+        int changed = 0;
+        for (int index = 0; index < allChannels.Count; index++)
+        {
+            Channel current = allChannels[index];
+            if (!selectedIds.Contains(current.Id))
+            {
+                continue;
+            }
+
+            Channel updated = update(current);
+            if (updated == current)
+            {
+                continue;
+            }
+
+            allChannels[index] = updated;
+            UpdateChannelStateIndex(updated);
+            changed++;
+            if (SelectedChannel?.Id == updated.Id)
+            {
+                SelectedChannel = updated;
+            }
+        }
+
+        if (changed == 0)
+        {
+            StatusText = "Batch action made no changes.";
+            return;
+        }
+
+        RefreshGroupsAndCategories();
+        ScheduleSearch();
+        _ = SaveChannelStatesSafelyAsync();
+        StatusText = $"{changed:N0} selected channels {actionDescription}.";
+    }
+
     private void ClearFilters()
     {
         SearchText = string.Empty;
@@ -892,7 +1099,7 @@ public sealed class MainViewModel : ObservableObject
             FavoritesOnly = FavoritesOnly,
             HiddenFilter = SelectedHiddenFilter,
             SortMode = SelectedSortMode,
-            Limit = 10_000
+            Limit = MaxVisibleChannelResults
         };
 
         Channel[] snapshot = allChannels.ToArray();
@@ -910,9 +1117,12 @@ public sealed class MainViewModel : ObservableObject
             {
                 int hiddenCount = allChannels.Count(channel => channel.IsHidden);
                 string hiddenSummary = hiddenCount > 0 ? $" ({hiddenCount:N0} hidden)" : string.Empty;
+                string capSummary = VisibleChannels.Count >= MaxVisibleChannelResults
+                    ? $" Showing first {MaxVisibleChannelResults:N0} results."
+                    : string.Empty;
                 StatusText = SelectedHiddenFilter == HiddenChannelFilter.HiddenOnly
                     ? $"Showing {VisibleChannels.Count:N0} hidden channels of {allChannels.Count:N0} total."
-                    : $"Showing {VisibleChannels.Count:N0} of {allChannels.Count:N0} channels{hiddenSummary}.";
+                    : $"Showing {VisibleChannels.Count:N0} of {allChannels.Count:N0} channels{hiddenSummary}.{capSummary}";
             }
         });
     }
@@ -1043,24 +1253,80 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private ChannelOrganizationBackup CreateOrganizationBackup()
+    {
+        return new ChannelOrganizationBackup
+        {
+            Preferences = CreateOrganizationPreferences(),
+            ChannelStates = channelStates.Values
+                .Where(HasUserState)
+                .OrderBy(state => state.ChannelId)
+                .ToArray()
+        };
+    }
+
+    private ChannelOrganizationPreferences CreateOrganizationPreferences()
+    {
+        string[] customGroups = knownCustomGroups
+            .Select(NormalizeCustomGroup)
+            .Where(group => group is not null)
+            .Select(group => group!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return new ChannelOrganizationPreferences
+        {
+            SortMode = SelectedSortMode,
+            CustomGroups = customGroups
+        };
+    }
+
+    private void ApplyOrganizationBackup(ChannelOrganizationBackup backup)
+    {
+        channelStates.Clear();
+        foreach (ChannelUserState state in backup.ChannelStates.Where(HasUserState))
+        {
+            channelStates[state.ChannelId] = state;
+        }
+
+        knownCustomGroups.Clear();
+        foreach (string group in backup.Preferences.CustomGroups
+                     .Select(NormalizeCustomGroup)
+                     .Where(group => group is not null)
+                     .Select(group => group!))
+        {
+            knownCustomGroups.Add(group);
+        }
+
+        for (int index = 0; index < allChannels.Count; index++)
+        {
+            allChannels[index] = ApplyUserState(allChannels[index] with
+            {
+                IsFavorite = false,
+                IsHidden = false,
+                CustomGroup = null,
+                CustomSortIndex = null,
+                LastWatchedAt = null
+            });
+        }
+
+        selectedSortMode = Enum.IsDefined(backup.Preferences.SortMode)
+            ? backup.Preferences.SortMode
+            : ChannelSortMode.FavoritesFirst;
+        OnPropertyChanged(nameof(SelectedSortMode));
+        RefreshGroupsAndCategories();
+        if (SelectedChannel is not null)
+        {
+            SelectedChannel = allChannels.FirstOrDefault(channel => channel.Id == SelectedChannel.Id);
+        }
+    }
+
     private async Task SaveOrganizationPreferencesSafelyAsync()
     {
         try
         {
-            string[] customGroups = knownCustomGroups
-                .Select(NormalizeCustomGroup)
-                .Where(group => group is not null)
-                .Select(group => group!)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Order(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            await organizationPreferencesStore.SaveAsync(
-                new ChannelOrganizationPreferences
-                {
-                    SortMode = SelectedSortMode,
-                    CustomGroups = customGroups
-                },
-                shutdownCts.Token).ConfigureAwait(false);
+            await organizationPreferencesStore.SaveAsync(CreateOrganizationPreferences(), shutdownCts.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -1145,6 +1411,7 @@ public sealed class MainViewModel : ObservableObject
     private void RefreshCustomGroupCollections()
     {
         string desiredAssignment = SelectedChannel?.CustomGroup ?? selectedCustomGroupAssignment;
+        Dictionary<string, int> customGroupCounts = CountCustomGroupChannels();
         string[] customGroups = allChannels
             .Select(channel => channel.CustomGroup)
             .Concat(channelStates.Values.Select(state => state.CustomGroup))
@@ -1160,16 +1427,23 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             CustomGroups.Clear();
+            CustomGroupSummaries.Clear();
             CustomGroupAssignments.Clear();
             CustomGroupAssignments.Add(SourceGroupAssignmentOption);
             foreach (string group in customGroups)
             {
                 CustomGroups.Add(group);
+                CustomGroupSummaries.Add(new CustomGroupSummaryViewModel(
+                    group,
+                    customGroupCounts.GetValueOrDefault(group)));
                 CustomGroupAssignments.Add(group);
             }
 
             SelectedCustomGroupAssignment = CustomGroupAssignments.Contains(desiredAssignment, StringComparer.OrdinalIgnoreCase)
                 ? desiredAssignment
+                : SourceGroupAssignmentOption;
+            SelectedBatchGroupAssignment = CustomGroupAssignments.Contains(SelectedBatchGroupAssignment, StringComparer.OrdinalIgnoreCase)
+                ? SelectedBatchGroupAssignment
                 : SourceGroupAssignmentOption;
             if (SelectedManagedCustomGroup is not null &&
                 !CustomGroups.Contains(SelectedManagedCustomGroup, StringComparer.OrdinalIgnoreCase))
@@ -1183,6 +1457,46 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private Dictionary<string, int> CountCustomGroupChannels()
+    {
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        HashSet<Guid> loadedChannelIds = allChannels.Select(channel => channel.Id).ToHashSet();
+
+        foreach (Channel channel in allChannels)
+        {
+            string? group = NormalizeCustomGroup(channel.CustomGroup);
+            if (group is null)
+            {
+                continue;
+            }
+
+            counts[group] = counts.GetValueOrDefault(group) + 1;
+        }
+
+        foreach ((Guid channelId, ChannelUserState state) in channelStates)
+        {
+            if (loadedChannelIds.Contains(channelId))
+            {
+                continue;
+            }
+
+            string? group = NormalizeCustomGroup(state.CustomGroup);
+            if (group is null)
+            {
+                continue;
+            }
+
+            counts[group] = counts.GetValueOrDefault(group) + 1;
+        }
+
+        foreach (string group in knownCustomGroups)
+        {
+            counts.TryAdd(group, 0);
+        }
+
+        return counts;
+    }
+
     private void EnsureCustomGroupChoice(string group)
     {
         if (!CustomGroupAssignments.Contains(group, StringComparer.OrdinalIgnoreCase))
@@ -1193,6 +1507,11 @@ public sealed class MainViewModel : ObservableObject
         if (!CustomGroups.Contains(group, StringComparer.OrdinalIgnoreCase))
         {
             CustomGroups.Add(group);
+        }
+
+        if (!CustomGroupSummaries.Any(summary => summary.Name.Equals(group, StringComparison.OrdinalIgnoreCase)))
+        {
+            CustomGroupSummaries.Add(new CustomGroupSummaryViewModel(group, 0));
         }
     }
 
@@ -1331,6 +1650,34 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private void RaiseBatchCommandStates()
+    {
+        if (BatchFavoriteCommand is RelayCommand favorite)
+        {
+            favorite.RaiseCanExecuteChanged();
+        }
+
+        if (BatchHideCommand is RelayCommand hide)
+        {
+            hide.RaiseCanExecuteChanged();
+        }
+
+        if (BatchUnhideCommand is RelayCommand unhide)
+        {
+            unhide.RaiseCanExecuteChanged();
+        }
+
+        if (BatchAssignGroupCommand is RelayCommand assignGroup)
+        {
+            assignGroup.RaiseCanExecuteChanged();
+        }
+
+        if (BatchClearGroupCommand is RelayCommand clearGroup)
+        {
+            clearGroup.RaiseCanExecuteChanged();
+        }
+    }
+
     private void RaiseImportCommandStates()
     {
         if (ImportFileCommand is AsyncRelayCommand file)
@@ -1356,6 +1703,16 @@ public sealed class MainViewModel : ObservableObject
         if (ImportEpgCommand is AsyncRelayCommand epg)
         {
             epg.RaiseCanExecuteChanged();
+        }
+
+        if (ImportOrganizationCommand is AsyncRelayCommand importOrganization)
+        {
+            importOrganization.RaiseCanExecuteChanged();
+        }
+
+        if (ExportOrganizationCommand is AsyncRelayCommand exportOrganization)
+        {
+            exportOrganization.RaiseCanExecuteChanged();
         }
     }
 

@@ -20,9 +20,11 @@ Use this checklist before trying a private playlist.
 16. Change **Sort** between playlist order, name, favorites first, recently watched, and custom order.
 17. Add a custom group, assign the selected channel, and confirm the group appears in the group filter.
 18. Rename and delete a test custom group from **Channel Organization**.
-19. Use **Up**/**Down** on a selected channel and confirm **Custom order** preserves the move.
-20. Mark a channel as favorite, close the app, reopen, and re-import the same playlist to confirm favorite/hidden/custom group/sort state reappears.
-21. Confirm normal UI does not show full tokenized stream URLs.
+19. Multi-select several channels and test **Batch Favorite**, **Batch Hide**, **Batch Unhide**, **Assign Group**, and **Clear Group**.
+20. Use **Up**/**Down** on a selected channel and confirm **Custom order** preserves the move.
+21. Export organization settings, import them back, and confirm favorite/hidden/custom group/sort state is restored.
+22. Mark a channel as favorite, close the app, reopen, and re-import the same playlist to confirm favorite/hidden/custom group/sort state reappears.
+23. Confirm normal UI does not show full tokenized stream URLs.
 
 Optional public smoke command:
 

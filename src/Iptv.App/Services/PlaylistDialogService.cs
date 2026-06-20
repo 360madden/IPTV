@@ -31,6 +31,35 @@ public sealed class PlaylistDialogService : IPlaylistDialogService
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
+    public string? PickOrganizationImportFile()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import channel organization",
+            Filter = "IPTV organization backups (*.json)|*.json|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
+    public string? PickOrganizationExportFile()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export channel organization",
+            Filter = "IPTV organization backups (*.json)|*.json|All files (*.*)|*.*",
+            DefaultExt = ".json",
+            AddExtension = true,
+            CheckPathExists = true,
+            OverwritePrompt = true,
+            FileName = $"iptv-organization-{DateTime.Now:yyyyMMdd-HHmmss}.json"
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
     public string? PromptPlaylistUrl()
     {
         var dialog = new UrlPromptWindow
