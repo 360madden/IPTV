@@ -45,7 +45,7 @@ Launcher slice validation on 2026-06-20 passed:
 
 ## GitHub Setup Update
 
-GitHub repository `360madden/IPTV` already existed with unrelated `main` history containing an old `README.md` and `ph.m3u`. Setup was handled safely by creating branch `codex/github-setup` from `origin/main`, merging the local app history with `--allow-unrelated-histories`, resolving `README.md` in favor of the current app README, and removing `ph.m3u` from the integration branch so the app repository remains content-neutral. Remote `main` was not force-pushed or overwritten.
+GitHub repository `360madden/IPTV` already existed with unrelated `main` history containing an old `README.md` and `ph.m3u`. Setup was handled safely by creating branch `codex/github-setup` from `origin/main`, merging the local app history with `--allow-unrelated-histories`, resolving `README.md` in favor of the current app README, and removing `ph.m3u` from the integration branch so the app repository remains content-neutral. Remote `main` was not force-pushed or overwritten. Draft PR: `https://github.com/360madden/IPTV/pull/1`.
 ## Best Next Resume Step
 
 Start with `git status --short --branch`, then verify whether branch `codex/github-setup` and its draft PR are still current. If continuing feature work, prioritize real VOD resume validation and duplicate-fixture GUI automation.
