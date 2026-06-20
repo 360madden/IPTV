@@ -133,6 +133,20 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void SetParentalPin_Click(object sender, RoutedEventArgs e)
+    {
+        viewModel.SetParentalPin(ParentalPinBox.Password);
+        ParentalPinBox.Clear();
+        e.Handled = true;
+    }
+
+    private void UnlockParentalPin_Click(object sender, RoutedEventArgs e)
+    {
+        viewModel.UnlockParentalControls(ParentalPinBox.Password);
+        ParentalPinBox.Clear();
+        e.Handled = true;
+    }
+
     private void ClearSelection_Click(object sender, RoutedEventArgs e)
     {
         ClearChannelSelection();

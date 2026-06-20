@@ -115,7 +115,10 @@ public sealed class JsonSmartGroupPresetFileService : ISmartGroupPresetFileServi
         {
             Name = name,
             MatchText = matchText,
-            DestinationGroup = destination
+            DestinationGroup = destination,
+            MatchMode = Enum.IsDefined(preset.MatchMode)
+                ? preset.MatchMode
+                : SmartRuleMatchMode.ContainsAny
         };
     }
 

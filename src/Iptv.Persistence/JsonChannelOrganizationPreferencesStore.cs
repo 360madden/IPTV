@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Iptv.Core.Channels;
+using Iptv.Core.Playback;
 
 namespace Iptv.Persistence;
 
@@ -96,6 +97,8 @@ public sealed class JsonChannelOrganizationPreferencesStore : IChannelOrganizati
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         Dictionary<string, string> profileNames = NormalizeProfileNames(preferences.SourceProfileNames);
+        Dictionary<string, ProviderPlaybackProfile> playbackProfiles = NormalizePlaybackProfiles(preferences.SourcePlaybackProfiles);
+        string[] lockedGroups = NormalizeGroups(preferences.LockedGroups);
 
         return preferences with
         {
@@ -106,7 +109,12 @@ public sealed class JsonChannelOrganizationPreferencesStore : IChannelOrganizati
             ChannelViewDensity = Enum.IsDefined(preferences.ChannelViewDensity)
                 ? preferences.ChannelViewDensity
                 : ChannelViewDensity.Comfortable,
-            SourceProfileNames = profileNames
+            SourceProfileNames = profileNames,
+            SourcePlaybackProfiles = playbackProfiles,
+            RefreshIntervalMinutes = NormalizeRefreshInterval(preferences.RefreshIntervalMinutes),
+            LockedGroups = lockedGroups,
+            ParentalPinSalt = NormalizeSecret(preferences.ParentalPinSalt),
+            ParentalPinHash = NormalizeSecret(preferences.ParentalPinHash)
         };
     }
 
@@ -144,5 +152,55 @@ public sealed class JsonChannelOrganizationPreferencesStore : IChannelOrganizati
         }
 
         return normalized;
+    }
+
+    private static Dictionary<string, ProviderPlaybackProfile> NormalizePlaybackProfiles(
+        IDictionary<string, ProviderPlaybackProfile>? playbackProfiles)
+    {
+        var normalized = new Dictionary<string, ProviderPlaybackProfile>(StringComparer.OrdinalIgnoreCase);
+        if (playbackProfiles is null)
+        {
+            return normalized;
+        }
+
+        foreach ((string sourceId, ProviderPlaybackProfile profile) in playbackProfiles)
+        {
+            if (string.IsNullOrWhiteSpace(sourceId) || profile is null)
+            {
+                continue;
+            }
+
+            BufferingPreset bufferingPreset = Enum.IsDefined(profile.BufferingPreset)
+                ? profile.BufferingPreset
+                : BufferingPreset.Balanced;
+            normalized[sourceId.Trim()] = new ProviderPlaybackProfile
+            {
+                RetryCount = Math.Clamp(profile.RetryCount, 0, 3),
+                BufferingPreset = bufferingPreset
+            };
+        }
+
+        return normalized;
+    }
+
+    private static string[] NormalizeGroups(IEnumerable<string>? groups)
+    {
+        return (groups ?? [])
+            .Select(NormalizeCustomGroup)
+            .Where(group => group is not null)
+            .Select(group => group!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static int NormalizeRefreshInterval(int minutes)
+    {
+        return Math.Clamp(minutes <= 0 ? 60 : minutes, 5, 24 * 60);
+    }
+
+    private static string? NormalizeSecret(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }

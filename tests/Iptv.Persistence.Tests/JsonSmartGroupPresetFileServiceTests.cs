@@ -21,13 +21,15 @@ public sealed class JsonSmartGroupPresetFileServiceTests
                     {
                         Name = " News ",
                         MatchText = " local   news ",
-                        DestinationGroup = "My News"
+                        DestinationGroup = "My News",
+                        MatchMode = SmartRuleMatchMode.NameStartsWith
                     },
                     new SmartGroupRulePreset
                     {
                         Name = "News",
                         MatchText = "world news",
-                        DestinationGroup = "World"
+                        DestinationGroup = "World",
+                        MatchMode = SmartRuleMatchMode.Regex
                     }
                 ],
                 CancellationToken.None);
@@ -38,6 +40,7 @@ public sealed class JsonSmartGroupPresetFileServiceTests
             Assert.Equal("News", preset.Name);
             Assert.Equal("world news", preset.MatchText);
             Assert.Equal("World", preset.DestinationGroup);
+            Assert.Equal(SmartRuleMatchMode.Regex, preset.MatchMode);
         }
         finally
         {

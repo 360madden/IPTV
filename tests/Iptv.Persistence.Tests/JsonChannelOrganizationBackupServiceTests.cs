@@ -1,4 +1,5 @@
 using Iptv.Core.Channels;
+using Iptv.Core.Playback;
 
 namespace Iptv.Persistence.Tests;
 
@@ -28,7 +29,16 @@ public sealed class JsonChannelOrganizationBackupServiceTests
                         SourceProfileNames = new Dictionary<string, string>
                         {
                             ["source-a"] = "Provider A"
-                        }
+                        },
+                        SourcePlaybackProfiles = new Dictionary<string, ProviderPlaybackProfile>
+                        {
+                            ["source-a"] = new() { RetryCount = 2, BufferingPreset = BufferingPreset.LowLatency }
+                        },
+                        RefreshScheduleEnabled = true,
+                        RefreshIntervalMinutes = 120,
+                        ParentalPinSalt = "salt",
+                        ParentalPinHash = "hash",
+                        LockedGroups = ["Kids", "Kids", "Sports"]
                     },
                     ChannelStates =
                     [
@@ -39,7 +49,8 @@ public sealed class JsonChannelOrganizationBackupServiceTests
                             IsHidden = true,
                             CustomGroup = "News",
                             CustomSortIndex = 2,
-                            LastWatchedAt = DateTimeOffset.UtcNow
+                            LastWatchedAt = DateTimeOffset.UtcNow,
+                            ResumeProgressPercent = 88
                         }
                     ]
                 },
@@ -53,6 +64,13 @@ public sealed class JsonChannelOrganizationBackupServiceTests
             Assert.True(imported.Preferences.LargeLibraryMode);
             Assert.Equal(ChannelViewDensity.Compact, imported.Preferences.ChannelViewDensity);
             Assert.Equal("Provider A", imported.Preferences.SourceProfileNames["source-a"]);
+            Assert.Equal(2, imported.Preferences.SourcePlaybackProfiles["source-a"].RetryCount);
+            Assert.Equal(BufferingPreset.LowLatency, imported.Preferences.SourcePlaybackProfiles["source-a"].BufferingPreset);
+            Assert.True(imported.Preferences.RefreshScheduleEnabled);
+            Assert.Equal(120, imported.Preferences.RefreshIntervalMinutes);
+            Assert.Equal("salt", imported.Preferences.ParentalPinSalt);
+            Assert.Equal("hash", imported.Preferences.ParentalPinHash);
+            Assert.Equal(["Kids", "Sports"], imported.Preferences.LockedGroups);
             ChannelUserState state = Assert.Single(imported.ChannelStates);
             Assert.Equal(channelId, state.ChannelId);
             Assert.True(state.IsFavorite);
@@ -60,6 +78,7 @@ public sealed class JsonChannelOrganizationBackupServiceTests
             Assert.Equal("News", state.CustomGroup);
             Assert.Equal(2, state.CustomSortIndex);
             Assert.NotNull(state.LastWatchedAt);
+            Assert.Equal(88, state.ResumeProgressPercent);
         }
         finally
         {

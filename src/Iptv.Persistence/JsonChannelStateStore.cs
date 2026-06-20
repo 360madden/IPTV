@@ -45,7 +45,8 @@ public sealed class JsonChannelStateStore : IChannelStateStore
                     IsHidden = existing?.IsHidden ?? false,
                     CustomGroup = NormalizeCustomGroup(existing?.CustomGroup),
                     CustomSortIndex = NormalizeCustomSortIndex(existing?.CustomSortIndex),
-                    LastWatchedAt = existing?.LastWatchedAt
+                    LastWatchedAt = existing?.LastWatchedAt,
+                    ResumeProgressPercent = NormalizeResumeProgress(existing?.ResumeProgressPercent)
                 };
             })
             .Where(HasUserState)
@@ -160,7 +161,8 @@ public sealed class JsonChannelStateStore : IChannelStateStore
                 .Where(state => state.LastWatchedAt.HasValue)
                 .Select(state => state.LastWatchedAt)
                 .DefaultIfEmpty()
-                .Max()
+                .Max(),
+            ResumeProgressPercent = snapshot.LastOrDefault(state => state.ResumeProgressPercent.HasValue)?.ResumeProgressPercent
         };
     }
 
@@ -169,7 +171,8 @@ public sealed class JsonChannelStateStore : IChannelStateStore
         return state with
         {
             CustomGroup = NormalizeCustomGroup(state.CustomGroup),
-            CustomSortIndex = NormalizeCustomSortIndex(state.CustomSortIndex)
+            CustomSortIndex = NormalizeCustomSortIndex(state.CustomSortIndex),
+            ResumeProgressPercent = NormalizeResumeProgress(state.ResumeProgressPercent)
         };
     }
 
@@ -180,7 +183,8 @@ public sealed class JsonChannelStateStore : IChannelStateStore
                 state.IsHidden ||
                 !string.IsNullOrWhiteSpace(state.CustomGroup) ||
                 state.CustomSortIndex.HasValue ||
-                state.LastWatchedAt.HasValue);
+                state.LastWatchedAt.HasValue ||
+                state.ResumeProgressPercent.HasValue);
     }
 
     private static string? NormalizeCustomGroup(string? value)
@@ -197,6 +201,11 @@ public sealed class JsonChannelStateStore : IChannelStateStore
     private static int? NormalizeCustomSortIndex(int? value)
     {
         return value < 0 ? null : value;
+    }
+
+    private static int? NormalizeResumeProgress(int? value)
+    {
+        return value is null ? null : Math.Clamp(value.Value, 0, 100);
     }
 
     private sealed class ChannelStateDocument

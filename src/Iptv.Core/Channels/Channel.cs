@@ -43,4 +43,6 @@ public sealed record Channel
     public DateTimeOffset ImportedAt { get; init; } = DateTimeOffset.UtcNow;
 
     public DateTimeOffset? LastWatchedAt { get; init; }
+
+    public int? ResumeProgressPercent { get; init; }
 }

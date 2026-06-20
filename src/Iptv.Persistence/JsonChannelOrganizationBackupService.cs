@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Iptv.Core.Channels;
+using Iptv.Core.Playback;
 
 namespace Iptv.Persistence;
 
@@ -114,6 +115,8 @@ public sealed class JsonChannelOrganizationBackupService : IChannelOrganizationB
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         Dictionary<string, string> profileNames = NormalizeProfileNames(preferences.SourceProfileNames);
+        Dictionary<string, ProviderPlaybackProfile> playbackProfiles = NormalizePlaybackProfiles(preferences.SourcePlaybackProfiles);
+        string[] lockedGroups = NormalizeGroups(preferences.LockedGroups);
 
         return preferences with
         {
@@ -124,7 +127,12 @@ public sealed class JsonChannelOrganizationBackupService : IChannelOrganizationB
             ChannelViewDensity = Enum.IsDefined(preferences.ChannelViewDensity)
                 ? preferences.ChannelViewDensity
                 : ChannelViewDensity.Comfortable,
-            SourceProfileNames = profileNames
+            SourceProfileNames = profileNames,
+            SourcePlaybackProfiles = playbackProfiles,
+            RefreshIntervalMinutes = NormalizeRefreshInterval(preferences.RefreshIntervalMinutes),
+            LockedGroups = lockedGroups,
+            ParentalPinSalt = NormalizeSecret(preferences.ParentalPinSalt),
+            ParentalPinHash = NormalizeSecret(preferences.ParentalPinHash)
         };
     }
 
@@ -142,7 +150,8 @@ public sealed class JsonChannelOrganizationBackupService : IChannelOrganizationB
                 .Where(state => state.LastWatchedAt.HasValue)
                 .Select(state => state.LastWatchedAt)
                 .DefaultIfEmpty()
-                .Max()
+                .Max(),
+            ResumeProgressPercent = snapshot.LastOrDefault(state => state.ResumeProgressPercent.HasValue)?.ResumeProgressPercent
         };
     }
 
@@ -151,7 +160,8 @@ public sealed class JsonChannelOrganizationBackupService : IChannelOrganizationB
         return state with
         {
             CustomGroup = NormalizeCustomGroup(state.CustomGroup),
-            CustomSortIndex = state.CustomSortIndex < 0 ? null : state.CustomSortIndex
+            CustomSortIndex = state.CustomSortIndex < 0 ? null : state.CustomSortIndex,
+            ResumeProgressPercent = NormalizeResumeProgress(state.ResumeProgressPercent)
         };
     }
 
@@ -162,7 +172,8 @@ public sealed class JsonChannelOrganizationBackupService : IChannelOrganizationB
                 state.IsHidden ||
                 !string.IsNullOrWhiteSpace(state.CustomGroup) ||
                 state.CustomSortIndex.HasValue ||
-                state.LastWatchedAt.HasValue);
+                state.LastWatchedAt.HasValue ||
+                state.ResumeProgressPercent.HasValue);
     }
 
     private static string? NormalizeCustomGroup(string? value)
@@ -199,5 +210,60 @@ public sealed class JsonChannelOrganizationBackupService : IChannelOrganizationB
         }
 
         return normalized;
+    }
+
+    private static Dictionary<string, ProviderPlaybackProfile> NormalizePlaybackProfiles(
+        IDictionary<string, ProviderPlaybackProfile>? playbackProfiles)
+    {
+        var normalized = new Dictionary<string, ProviderPlaybackProfile>(StringComparer.OrdinalIgnoreCase);
+        if (playbackProfiles is null)
+        {
+            return normalized;
+        }
+
+        foreach ((string sourceId, ProviderPlaybackProfile profile) in playbackProfiles)
+        {
+            if (string.IsNullOrWhiteSpace(sourceId) || profile is null)
+            {
+                continue;
+            }
+
+            BufferingPreset bufferingPreset = Enum.IsDefined(profile.BufferingPreset)
+                ? profile.BufferingPreset
+                : BufferingPreset.Balanced;
+            normalized[sourceId.Trim()] = new ProviderPlaybackProfile
+            {
+                RetryCount = Math.Clamp(profile.RetryCount, 0, 3),
+                BufferingPreset = bufferingPreset
+            };
+        }
+
+        return normalized;
+    }
+
+    private static string[] NormalizeGroups(IEnumerable<string>? groups)
+    {
+        return (groups ?? [])
+            .Select(NormalizeCustomGroup)
+            .Where(group => group is not null)
+            .Select(group => group!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static int NormalizeRefreshInterval(int minutes)
+    {
+        return Math.Clamp(minutes <= 0 ? 60 : minutes, 5, 24 * 60);
+    }
+
+    private static int? NormalizeResumeProgress(int? value)
+    {
+        return value is null ? null : Math.Clamp(value.Value, 0, 100);
+    }
+
+    private static string? NormalizeSecret(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }

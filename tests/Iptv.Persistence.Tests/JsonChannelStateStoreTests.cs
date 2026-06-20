@@ -46,7 +46,8 @@ public sealed class JsonChannelStateStoreTests
                         IsFavorite = true,
                         CustomGroup = "My News",
                         CustomSortIndex = 3,
-                        LastWatchedAt = DateTimeOffset.UtcNow
+                        LastWatchedAt = DateTimeOffset.UtcNow,
+                        ResumeProgressPercent = 42
                     },
                     new ChannelUserState { ChannelId = hidden, IsHidden = true }
                 ],
@@ -59,6 +60,7 @@ public sealed class JsonChannelStateStoreTests
             Assert.Equal("My News", loaded[favorite].CustomGroup);
             Assert.Equal(3, loaded[favorite].CustomSortIndex);
             Assert.NotNull(loaded[favorite].LastWatchedAt);
+            Assert.Equal(42, loaded[favorite].ResumeProgressPercent);
             Assert.True(loaded[hidden].IsHidden);
         }
         finally

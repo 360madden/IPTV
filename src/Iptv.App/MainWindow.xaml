@@ -282,10 +282,21 @@
                                 <TextBlock Text="Smart group rule"
                                            FontWeight="SemiBold"
                                            Margin="0,0,0,6" />
-                                <TextBlock Text="Matches channel name, source group, category, TVG ID, or TVG name. Apply preserves existing custom groups."
+                                <TextBlock Text="Match by contains, starts-with, regex, group, or category. Apply preserves existing custom groups."
                                            TextWrapping="Wrap"
                                            Foreground="{StaticResource TextSecondaryBrush}"
                                            Margin="0,0,0,8" />
+                                <TextBlock Text="Rule mode"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,4" />
+                                <ComboBox ItemsSource="{Binding SmartRuleMatchModeOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedSmartRuleMatchMode}"
+                                          Padding="6"
+                                          Margin="0,0,0,8"
+                                          Foreground="Black"
+                                          AutomationProperties.Name="Smart Group Rule Mode" />
                                 <TextBlock Text="Match text"
                                            Foreground="{StaticResource TextSecondaryBrush}"
                                            Margin="0,0,0,4" />
@@ -349,6 +360,70 @@
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
+                                <Separator Margin="0,12,0,10" />
+                                <TextBlock Text="Duplicate merge assistant"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,6" />
+                                <TextBlock Text="{Binding DuplicateAssistantSummaryText}"
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,8" />
+                                <WrapPanel>
+                                    <Button Content="Refresh Duplicates"
+                                            Command="{Binding RefreshDuplicateGroupsCommand}"
+                                            Margin="0,0,8,8" />
+                                    <Button Content="Hide Duplicates"
+                                            Command="{Binding HideSelectedDuplicateGroupCommand}"
+                                            Margin="0,0,8,8" />
+                                </WrapPanel>
+                                <ListBox ItemsSource="{Binding DuplicateChannelGroups}"
+                                         SelectedItem="{Binding SelectedDuplicateGroup}"
+                                         MaxHeight="100"
+                                         Background="Transparent"
+                                         BorderBrush="#334056"
+                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         ScrollViewer.CanContentScroll="True"
+                                         VirtualizingPanel.IsVirtualizing="True"
+                                         AutomationProperties.Name="Duplicate Channel Groups">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayText}"
+                                                       TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <Separator Margin="0,12,0,10" />
+                                <TextBlock Text="Parental / PIN lock"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,6" />
+                                <TextBlock Text="{Binding ParentalLockStatusText}"
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,8" />
+                                <PasswordBox x:Name="ParentalPinBox"
+                                             MaxLength="12"
+                                             Margin="0,0,0,8"
+                                             AutomationProperties.Name="Parental PIN" />
+                                <WrapPanel>
+                                    <Button Content="Set PIN"
+                                            Click="SetParentalPin_Click"
+                                            Margin="0,0,8,8" />
+                                    <Button Content="Unlock"
+                                            Click="UnlockParentalPin_Click"
+                                            Margin="0,0,8,8" />
+                                    <Button Content="Lock Now"
+                                            Command="{Binding LockParentalControlsCommand}"
+                                            Margin="0,0,8,8" />
+                                    <Button Content="Lock Group"
+                                            Command="{Binding LockSelectedGroupCommand}"
+                                            Margin="0,0,8,8" />
+                                    <Button Content="Unlock Group"
+                                            Command="{Binding UnlockSelectedGroupCommand}"
+                                            Margin="0,0,8,8" />
+                                    <Button Content="Clear PIN"
+                                            Command="{Binding ClearParentalPinCommand}"
+                                            Margin="0,0,8,8" />
+                                </WrapPanel>
                             </StackPanel>
                         </Border>
                     </Expander>
@@ -380,7 +455,53 @@
                                          Margin="0,8,0,8"
                                          AutomationProperties.Name="Rename Source Profile" />
                                 <Button Content="Rename Profile"
-                                        Command="{Binding RenameSourceProfileCommand}" />
+                                        Command="{Binding RenameSourceProfileCommand}"
+                                        Margin="0,0,0,12" />
+                                <TextBlock Text="Playback fallback"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,6" />
+                                <TextBlock Text="Provider profile applies buffer preset and startup retries before playback."
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,8" />
+                                <TextBlock Text="Retries"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,4" />
+                                <ComboBox ItemsSource="{Binding RetryCountOptions}"
+                                          SelectedItem="{Binding SelectedSourceRetryCount}"
+                                          Padding="6"
+                                          Margin="0,0,0,8"
+                                          Foreground="Black"
+                                          AutomationProperties.Name="Source Retry Count" />
+                                <TextBlock Text="Buffer preset"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,4" />
+                                <ComboBox ItemsSource="{Binding BufferingPresets}"
+                                          SelectedItem="{Binding SelectedSourceBufferingPreset}"
+                                          Padding="6"
+                                          Margin="0,0,0,8"
+                                          Foreground="Black"
+                                          AutomationProperties.Name="Source Buffer Preset" />
+                                <Button Content="Save Playback Profile"
+                                        Command="{Binding SaveSourcePlaybackProfileCommand}"
+                                        Margin="0,0,0,12" />
+                                <TextBlock Text="Refresh schedule"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,6" />
+                                <CheckBox Content="Enable manual refresh reminders"
+                                          IsChecked="{Binding RefreshScheduleEnabled}"
+                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Margin="0,0,0,8"
+                                          AutomationProperties.Name="Enable Refresh Schedule" />
+                                <ComboBox ItemsSource="{Binding RefreshIntervalMinuteOptions}"
+                                          SelectedItem="{Binding SelectedRefreshIntervalMinutes}"
+                                          Padding="6"
+                                          Margin="0,0,0,8"
+                                          Foreground="Black"
+                                          AutomationProperties.Name="Refresh Interval Minutes" />
+                                <TextBlock Text="{Binding RefreshScheduleStatusText}"
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSecondaryBrush}" />
                             </StackPanel>
                         </Border>
                     </Expander>
@@ -541,6 +662,40 @@
                                        Margin="0,8,0,0"
                                        TextWrapping="Wrap"
                                        Foreground="{StaticResource TextSecondaryBrush}" />
+                            <Expander Header="{Binding EpgTimelineSummaryText}"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Background="{StaticResource PanelAltBrush}"
+                                      Margin="0,8,0,0"
+                                      IsExpanded="False"
+                                      AutomationProperties.Name="EPG Timeline">
+                                <DataGrid ItemsSource="{Binding EpgTimelineRows}"
+                                          AutoGenerateColumns="False"
+                                          IsReadOnly="True"
+                                          MaxHeight="180"
+                                          Margin="0,6,0,0"
+                                          Background="{StaticResource PanelAltBrush}"
+                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          BorderBrush="#334056"
+                                          EnableRowVirtualization="True"
+                                          EnableColumnVirtualization="True"
+                                          VirtualizingPanel.IsVirtualizing="True"
+                                          VirtualizingPanel.VirtualizationMode="Recycling">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Channel"
+                                                            Binding="{Binding ChannelName}"
+                                                            Width="2*" />
+                                        <DataGridTextColumn Header="Now"
+                                                            Binding="{Binding NowTitle}"
+                                                            Width="2*" />
+                                        <DataGridTextColumn Header="Next"
+                                                            Binding="{Binding NextTitle}"
+                                                            Width="2*" />
+                                        <DataGridTextColumn Header="Later"
+                                                            Binding="{Binding LaterTitle}"
+                                                            Width="2*" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Expander>
                         </StackPanel>
                     </Border>
 
@@ -961,6 +1116,52 @@
                                            TextWrapping="Wrap" />
                             </Border>
                         </Expander>
+                        <Expander Header="VOD / Series details"
+                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  Background="{StaticResource PanelAltBrush}"
+                                  Margin="0,8,0,0"
+                                  IsExpanded="False"
+                                  AutomationProperties.Name="VOD Detail Page">
+                            <Border Background="{StaticResource PanelAltBrush}"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,6,0,0">
+                                <DockPanel LastChildFill="True">
+                                    <Border DockPanel.Dock="Left"
+                                            Width="110"
+                                            Height="160"
+                                            CornerRadius="8"
+                                            Background="#111827"
+                                            Margin="0,0,12,0"
+                                            ClipToBounds="True">
+                                        <Image Source="{Binding SelectedChannelLogoPath}"
+                                               Stretch="UniformToFill" />
+                                    </Border>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding SelectedVodDetailText}"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding ResumeProgressText}"
+                                                   FontWeight="SemiBold"
+                                                   Margin="0,8,0,6" />
+                                        <WrapPanel>
+                                            <Button Content="25%"
+                                                    Command="{Binding SetResume25Command}"
+                                                    Margin="0,0,8,8" />
+                                            <Button Content="50%"
+                                                    Command="{Binding SetResume50Command}"
+                                                    Margin="0,0,8,8" />
+                                            <Button Content="75%"
+                                                    Command="{Binding SetResume75Command}"
+                                                    Margin="0,0,8,8" />
+                                            <Button Content="Clear Resume"
+                                                    Command="{Binding ClearResumeCommand}"
+                                                    Margin="0,0,8,8" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                        </Expander>
                         <Expander Header="EPG guide"
                                   Foreground="{StaticResource TextPrimaryBrush}"
                                   Background="{StaticResource PanelAltBrush}"
@@ -1019,7 +1220,8 @@
                                       IsChecked="{Binding Clock.IsVisible}"
                                       VerticalAlignment="Center"
                                       Foreground="{StaticResource TextPrimaryBrush}"
-                                      Margin="6,0,10,0" />
+                                      Margin="6,0,10,0"
+                                      AutomationProperties.Name="Player Clock" />
                             <CheckBox Content="24h"
                                       IsChecked="{Binding Clock.Use24HourClock}"
                                       VerticalAlignment="Center"

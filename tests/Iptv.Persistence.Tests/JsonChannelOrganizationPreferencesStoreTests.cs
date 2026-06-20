@@ -1,4 +1,5 @@
 using Iptv.Core.Channels;
+using Iptv.Core.Playback;
 
 namespace Iptv.Persistence.Tests;
 
@@ -22,7 +23,16 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
                     SourceProfileNames = new Dictionary<string, string>
                     {
                         [" source-a "] = " Provider A "
-                    }
+                    },
+                    SourcePlaybackProfiles = new Dictionary<string, ProviderPlaybackProfile>
+                    {
+                        [" source-a "] = new() { RetryCount = 9, BufferingPreset = BufferingPreset.PoorNetwork }
+                    },
+                    RefreshScheduleEnabled = true,
+                    RefreshIntervalMinutes = 3,
+                    ParentalPinSalt = " salt ",
+                    ParentalPinHash = " hash ",
+                    LockedGroups = [" Kids ", "Kids", "Sports"]
                 },
                 CancellationToken.None);
 
@@ -33,6 +43,13 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
             Assert.True(loaded.LargeLibraryMode);
             Assert.Equal(ChannelViewDensity.Dense, loaded.ChannelViewDensity);
             Assert.Equal("Provider A", loaded.SourceProfileNames["source-a"]);
+            Assert.Equal(3, loaded.SourcePlaybackProfiles["source-a"].RetryCount);
+            Assert.Equal(BufferingPreset.PoorNetwork, loaded.SourcePlaybackProfiles["source-a"].BufferingPreset);
+            Assert.True(loaded.RefreshScheduleEnabled);
+            Assert.Equal(5, loaded.RefreshIntervalMinutes);
+            Assert.Equal("salt", loaded.ParentalPinSalt);
+            Assert.Equal("hash", loaded.ParentalPinHash);
+            Assert.Equal(["Kids", "Sports"], loaded.LockedGroups);
         }
         finally
         {
@@ -56,6 +73,7 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
             Assert.Equal(ChannelSortMode.FavoritesFirst, loaded.SortMode);
             Assert.False(loaded.LargeLibraryMode);
             Assert.Equal(ChannelViewDensity.Comfortable, loaded.ChannelViewDensity);
+            Assert.Equal(60, loaded.RefreshIntervalMinutes);
         }
         finally
         {

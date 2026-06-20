@@ -13,4 +13,6 @@ public sealed record ChannelUserState
     public int? CustomSortIndex { get; init; }
 
     public DateTimeOffset? LastWatchedAt { get; init; }
+
+    public int? ResumeProgressPercent { get; init; }
 }
