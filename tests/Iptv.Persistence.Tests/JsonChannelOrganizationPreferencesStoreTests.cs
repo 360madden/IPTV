@@ -16,7 +16,8 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
                 new ChannelOrganizationPreferences
                 {
                     SortMode = ChannelSortMode.CustomOrder,
-                    CustomGroups = ["Sports", "Sports", "  News  "]
+                    CustomGroups = ["Sports", "Sports", "  News  "],
+                    LargeLibraryMode = true
                 },
                 CancellationToken.None);
 
@@ -24,6 +25,7 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
 
             Assert.Equal(ChannelSortMode.CustomOrder, loaded.SortMode);
             Assert.Equal(["News", "Sports"], loaded.CustomGroups);
+            Assert.True(loaded.LargeLibraryMode);
         }
         finally
         {
@@ -45,6 +47,7 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
             ChannelOrganizationPreferences loaded = await store.LoadAsync(CancellationToken.None);
 
             Assert.Equal(ChannelSortMode.FavoritesFirst, loaded.SortMode);
+            Assert.False(loaded.LargeLibraryMode);
         }
         finally
         {

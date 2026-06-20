@@ -68,6 +68,26 @@ public sealed class ChannelSearchServiceTests
     }
 
     [Fact]
+    public void Search_FiltersByContentKind()
+    {
+        var channels = new[]
+        {
+            CreateChannel("Live News", "News", contentKind: ContentKind.LiveTv),
+            CreateChannel("Movie One", "Movies", contentKind: ContentKind.Vod),
+            CreateChannel("Series One", "Series", contentKind: ContentKind.Series)
+        };
+        var service = new ChannelSearchService();
+
+        IReadOnlyList<Channel> results = service.Search(channels, new ChannelSearchQuery
+        {
+            ContentKind = ContentKind.Vod
+        });
+
+        Channel result = Assert.Single(results);
+        Assert.Equal("Movie One", result.DisplayName);
+    }
+
+    [Fact]
     public void Search_SortsByPlaylistOrder()
     {
         var channels = new[]
@@ -130,7 +150,8 @@ public sealed class ChannelSearchServiceTests
         string? customGroup = null,
         int importIndex = 0,
         int? customSortIndex = null,
-        DateTimeOffset? lastWatchedAt = null)
+        DateTimeOffset? lastWatchedAt = null,
+        ContentKind contentKind = ContentKind.LiveTv)
     {
         Assert.True(SensitiveUri.TryCreate($"https://stream.example/{Uri.EscapeDataString(name)}.m3u8", out SensitiveUri? uri, out string? error), error);
 
@@ -147,6 +168,7 @@ public sealed class ChannelSearchServiceTests
             CustomGroup = customGroup,
             CustomSortIndex = customSortIndex,
             Category = ChannelNormalizer.InferCategory(group, name),
+            ContentKind = contentKind,
             IsFavorite = isFavorite,
             IsHidden = isHidden,
             LastWatchedAt = lastWatchedAt

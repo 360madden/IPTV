@@ -10,6 +10,8 @@ public sealed record ChannelSearchQuery
 
     public string? Category { get; init; }
 
+    public ContentKind? ContentKind { get; init; }
+
     public bool FavoritesOnly { get; init; }
 
     public HiddenChannelFilter HiddenFilter { get; init; } = HiddenChannelFilter.VisibleOnly;

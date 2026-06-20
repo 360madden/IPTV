@@ -13,6 +13,7 @@ using Iptv.App.ViewModels;
 using Iptv.Core.Channels;
 using Iptv.Epg;
 using Iptv.Persistence;
+using Iptv.Persistence.Logos;
 using Iptv.Playback;
 using Iptv.Playlists;
 using Iptv.Search;
@@ -46,6 +47,7 @@ public partial class MainWindow : Window
     private int previousMainContentRowSpan;
     private int previousPlayerPanelColumn;
     private int previousPlayerPanelColumnSpan;
+    private Point channelDragStartPoint;
     private bool isFullscreen;
 
     public MainWindow(string? startupPlaylistUrl = null)
@@ -60,6 +62,7 @@ public partial class MainWindow : Window
         var stateStore = new JsonChannelStateStore();
         var organizationPreferencesStore = new JsonChannelOrganizationPreferencesStore();
         var organizationBackupService = new JsonChannelOrganizationBackupService();
+        var logoCacheService = new LogoCacheService();
         var uiPreferencesStore = new JsonUiPreferencesStore();
         var epgImportService = new XmltvImportService();
         var dialogService = new PlaylistDialogService();
@@ -71,6 +74,7 @@ public partial class MainWindow : Window
             stateStore,
             organizationPreferencesStore,
             organizationBackupService,
+            logoCacheService,
             uiPreferencesStore,
             epgImportService,
             dialogService);
@@ -117,6 +121,70 @@ public partial class MainWindow : Window
         if (sender is ListBox listBox)
         {
             viewModel.SetSelectedChannels(listBox.SelectedItems.OfType<Channel>());
+        }
+    }
+
+    private void SelectAllVisible_Click(object sender, RoutedEventArgs e)
+    {
+        SelectAllVisibleChannels();
+        e.Handled = true;
+    }
+
+    private void ClearSelection_Click(object sender, RoutedEventArgs e)
+    {
+        ClearChannelSelection();
+        e.Handled = true;
+    }
+
+    private void Channels_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        channelDragStartPoint = e.GetPosition(null);
+    }
+
+    private void Channels_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        Point currentPosition = e.GetPosition(null);
+        if (Math.Abs(currentPosition.X - channelDragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(currentPosition.Y - channelDragStartPoint.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        if (FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject) is not { DataContext: Channel channel } item)
+        {
+            return;
+        }
+
+        DragDrop.DoDragDrop(item, channel, DragDropEffects.Move);
+    }
+
+    private void Channels_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = DragDropEffects.None;
+        if (e.Data.GetDataPresent(typeof(Channel)) &&
+            e.Data.GetData(typeof(Channel)) is Channel dragged &&
+            FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject) is { DataContext: Channel target } &&
+            viewModel.CanDropChannelOn(dragged, target))
+        {
+            e.Effects = DragDropEffects.Move;
+        }
+
+        e.Handled = true;
+    }
+
+    private void Channels_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(typeof(Channel)) &&
+            e.Data.GetData(typeof(Channel)) is Channel dragged &&
+            FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject) is { DataContext: Channel target })
+        {
+            viewModel.MoveChannelBefore(dragged.Id, target.Id);
+            e.Handled = true;
         }
     }
 
@@ -175,6 +243,14 @@ public partial class MainWindow : Window
         {
             switch (key)
             {
+                case Key.A when !textInputFocused && !IsFocusWithin<ComboBox>() && !IsFocusWithin<ComboBoxItem>():
+                    SelectAllVisibleChannels();
+                    e.Handled = true;
+                    return;
+                case Key.D when !textInputFocused:
+                    ClearChannelSelection();
+                    e.Handled = true;
+                    return;
                 case Key.F:
                     SearchBox.Focus();
                     SearchBox.SelectAll();
@@ -212,6 +288,13 @@ public partial class MainWindow : Window
             case Key.Space when TryExecute(viewModel.PlaySelectedCommand):
             case Key.P when TryExecute(viewModel.PauseCommand):
             case Key.S when TryExecute(viewModel.StopCommand):
+                e.Handled = true;
+                break;
+            case Key.V when TryExecute(viewModel.ToggleFavoriteCommand):
+            case Key.H when TryExecute(viewModel.ToggleHiddenCommand):
+            case Key.B when TryExecute(viewModel.BatchFavoriteCommand):
+            case Key.Delete when TryExecute(viewModel.BatchHideCommand):
+            case Key.U when TryExecute(viewModel.BatchUnhideCommand):
                 e.Handled = true;
                 break;
             case Key.F:
@@ -433,6 +516,34 @@ public partial class MainWindow : Window
 
         command.Execute(null);
         return true;
+    }
+
+    private void SelectAllVisibleChannels()
+    {
+        ChannelsListBox.SelectAll();
+        viewModel.SetSelectedChannels(ChannelsListBox.SelectedItems.OfType<Channel>());
+    }
+
+    private void ClearChannelSelection()
+    {
+        ChannelsListBox.UnselectAll();
+        viewModel.SetSelectedChannels(Array.Empty<Channel>());
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? source) where T : DependencyObject
+    {
+        DependencyObject? current = source;
+        while (current is not null)
+        {
+            if (current is T target)
+            {
+                return target;
+            }
+
+            current = GetElementParent(current);
+        }
+
+        return null;
     }
 
     private static bool IsFocusWithin<T>() where T : DependencyObject

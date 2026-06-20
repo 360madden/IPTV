@@ -110,6 +110,19 @@
                               Background="{StaticResource PanelAltBrush}"
                               Foreground="Black" />
 
+                    <TextBlock Text="Content"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="0,0,0,6" />
+                    <ComboBox ItemsSource="{Binding ContentKindFilterOptions}"
+                              DisplayMemberPath="Label"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding SelectedContentKind}"
+                              Margin="0,0,0,14"
+                              Padding="8"
+                              Background="{StaticResource PanelAltBrush}"
+                              Foreground="Black"
+                              AutomationProperties.Name="Content Type Filter" />
+
                     <CheckBox Content="Favorites only"
                               IsChecked="{Binding FavoritesOnly}"
                               Foreground="{StaticResource TextPrimaryBrush}"
@@ -140,6 +153,17 @@
                               Background="{StaticResource PanelAltBrush}"
                               Foreground="Black"
                               AutomationProperties.Name="Channel Sort Mode" />
+
+                    <CheckBox Content="Large library mode"
+                              IsChecked="{Binding LargeLibraryMode}"
+                              Foreground="{StaticResource TextPrimaryBrush}"
+                              Margin="0,0,0,4"
+                              AutomationProperties.Name="Large Library Mode" />
+                    <TextBlock Text="{Binding VisibleResultLimitText}"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               FontSize="12"
+                               Margin="0,0,0,12" />
 
                     <Button Content="Clear Filters"
                             Command="{Binding ClearFiltersCommand}"
@@ -230,6 +254,37 @@
                                             Command="{Binding BatchClearGroupCommand}"
                                             Margin="0,0,8,8" />
                                 </WrapPanel>
+                                <Separator Margin="0,6,0,10" />
+                                <TextBlock Text="Smart group rule"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,6" />
+                                <TextBlock Text="Matches channel name, source group, category, TVG ID, or TVG name. Apply preserves existing custom groups."
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,8" />
+                                <TextBlock Text="Match text"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,4" />
+                                <TextBox Text="{Binding SmartGroupMatchText, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,8"
+                                         AutomationProperties.Name="Smart Group Match Text" />
+                                <TextBlock Text="Destination group"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,4" />
+                                <TextBox Text="{Binding SmartGroupName, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,8"
+                                         AutomationProperties.Name="Smart Group Destination" />
+                                <WrapPanel>
+                                    <Button Content="Preview Rule"
+                                            Command="{Binding PreviewSmartGroupCommand}"
+                                            Margin="0,0,8,8" />
+                                    <Button Content="Apply Rule"
+                                            Command="{Binding ApplySmartGroupCommand}"
+                                            Margin="0,0,8,8" />
+                                </WrapPanel>
+                                <TextBlock Text="{Binding SmartGroupPreviewText}"
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSecondaryBrush}" />
                             </StackPanel>
                         </Border>
                     </Expander>
@@ -354,6 +409,14 @@
                                        Margin="0,8,0,0"
                                        TextWrapping="Wrap"
                                        Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding ProfileSummaryText}"
+                                       Margin="0,8,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding ReconciliationText}"
+                                       Margin="0,8,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding EpgSummaryText}"
                                        Margin="0,8,0,0"
                                        TextWrapping="Wrap"
@@ -409,22 +472,40 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Channels"
-                               FontSize="20"
-                               FontWeight="SemiBold"
-                               Margin="6,4,0,12" />
+                    <DockPanel Margin="6,4,0,12">
+                        <StackPanel DockPanel.Dock="Right"
+                                    Orientation="Horizontal">
+                            <Button Content="Select All Visible"
+                                    Click="SelectAllVisible_Click"
+                                    Padding="10,5"
+                                    Margin="0,0,8,0"
+                                    AutomationProperties.Name="Select All Visible Channels" />
+                            <Button Content="Clear Selection"
+                                    Click="ClearSelection_Click"
+                                    Padding="10,5"
+                                    AutomationProperties.Name="Clear Channel Selection" />
+                        </StackPanel>
+                        <TextBlock Text="Channels"
+                                   FontSize="20"
+                                   FontWeight="SemiBold" />
+                    </DockPanel>
 
                     <ListBox x:Name="ChannelsListBox"
                              Grid.Row="1"
                              ItemsSource="{Binding VisibleChannels}"
                              SelectedItem="{Binding SelectedChannel}"
                              SelectionMode="Extended"
+                             AllowDrop="True"
                              Background="Transparent"
                              BorderThickness="0"
                              Foreground="{StaticResource TextPrimaryBrush}"
                              ScrollViewer.CanContentScroll="True"
                              VirtualizingPanel.IsVirtualizing="True"
                              VirtualizingPanel.VirtualizationMode="Recycling"
+                             PreviewMouseLeftButtonDown="Channels_PreviewMouseLeftButtonDown"
+                             PreviewMouseMove="Channels_PreviewMouseMove"
+                             DragOver="Channels_DragOver"
+                             Drop="Channels_Drop"
                              SelectionChanged="Channels_SelectionChanged"
                              MouseDoubleClick="Channels_MouseDoubleClick">
                         <ListBox.ItemContainerStyle>
@@ -439,8 +520,18 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Background="{StaticResource PanelAltBrush}"
-                                        CornerRadius="10"
-                                        Padding="12">
+                                        CornerRadius="10">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Padding" Value="12" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.LargeLibraryMode, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                             Value="True">
+                                                    <Setter Property="Padding" Value="8" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -455,9 +546,27 @@
                                                        Foreground="{StaticResource TextSecondaryBrush}"
                                                        FontSize="12"
                                                        TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Category}"
-                                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                                       FontSize="12" />
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Category}"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           FontSize="12">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding DataContext.LargeLibraryMode, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                             Value="True">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding ContentKind}"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           FontSize="12"
+                                                           Margin="8,0,0,0" />
+                                            </StackPanel>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1"
                                                     HorizontalAlignment="Right">
@@ -482,6 +591,28 @@
                                                        FontSize="18"
                                                        HorizontalAlignment="Right"
                                                        Visibility="{Binding IsFavorite, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <Border Background="#664EA7FF"
+                                                    CornerRadius="8"
+                                                    Padding="7,3"
+                                                    Margin="0,6,0,0">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding TvgLogo}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding TvgLogo}" Value="">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="LOGO"
+                                                           Foreground="#EAF2FF"
+                                                           FontSize="11"
+                                                           FontWeight="Bold" />
+                                            </Border>
                                             <Border Background="#66FFB04E"
                                                     CornerRadius="8"
                                                     Padding="7,3"
@@ -637,6 +768,50 @@
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    Margin="0,6,0,0"
                                    TextWrapping="Wrap" />
+                        <DockPanel Margin="0,8,0,0">
+                            <Border DockPanel.Dock="Left"
+                                    Width="64"
+                                    Height="42"
+                                    CornerRadius="6"
+                                    Background="{StaticResource PanelAltBrush}"
+                                    Margin="0,0,10,0"
+                                    ClipToBounds="True">
+                                <Image Source="{Binding SelectedChannelLogoPath}"
+                                       Stretch="Uniform">
+                                    <Image.Style>
+                                        <Style TargetType="Image">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SelectedChannelLogoPath}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding SelectedChannelLogoPath}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Image.Style>
+                                </Image>
+                            </Border>
+                            <TextBlock Text="{Binding SelectedChannelLogoStatusText}"
+                                       VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </DockPanel>
+                        <Expander Header="Channel details"
+                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  Background="{StaticResource PanelAltBrush}"
+                                  Margin="0,8,0,0"
+                                  IsExpanded="False">
+                            <Border Background="{StaticResource PanelAltBrush}"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,6,0,0">
+                                <TextBlock Text="{Binding SelectedChannelMetadataText}"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </Border>
+                        </Expander>
                     </StackPanel>
 
                     <Grid x:Name="PlayerControlsPanel"

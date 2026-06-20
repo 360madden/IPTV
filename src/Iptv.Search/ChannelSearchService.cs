@@ -30,6 +30,11 @@ public sealed class ChannelSearchService : IChannelSearchService
             filtered = filtered.Where(channel => channel.Category.Equals(query.Category, StringComparison.OrdinalIgnoreCase));
         }
 
+        if (query.ContentKind is ContentKind contentKind)
+        {
+            filtered = filtered.Where(channel => channel.ContentKind == contentKind);
+        }
+
         if (query.FavoritesOnly)
         {
             filtered = filtered.Where(channel => channel.IsFavorite);

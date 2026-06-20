@@ -44,14 +44,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\xumo-gui-smoke.ps1 -
 - Local and remote M3U/M3U8 import.
 - Playlist refresh with added/removed/unchanged diff summary.
 - XMLTV file import with channel/program counts and basic channel matching.
-- Search, group/category/visibility filters, sort modes, favorites, hidden channels, and custom group assignment.
+- Search, group/category/content/visibility filters, sort modes, favorites, hidden channels, and custom group assignment.
 - Local channel organization persistence for favorites, hidden channels, custom groups, custom order, and recently watched sorting.
-- Custom group manager with counts, add, rename, delete, batch actions, and selected-channel move up/down controls.
+- Custom group manager with counts, add, rename, delete, batch actions, select-all/clear-selection, smart group rules, and drag/drop or up/down custom ordering.
 - Import/export for channel organization backups without raw stream URLs.
+- Automatic per-playlist/source organization matching, refresh reconciliation summaries, safe channel details, selected-channel logo caching, and large-library mode for compact 10k-result browsing.
 - LibVLC playback with fullscreen toggle, volume, buffering presets, and startup timeout guidance.
 - Optional clock overlay with position, size, background, opacity, 24-hour, and seconds settings.
 - True app-managed fullscreen with video overlay clock, mini-HUD controls, auto-hide, double-click toggle, and monitor preference.
-- Keyboard shortcuts: `Ctrl+F` search, `Ctrl+L` import URL, `Ctrl+O` import file, `Ctrl+R` refresh, `Space` play, `P` pause, `S` stop, `C` clock, `F`/`F11` fullscreen, `Esc` exit fullscreen.
+- Keyboard shortcuts: `Ctrl+F` search, `Ctrl+L` import URL, `Ctrl+O` import file, `Ctrl+R` refresh, `Ctrl+A` select visible, `Ctrl+D` clear selection, `Space` play, `P` pause, `S` stop, `V` favorite, `H` hide/unhide, `B` batch favorite, `Delete` batch hide, `U` batch unhide, `C` clock, `F`/`F11` fullscreen, `Esc` exit fullscreen.
 - Redacted diagnostics panel for import/playback events.
 
 ## Privacy Policy for Development
