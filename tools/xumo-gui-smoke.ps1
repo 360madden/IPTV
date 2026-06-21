@@ -14,6 +14,7 @@ param(
     [switch]$RequireClockOverlay,
     [switch]$UseDialogImport,
     [switch]$ExerciseMutatingOrganization,
+    [switch]$ExerciseLibraryManagementDialogs,
     [switch]$CaptureScreenshots,
     [switch]$UseRealUserProfile
 )
@@ -26,6 +27,14 @@ if (-not [string]::IsNullOrWhiteSpace($PlaylistFile) -and $UseDialogImport) {
 
 if ($FirstRunAction -ne "None" -and (-not [string]::IsNullOrWhiteSpace($PlaylistFile) -or $UseDialogImport)) {
     throw "-FirstRunAction must launch without startup import arguments."
+}
+
+if ($ExerciseLibraryManagementDialogs -and $UseRealUserProfile) {
+    throw "-ExerciseLibraryManagementDialogs requires an isolated profile; omit -UseRealUserProfile."
+}
+
+if ($ExerciseLibraryManagementDialogs -and -not [string]::IsNullOrWhiteSpace($PlaylistFile)) {
+    throw "-ExerciseLibraryManagementDialogs currently supports URL startup imports so it can seed a deterministic source profile."
 }
 
 Add-Type -AssemblyName UIAutomationClient
@@ -68,6 +77,7 @@ $process = $null
 $originalLocalAppData = $env:LOCALAPPDATA
 $originalAppDataOverride = $env:IPTV_VIEWER_APPDATA_DIR
 $isolatedProfileRoot = $null
+$libraryManagementSourceId = $null
 $screenshotRoot = Join-Path $repoRoot "artifacts\gui-smoke"
 
 function Wait-Until {
@@ -134,6 +144,19 @@ function Find-ByNameContains {
     }
 
     return $null
+}
+
+function Find-ByAutomationId {
+    param(
+        [System.Windows.Automation.AutomationElement]$Root,
+        [string]$AutomationId,
+        [System.Windows.Automation.TreeScope]$Scope = [System.Windows.Automation.TreeScope]::Descendants
+    )
+
+    $condition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+        $AutomationId)
+    return $Root.FindFirst($Scope, $condition)
 }
 
 function Invoke-Element {
@@ -347,6 +370,66 @@ function Save-WindowScreenshot {
     }
 }
 
+function Submit-FileDialogPath {
+    param(
+        [System.Windows.Automation.AutomationElement]$Dialog,
+        [string]$Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw "File dialog path is required."
+    }
+
+    $Dialog.SetFocus()
+    Start-Sleep -Milliseconds 250
+    $fileNameField = Find-ByAutomationId $Dialog "1148"
+    if ($null -eq $fileNameField) {
+        $fileNameField = Find-ByAutomationId $Dialog "FileNameControlHost"
+    }
+
+    if ($null -eq $fileNameField) {
+        $fileNameField = Find-ByName $Dialog "File name:"
+    }
+
+    if ($null -ne $fileNameField) {
+        Set-ElementValue $fileNameField $Path
+    } else {
+        [System.Windows.Forms.SendKeys]::SendWait("%n")
+        [System.Windows.Forms.SendKeys]::SendWait("^a")
+        [System.Windows.Forms.SendKeys]::SendWait($Path)
+    }
+
+    $submitButton = Find-ByName $Dialog "Save"
+    if ($null -eq $submitButton) {
+        $submitButton = Find-ByName $Dialog "Open"
+    }
+
+    if ($null -ne $submitButton) {
+        Invoke-Element $submitButton
+    } else {
+        [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+    }
+
+    Start-Sleep -Milliseconds 500
+}
+
+function Get-StableGuid {
+    param([string[]]$Parts)
+
+    $separator = [string][char]0x001f
+    $value = [string]::Join($separator, $Parts)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $hash = $sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($value))
+    }
+    finally {
+        $sha256.Dispose()
+    }
+
+    $bytes = [byte[]]$hash[0..15]
+    return ([Guid]::new($bytes)).ToString()
+}
+
 try {
     if (-not $UseRealUserProfile) {
         $isolatedProfileRoot = Join-Path ([System.IO.Path]::GetTempPath()) "iptv-gui-smoke-$([Guid]::NewGuid().ToString('N'))"
@@ -354,6 +437,21 @@ try {
         $env:LOCALAPPDATA = $isolatedProfileRoot
         $env:IPTV_VIEWER_APPDATA_DIR = $isolatedProfileRoot
         Write-Host "Using isolated LOCALAPPDATA: $isolatedProfileRoot"
+
+        if ($ExerciseLibraryManagementDialogs) {
+            $playlistUri = [Uri]$PlaylistUrl
+            $libraryManagementSourceId = Get-StableGuid @("remote", $playlistUri.Host)
+            $sourcePlaybackProfiles = @{}
+            $sourcePlaybackProfiles[$libraryManagementSourceId] = @{
+                retryCount = 1
+                bufferingPreset = 1
+            }
+            @{
+                sourcePlaybackProfiles = $sourcePlaybackProfiles
+            } |
+                ConvertTo-Json -Depth 8 |
+                Set-Content -LiteralPath (Join-Path $isolatedProfileRoot "channel-organization-preferences.json") -Encoding UTF8
+        }
     }
 
     if (-not $SkipBuild) {
@@ -468,6 +566,9 @@ try {
     Select-Element $channel
 
     Write-Host "Verifying organization feature surfaces..."
+    Wait-Until { Find-ByName $main "Recent Playlist Sources" } $TimeoutSeconds "recent playlist source selector" | Out-Null
+    Wait-Until { Find-ByName $main "Import Recent Playlist Sources" } $TimeoutSeconds "recent playlist source import button" | Out-Null
+    Wait-Until { Find-ByName $main "Export Recent Playlist Sources" } $TimeoutSeconds "recent playlist source export button" | Out-Null
     Wait-Until { Find-ByName $main "Channel View Density" } $TimeoutSeconds "channel density selector" | Out-Null
     Wait-Until { Find-ByName $main "Smart Group Rule Mode" } $TimeoutSeconds "smart group rule mode selector" | Out-Null
     Wait-Until { Find-ByName $main "Duplicate Channel Groups" } $TimeoutSeconds "duplicate channel groups list" | Out-Null
@@ -484,7 +585,11 @@ try {
     Wait-Until { Find-ByName $main "Search Benchmark" } $TimeoutSeconds "search benchmark panel" | Out-Null
 
     Expand-Element (Wait-Until { Find-ByName $main "Source Profiles" } $TimeoutSeconds "source profiles panel")
+    Wait-Until { Find-ByName $main "Import Source Profiles" } $TimeoutSeconds "source profile import button" | Out-Null
+    Wait-Until { Find-ByName $main "Export Source Profiles" } $TimeoutSeconds "source profile export button" | Out-Null
+    Wait-Until { Find-ByName $main "Source Default Visibility Group" } $TimeoutSeconds "source default visibility group selector" | Out-Null
     Wait-Until { Find-ByName $main "XMLTV Guide URL" } $TimeoutSeconds "XMLTV guide URL field" | Out-Null
+    Wait-Until { Find-ByName $main "Library Health Dashboard" } $TimeoutSeconds "library health dashboard" | Out-Null
 
     Expand-Element (Wait-Until { Find-ByName $main "EPG Timeline" } $TimeoutSeconds "EPG timeline panel")
     Wait-Until { Find-ByName $main "EPG Timeline Window" } $TimeoutSeconds "EPG timeline window selector" | Out-Null
@@ -494,6 +599,81 @@ try {
     Wait-Until { Find-ByName $main "Search Benchmark Results" } $TimeoutSeconds "search benchmark results list" | Out-Null
 
     Save-WindowScreenshot $main "window-library"
+
+    if ($ExerciseLibraryManagementDialogs) {
+        Write-Host "Exercising recent-source export/import and source-profile conflict preview..."
+        if ([string]::IsNullOrWhiteSpace($libraryManagementSourceId)) {
+            throw "Library management smoke source profile was not seeded."
+        }
+
+        $librarySmokeRoot = Join-Path $isolatedProfileRoot "library-management-smoke"
+        New-Item -ItemType Directory -Force -Path $librarySmokeRoot | Out-Null
+        $recentExportPath = Join-Path $librarySmokeRoot "recent-sources.json"
+
+        Invoke-Element (Wait-Until { Find-ByName $main "Export Recent Playlist Sources" } $TimeoutSeconds "Export Recent Playlist Sources button")
+        $recentSaveDialog = Wait-Until {
+            Get-ProcessWindowByName -ProcessId $process.Id -Name "Export recent playlist sources"
+        } $TimeoutSeconds "recent playlist source export dialog"
+        Submit-FileDialogPath $recentSaveDialog $recentExportPath
+        Wait-Until { Test-Path -LiteralPath $recentExportPath } $TimeoutSeconds "recent playlist source export file" | Out-Null
+
+        Invoke-Element (Wait-Until { Find-ByName $main "Import Recent Playlist Sources" } $TimeoutSeconds "Import Recent Playlist Sources button")
+        $recentOpenDialog = Wait-Until {
+            Get-ProcessWindowByName -ProcessId $process.Id -Name "Import recent playlist sources"
+        } $TimeoutSeconds "recent playlist source import dialog"
+        Submit-FileDialogPath $recentOpenDialog $recentExportPath
+        Wait-Until { Find-ByNameContains $main "Imported recent playlist sources" } $TimeoutSeconds "recent playlist source import status" | Out-Null
+
+        $sourceProfileImportPath = Join-Path $librarySmokeRoot "source-profile-conflict.json"
+        $sourcePlaybackProfiles = @{}
+        $sourcePlaybackProfiles[$libraryManagementSourceId] = @{
+            retryCount = 3
+            bufferingPreset = 2
+        }
+        $sourceProfileImport = @{
+            version = 1
+            sourceProfileNames = @{}
+            sourcePlaybackProfiles = $sourcePlaybackProfiles
+            sourceDefaultHiddenGroups = @{}
+        }
+        $sourceProfileImport |
+            ConvertTo-Json -Depth 8 |
+            Set-Content -LiteralPath $sourceProfileImportPath -Encoding UTF8
+
+        Invoke-Element (Wait-Until { Find-ByName $main "Import Source Profiles" } $TimeoutSeconds "Import Source Profiles button")
+        $sourceOpenDialog = Wait-Until {
+            Get-ProcessWindowByName -ProcessId $process.Id -Name "Import source profiles"
+        } $TimeoutSeconds "source profile import dialog"
+        Submit-FileDialogPath $sourceOpenDialog $sourceProfileImportPath
+
+        $conflictDialog = Wait-Until {
+            $root = [System.Windows.Automation.AutomationElement]::RootElement
+            $dialog = Find-ByName `
+                -Root $root `
+                -Name "Preview Confirm Dialog" `
+                -Scope ([System.Windows.Automation.TreeScope]::Children)
+            if ($null -eq $dialog) {
+                $dialog = Get-ProcessWindowByName -ProcessId $process.Id -Name "Review Changes"
+            }
+
+            $conflictMessage = if ($null -ne $dialog) {
+                Find-ByNameContains `
+                    -Root $dialog `
+                    -Text "source profile file updates existing profile settings" `
+                    -Scope ([System.Windows.Automation.TreeScope]::Descendants)
+            } else {
+                $null
+            }
+
+            if ($null -ne $dialog -and $null -ne $conflictMessage) {
+                return $dialog
+            }
+
+            return $false
+        } $TimeoutSeconds "source profile conflict preview dialog"
+        Invoke-Element (Wait-Until { Find-ByName $conflictDialog "Cancel" } $TimeoutSeconds "source profile conflict cancel button")
+        Wait-Until { Find-ByNameContains $main "Source profile import cancelled before applying conflicts" } $TimeoutSeconds "source profile conflict cancellation status" | Out-Null
+    }
 
     if ($ExerciseMutatingOrganization) {
         Write-Host "Exercising isolated PIN lock/unlock workflow..."

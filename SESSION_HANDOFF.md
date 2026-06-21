@@ -3,56 +3,61 @@
 Date: 2026-06-21
 Repo: `C:\RIFT MODDING\iptv`
 Remote: `https://github.com/360madden/IPTV.git`
-Branch for this slice: `codex/next-1-10-library-management`
-Baseline before this slice: `9d20f6d` (`Merge pull request #8 from 360madden/codex/next-practical-prefs-import-release`)
+Active branch: `codex/next-1-10-modular-health-overrides`
+Baseline for this slice: `8a6b859` (`Add library management polish (#9)` on `main`)
 
 ## Current Product State
 
-The repo contains a functional .NET 10 WPF IPTV viewer for user-supplied M3U/M3U8 playlists. Playback uses LibVLC. The app now includes playlist URL/local/sample import, recent playlist management, search, grouping, favorites, hidden channels, custom groups, default source visibility rules, EPG, VOD resume infrastructure, fullscreen/clock overlay, diagnostics, release packaging, and redacted smoke tooling. Keep the repository content-neutral: do not commit private playlists, credentials, generated user-library data, or proprietary stream URLs.
+The repo contains a functional .NET 10 WPF IPTV viewer for user-supplied M3U/M3U8 playlists. Playback uses LibVLC. The app supports URL/local/sample import, search, grouping, favorites, hidden channels, custom groups, source profiles, recent playlist sources, EPG, VOD resume surfaces, fullscreen/clock overlay, diagnostics, release packaging, and redacted smoke tooling. Keep it content-neutral: do not commit private playlists, credentials, generated user-library data, or proprietary stream URLs.
 
 ## This Slice
 
-The requested 1-10 library-management follow-up is implemented:
+The next 1-10 follow-up is implemented on top of merged PR #9:
 
-- Added `PlaylistImportCoordinator` to time and centralize import/refresh execution outside the main view model.
-- Expanded recent playlist source management with rename, pin/unpin, remove, import list, and export list commands/UI.
-- Added bounded JSON import/export service for recent playlist sources.
-- Added source-profile import conflict preview before overwriting existing names, playback profiles, or default visibility rules.
-- Added persistent source default hidden-group rules, with UI to hide/show source groups by default and apply rules to large loaded libraries without per-channel state churn.
-- Extended source profile import/export and organization backup/preferences persistence for default hidden-group rules.
-- Added a library health dashboard summarizing channel counts, visibility, source/group counts, VOD/series, logos, EPG programs, import duration, and import quality.
-- Added CI large-playlist search benchmark and optional release ZIP launch smoke in MSIX workflow.
-- Updated signing/release checklist docs for trusted PFX distribution path.
-- Added persistence tests for recent playlist source exports and default hidden-group roundtrips.
+- Merged PR #9 into `main`, then started `codex/next-1-10-modular-health-overrides`.
+- Extracted recent playlist source logic into `RecentPlaylistSourceManager`.
+- Extracted source default visibility rule logic into `SourceDefaultVisibilityManager`.
+- Added explicit per-channel visibility override persistence via `ChannelUserState.HasExplicitVisibility`, allowing “show despite default hidden rule” without losing legacy hidden behavior.
+- Added import memory/GC metrics to `LibraryHealthAnalyzer` and surfaced them in library health.
+- Added library health output to redacted diagnostics exports.
+- Improved source profile help text to explain backup/restore scope.
+- Added `Iptv.App.Tests` with manager and library health unit coverage.
+- Expanded persistence tests for explicit visible/hidden override roundtrips.
+- Expanded GUI smoke with recent-source import/export and source-profile conflict-preview coverage using an isolated seeded source profile.
+- Added CI upload of the large search benchmark timing artifact.
 
 ## Validation Snapshot
 
 Local validation passed on 2026-06-21:
 
+- `dotnet restore .\Iptv.slnx` — succeeded.
 - `dotnet format .\Iptv.slnx --verify-no-changes` — clean.
 - `dotnet build .\Iptv.slnx --no-restore` — succeeded, 0 warnings/errors.
-- `dotnet test .\Iptv.slnx --no-build` — 63/63 passed.
-- `dotnet run --project .\tools\Iptv.SearchBench\Iptv.SearchBench.csproj --no-build -- --count 75000` — completed; name search 500 results in 108 ms.
+- `dotnet test .\Iptv.slnx --no-build` — 70/70 passed.
+- `dotnet build .\Iptv.slnx --configuration Release --no-restore` — succeeded, 0 warnings/errors.
+- `dotnet test .\Iptv.slnx --configuration Release --no-build` — 70/70 passed.
+- `dotnet run --project .\tools\Iptv.SearchBench\Iptv.SearchBench.csproj --configuration Release --no-build -- --count 75000` — completed; name search 500 results in 108 ms.
 - `dotnet run --project .\tools\Iptv.Smoke\Iptv.Smoke.csproj --no-build -- --url https://www.apsattv.com/xumo.m3u --probe-count 5 --timeout-seconds 20` — imported 389 channels; 5/5 probes reached `Playing`.
-- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\validate-release-zip.ps1 -LaunchSeconds 2 -PlaylistFile .\assets\sample-playlists\synthetic-news-sports.m3u` — release ZIP validation passed using existing artifact.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\xumo-gui-smoke.ps1 -SkipBuild -TimeoutSeconds 90 -PlaybackTimeoutSeconds 35 -ExerciseLibraryManagementDialogs` — passed; live playback did not reach `Playing` before timeout but UI regression, clock, fullscreen, recent-source, and source-profile conflict-preview checks completed.
 - `git diff --check` — clean.
 
 ## GitHub / Branch State
 
 - Default branch: `main`.
 - Branch protection requires PRs and strict `Build and Test` on `main`.
-- This slice should be pushed as `codex/next-1-10-library-management`, opened as a PR, then merged through protected `main` if CI passes.
+- Push this branch as `codex/next-1-10-modular-health-overrides`, open a PR, wait for CI, then merge through protected `main` if checks pass.
 
 ## Known Cautions
 
-- `MainViewModel` remains large despite adding modular helpers. Continue extracting one feature area at a time.
-- Default source hidden-group rules are defaults, not explicit per-channel visible overrides; user-hidden/favorite/custom state still wins when present.
-- The release ZIP validation used an existing local artifact; package generation was not rerun in this slice.
-- The optional CI GUI launch smoke is `continue-on-error` because Windows runner desktop availability can vary.
+- `MainViewModel` is still large; this slice peels out two managers but further feature extraction remains high leverage.
+- Source default hidden rules are defaults. Explicit per-channel hide/show overrides now win when `HasExplicitVisibility` is stored.
+- GUI smoke uses real app windows and a public Xumo playlist URL; playback timing can be transient, so playback remains non-required unless `-RequirePlayback` is passed.
+- The source-profile conflict smoke seeds an isolated profile by deterministic source ID for the playlist host; keep that path isolated from real user profiles.
 
 ## Best Resume Flow
 
-1. Run `git status --short --branch` and confirm current branch/state.
-2. If the PR is not yet merged, push/inspect `codex/next-1-10-library-management` and wait for CI.
-3. Test manually with `launch-iptv.cmd "https://www.apsattv.com/xumo.m3u"` and verify recent-source management, source default visibility, and library health UI.
-4. Highest-impact next work: split recent-source/source-profile/default-visibility controllers out of `MainViewModel`, then add UI automation coverage for the new dialogs.
+1. Run `git status --short --branch` and inspect the diff.
+2. Push `codex/next-1-10-modular-health-overrides` and open the PR.
+3. Watch CI, especially the benchmark artifact upload step.
+4. If CI is green, merge through the protected flow.
+5. Next highest-impact work: continue splitting `MainViewModel` into feature controllers/view models, starting with source profiles or library health.

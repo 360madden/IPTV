@@ -37,6 +37,7 @@ public sealed class JsonChannelStateStoreTests
             var store = new JsonChannelStateStore(tempDirectory);
             Guid favorite = Guid.CreateVersion7();
             Guid hidden = Guid.CreateVersion7();
+            Guid explicitlyVisible = Guid.CreateVersion7();
 
             await store.SaveChannelStatesAsync(
                 [
@@ -49,19 +50,23 @@ public sealed class JsonChannelStateStoreTests
                         LastWatchedAt = DateTimeOffset.UtcNow,
                         ResumeProgressPercent = 42
                     },
-                    new ChannelUserState { ChannelId = hidden, IsHidden = true }
+                    new ChannelUserState { ChannelId = hidden, IsHidden = true },
+                    new ChannelUserState { ChannelId = explicitlyVisible, HasExplicitVisibility = true }
                 ],
                 CancellationToken.None);
 
             IReadOnlyDictionary<Guid, ChannelUserState> loaded = await store.LoadChannelStatesAsync(CancellationToken.None);
 
-            Assert.Equal(2, loaded.Count);
+            Assert.Equal(3, loaded.Count);
             Assert.True(loaded[favorite].IsFavorite);
             Assert.Equal("My News", loaded[favorite].CustomGroup);
             Assert.Equal(3, loaded[favorite].CustomSortIndex);
             Assert.NotNull(loaded[favorite].LastWatchedAt);
             Assert.Equal(42, loaded[favorite].ResumeProgressPercent);
             Assert.True(loaded[hidden].IsHidden);
+            Assert.True(loaded[hidden].HasExplicitVisibility);
+            Assert.False(loaded[explicitlyVisible].IsHidden);
+            Assert.True(loaded[explicitlyVisible].HasExplicitVisibility);
         }
         finally
         {

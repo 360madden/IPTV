@@ -8,6 +8,8 @@ public sealed record ChannelUserState
 
     public bool IsHidden { get; init; }
 
+    public bool HasExplicitVisibility { get; init; }
+
     public string? CustomGroup { get; init; }
 
     public int? CustomSortIndex { get; init; }

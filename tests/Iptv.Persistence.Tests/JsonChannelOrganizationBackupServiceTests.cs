@@ -15,6 +15,7 @@ public sealed class JsonChannelOrganizationBackupServiceTests
             string path = Path.Combine(tempDirectory, "organization.json");
             var service = new JsonChannelOrganizationBackupService();
             Guid channelId = Guid.CreateVersion7();
+            Guid explicitlyVisibleId = Guid.CreateVersion7();
 
             await service.ExportAsync(
                 path,
@@ -53,10 +54,16 @@ public sealed class JsonChannelOrganizationBackupServiceTests
                             ChannelId = channelId,
                             IsFavorite = true,
                             IsHidden = true,
+                            HasExplicitVisibility = true,
                             CustomGroup = "News",
                             CustomSortIndex = 2,
                             LastWatchedAt = DateTimeOffset.UtcNow,
                             ResumeProgressPercent = 88
+                        },
+                        new ChannelUserState
+                        {
+                            ChannelId = explicitlyVisibleId,
+                            HasExplicitVisibility = true
                         }
                     ]
                 },
@@ -80,14 +87,19 @@ public sealed class JsonChannelOrganizationBackupServiceTests
             Assert.Equal(["Kids", "Sports"], imported.Preferences.LockedGroups);
             Assert.Equal("https://example.com/guide.xml", imported.Preferences.XmltvGuideUrl);
             Assert.True(imported.Preferences.AutoLoadXmltvOnPlaylistImport);
-            ChannelUserState state = Assert.Single(imported.ChannelStates);
+            Assert.Equal(2, imported.ChannelStates.Length);
+            ChannelUserState state = imported.ChannelStates.Single(channelState => channelState.ChannelId == channelId);
             Assert.Equal(channelId, state.ChannelId);
             Assert.True(state.IsFavorite);
             Assert.True(state.IsHidden);
+            Assert.True(state.HasExplicitVisibility);
             Assert.Equal("News", state.CustomGroup);
             Assert.Equal(2, state.CustomSortIndex);
             Assert.NotNull(state.LastWatchedAt);
             Assert.Equal(88, state.ResumeProgressPercent);
+            ChannelUserState explicitlyVisible = imported.ChannelStates.Single(channelState => channelState.ChannelId == explicitlyVisibleId);
+            Assert.False(explicitlyVisible.IsHidden);
+            Assert.True(explicitlyVisible.HasExplicitVisibility);
         }
         finally
         {

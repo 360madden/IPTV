@@ -147,6 +147,7 @@ public sealed class JsonChannelOrganizationBackupService : IChannelOrganizationB
         {
             IsFavorite = snapshot.Any(state => state.IsFavorite),
             IsHidden = snapshot.Any(state => state.IsHidden),
+            HasExplicitVisibility = snapshot.Any(state => state.HasExplicitVisibility || state.IsHidden),
             CustomGroup = snapshot.LastOrDefault(state => !string.IsNullOrWhiteSpace(state.CustomGroup))?.CustomGroup,
             CustomSortIndex = snapshot.LastOrDefault(state => state.CustomSortIndex.HasValue)?.CustomSortIndex,
             LastWatchedAt = snapshot
@@ -173,6 +174,7 @@ public sealed class JsonChannelOrganizationBackupService : IChannelOrganizationB
         return state.ChannelId != Guid.Empty &&
             (state.IsFavorite ||
                 state.IsHidden ||
+                state.HasExplicitVisibility ||
                 !string.IsNullOrWhiteSpace(state.CustomGroup) ||
                 state.CustomSortIndex.HasValue ||
                 state.LastWatchedAt.HasValue ||

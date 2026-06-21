@@ -33,4 +33,16 @@ jobs:
         run: dotnet test .\Iptv.slnx --configuration Release --no-build
 
       - name: Large playlist search benchmark
-        run: dotnet run --project .\tools\Iptv.SearchBench\Iptv.SearchBench.csproj --configuration Release --no-build -- --count 75000
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path .\artifacts\bench | Out-Null
+          dotnet run --project .\tools\Iptv.SearchBench\Iptv.SearchBench.csproj --configuration Release --no-build -- --count 75000 2>&1 |
+            Tee-Object -FilePath .\artifacts\bench\search-benchmark.txt
+
+      - name: Upload search benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: search-benchmark
+          if-no-files-found: error
+          retention-days: 14
+          path: artifacts/bench/search-benchmark.txt

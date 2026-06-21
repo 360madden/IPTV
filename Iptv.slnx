@@ -9,6 +9,7 @@
     <Project Path="src/Iptv.Search/Iptv.Search.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Iptv.App.Tests/Iptv.App.Tests.csproj" />
     <Project Path="tests/Iptv.Core.Tests/Iptv.Core.Tests.csproj" />
     <Project Path="tests/Iptv.Epg.Tests/Iptv.Epg.Tests.csproj" />
     <Project Path="tests/Iptv.Persistence.Tests/Iptv.Persistence.Tests.csproj" />
