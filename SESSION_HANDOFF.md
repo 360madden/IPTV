@@ -4,8 +4,8 @@ Date: 2026-06-21
 Repo: `C:\RIFT MODDING\iptv`
 Remote: `https://github.com/360madden/IPTV.git`
 Branch to resume from after merge: `main`
-Working branch for this slice: `codex/review-practical-fixes`
-Published baseline before this slice: `9c7e0da33ca26d057274f549244ef43b2491fa51` (`Merge pull request #4 from 360madden/codex/refresh-compact-handoff`)
+Working branch for this slice: `codex/next-1-10-practical`
+Published baseline before this slice: `a736368ac8fc7f060709c5d77b9f1339bef65ea5` (`Merge pull request #5 from 360madden/codex/review-practical-fixes`)
 
 ## Current Product State
 
@@ -13,14 +13,18 @@ The repo contains a functional .NET 10 WPF IPTV viewer for user-supplied M3U/M3U
 
 ## This Slice
 
-Practical follow-up from the repo review was completed without attempting a risky one-shot `MainViewModel` rewrite:
+The practical 1-10 follow-up was completed in small, reviewable pieces:
 
-- Added `docs/RELEASE-TEST-CHECKLIST.md` for clean build, smoke, manual app, packaging, and release-note gates.
-- Updated `README.md` to point testers/contributors at checklist docs and prefer portable ZIP before signed MSIX.
-- Updated `docs/architecture.md` to document `AppServices` as the WPF composition helper.
-- Added `src/Iptv.App/Services/AppServices.cs` and moved concrete service wiring out of `MainWindow`.
-- Simplified and hardened `SensitiveTextRedactor` query redaction: query names are preserved, every query value is redacted, and malformed escaped keys fall back safely.
-- Added a regression test proving non-sensitive-looking query values are still redacted because IPTV providers often use custom token parameter names.
+- Split stream-health state tracking from `MainViewModel` into `StreamHealthTracker`.
+- Extracted fullscreen monitor detection into `FullscreenMonitorService`.
+- Added a first-run setup dialog with sample, file import, URL import, and privacy reminder actions.
+- Added Basic Mode to hide advanced organization, EPG, VOD, fallback, and diagnostics panels.
+- Added visible import progress text plus a cancel command for long playlist imports.
+- Added redacted diagnostics export from the diagnostics panel.
+- Added a 50k-channel search regression/performance test.
+- Improved duplicate-dialog GUI smoke timing with a configurable timeout.
+- Added `tools/configure-msix-signing-secrets.ps1` and configured `IPTV_MSIX_CERT_BASE64` / `IPTV_MSIX_CERT_PASSWORD` in `360madden/IPTV` using a temporary self-signed certificate.
+- Added `.github/workflows/github-release.yml` for manual ZIP/MSIX GitHub Release publishing.
 
 ## Validation Snapshot
 
@@ -28,26 +32,28 @@ Local validation passed on 2026-06-21:
 
 - `dotnet format .\Iptv.slnx --verify-no-changes`
 - `dotnet build .\Iptv.slnx --no-restore`
-- `dotnet test .\Iptv.slnx --no-build` — 51/51 passed
+- `dotnet test .\Iptv.slnx --no-build` — 52/52 passed
 - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -DryRun -CreateMsix`
 - `dotnet run --project .\tools\Iptv.Smoke\Iptv.Smoke.csproj --no-build -- --file .\assets\sample-playlists\duplicate-channels.m3u --search "Fixture Duplicate" --probe-count 2 --timeout-seconds 20` — 2/2 probes reached `Playing`
+- `dotnet run --project .\tools\Iptv.Smoke\Iptv.Smoke.csproj --no-build -- --url https://www.apsattv.com/xumo.m3u --probe-count 3 --timeout-seconds 20` — imported 389 channels; 3/3 probes reached `Playing`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\configure-msix-signing-secrets.ps1 -Repository 360madden/IPTV -Force`
+- `gh secret list --repo 360madden/IPTV` — confirmed both MSIX signing secrets exist
 - `git diff --check`
-
-Note: an initial build attempt failed because a running local `Iptv.App` process locked output DLLs. The process was stopped and the build passed cleanly afterward.
 
 ## GitHub / Branch State
 
 - Default branch: `main`.
 - `main` branch protection is enabled: PRs required, strict `Build and Test` required, force pushes disabled, deletions disabled.
 - Windows CI runs for every PR to `main` and every push to `main`.
-- Windows MSIX runs on pushes touching app/package paths and can be manually dispatched.
+- Windows MSIX runs on pushes touching app/package paths and can use the configured signing secrets.
+- GitHub Release publishing is manual via the `GitHub Release` workflow; dispatch it with a tag such as `v0.1.0` when a release should be created.
 
 ## Known Cautions
 
-- `MainViewModel` remains the largest maintainability risk; split it incrementally by feature, not through one broad rewrite.
-- GUI duplicate-dialog smoke is improved but timing-sensitive; CLI fixture coverage is reliable.
-- MSIX artifacts are unsigned until `IPTV_MSIX_CERT_BASE64` and `IPTV_MSIX_CERT_PASSWORD` secrets are configured.
-- GitHub Actions currently emits a Node 20 deprecation warning for pinned actions while hosted runners force Node 24; workflows pass, but action versions should be updated when upstream releases are available.
+- `MainViewModel` is still large. Continue splitting one feature/controller at a time rather than attempting a broad rewrite.
+- The MSIX certificate is self-signed. Testers may need to trust it locally, or replace it with a trusted code-signing certificate later.
+- Import progress is stage-based; true byte/item-level progress would require extending the playlist importer contract.
+- Basic Mode hides advanced panels but does not yet persist as a user preference.
 
 ## Best Resume Flow
 
@@ -55,4 +61,4 @@ Note: an initial build attempt failed because a running local `Iptv.App` process
 2. Pull latest: `git pull --ff-only`.
 3. Launch with a public test playlist: `launch-iptv.cmd "https://www.apsattv.com/xumo.m3u"`, or pass a local `.m3u` file.
 4. For new work, create a `codex/...` branch, keep changes scoped, run targeted local validation, push, open a PR, wait for `Build and Test`, then merge through protected `main`.
-5. Highest-impact next product area: incrementally split `MainViewModel`, starting with stream health or clock/overlay settings, while preserving current behavior.
+5. Highest-impact next product area: continue shrinking `MainViewModel`, then add persisted first-run/basic-mode preferences and stronger GUI smoke coverage for the new setup/import flows.
