@@ -52,6 +52,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly ISourceProfileFileService sourceProfileFileService;
     private readonly ISmartGroupPresetFileService smartGroupPresetFileService;
     private readonly IUiPreferencesStore uiPreferencesStore;
+    private readonly IThemeService themeService;
     private readonly CustomGroupCsvService customGroupCsvService = new();
     private readonly HttpClient logoHttpClient = new() { Timeout = TimeSpan.FromSeconds(6) };
     private readonly HttpClient xmltvHttpClient = new() { Timeout = TimeSpan.FromSeconds(20) };
@@ -155,6 +156,8 @@ public sealed class MainViewModel : ObservableObject
     private bool isBasicMode;
     private bool firstRunSetupCompleted;
     private int selectedLogoCacheLimitMegabytes = 100;
+    private AppTheme selectedAppTheme = AppTheme.Dark;
+    private AppUiScale selectedAppUiScale = AppUiScale.Normal;
     private string statusText = "Import a user-provided M3U/M3U8 playlist to begin.";
     private string playbackStatusText = "Playback idle.";
     private string importSummaryText = "No playlist imported yet.";
@@ -185,6 +188,7 @@ public sealed class MainViewModel : ObservableObject
         ISourceProfileFileService sourceProfileFileService,
         ISmartGroupPresetFileService smartGroupPresetFileService,
         IUiPreferencesStore uiPreferencesStore,
+        IThemeService themeService,
         IXmltvImportService xmltvImportService,
         IPlaylistDialogService dialogService)
     {
@@ -199,6 +203,7 @@ public sealed class MainViewModel : ObservableObject
         this.sourceProfileFileService = sourceProfileFileService;
         this.smartGroupPresetFileService = smartGroupPresetFileService;
         this.uiPreferencesStore = uiPreferencesStore;
+        this.themeService = themeService;
         this.xmltvImportService = xmltvImportService;
         this.dialogService = dialogService;
         Clock = new ClockOverlayViewModel(uiPreferencesStore);
@@ -388,6 +393,20 @@ public sealed class MainViewModel : ObservableObject
     public IReadOnlyList<int> RetryCountOptions { get; } = [0, 1, 2, 3];
 
     public IReadOnlyList<int> LogoCacheLimitMegabyteOptions { get; } = [25, 50, 100, 250, 500];
+
+    public IReadOnlyList<UiSelectionOption<AppTheme>> AppThemeOptions { get; } =
+    [
+        new(AppTheme.Dark, "Dark"),
+        new(AppTheme.Light, "Light"),
+        new(AppTheme.HighContrast, "High contrast")
+    ];
+
+    public IReadOnlyList<UiSelectionOption<AppUiScale>> AppUiScaleOptions { get; } =
+    [
+        new(AppUiScale.Normal, "Normal"),
+        new(AppUiScale.Large, "Large"),
+        new(AppUiScale.Tv, "TV distance")
+    ];
 
     public IReadOnlyList<UiSelectionOption<SmartViewFilter>> SmartViewOptions { get; } =
     [
@@ -1241,6 +1260,34 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    public AppTheme SelectedAppTheme
+    {
+        get => selectedAppTheme;
+        set
+        {
+            AppTheme normalized = ThemeService.NormalizeTheme(value);
+            if (SetProperty(ref selectedAppTheme, normalized))
+            {
+                themeService.ApplyTheme(normalized, SelectedAppUiScale);
+                _ = SaveUiPreferencesSafelyAsync();
+            }
+        }
+    }
+
+    public AppUiScale SelectedAppUiScale
+    {
+        get => selectedAppUiScale;
+        set
+        {
+            AppUiScale normalized = ThemeService.NormalizeUiScale(value);
+            if (SetProperty(ref selectedAppUiScale, normalized))
+            {
+                themeService.ApplyTheme(SelectedAppTheme, normalized);
+                _ = SaveUiPreferencesSafelyAsync();
+            }
+        }
+    }
+
     public string StreamHealthSummaryText
     {
         get => streamHealthSummaryText;
@@ -1375,8 +1422,19 @@ public sealed class MainViewModel : ObservableObject
     public Guid? NowPlayingChannelId
     {
         get => nowPlayingChannelId;
-        private set => SetProperty(ref nowPlayingChannelId, value);
+        private set
+        {
+            if (SetProperty(ref nowPlayingChannelId, value))
+            {
+                OnPropertyChanged(nameof(IsVideoPlaceholderVisible));
+                OnPropertyChanged(nameof(IsVideoSurfaceVisible));
+            }
+        }
     }
+
+    public bool IsVideoPlaceholderVisible => NowPlayingChannelId is null;
+
+    public bool IsVideoSurfaceVisible => !IsVideoPlaceholderVisible;
 
     public int Volume
     {
@@ -1403,6 +1461,11 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ShouldShowFirstRunSetup));
         selectedLogoCacheLimitMegabytes = NormalizeLogoCacheLimit(uiPreferences.LogoCacheLimitMegabytes);
         OnPropertyChanged(nameof(SelectedLogoCacheLimitMegabytes));
+        selectedAppTheme = ThemeService.NormalizeTheme(uiPreferences.AppTheme);
+        selectedAppUiScale = ThemeService.NormalizeUiScale(uiPreferences.AppUiScale);
+        themeService.ApplyTheme(selectedAppTheme, selectedAppUiScale);
+        OnPropertyChanged(nameof(SelectedAppTheme));
+        OnPropertyChanged(nameof(SelectedAppUiScale));
         ApplyRecentPlaylistSources(uiPreferences.RecentPlaylistSources);
         RefreshLogoCacheStatus();
         RefreshLibraryHealth();
@@ -3304,6 +3367,8 @@ public sealed class MainViewModel : ObservableObject
                     IsBasicMode = IsBasicMode,
                     FirstRunSetupCompleted = FirstRunSetupCompleted,
                     LogoCacheLimitMegabytes = SelectedLogoCacheLimitMegabytes,
+                    AppTheme = SelectedAppTheme,
+                    AppUiScale = SelectedAppUiScale,
                     RecentPlaylistSources = recentSources
                 },
                 CancellationToken.None).ConfigureAwait(false);

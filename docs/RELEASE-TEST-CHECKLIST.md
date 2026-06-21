@@ -32,8 +32,9 @@ Expected: import summaries are printed, full stream URLs are not printed, and pr
 4. Search, filter by group, favorite, hide/unhide, and assign a custom group.
 5. Play a channel, stop it, enter fullscreen with `F11`, show the HUD, and exit with `Esc`.
 6. Toggle the clock overlay and verify it remains visible in true fullscreen.
-7. Close and reopen the app, then confirm favorites/hidden/custom group state persists.
-8. Open diagnostics and confirm no raw tokenized URLs are visible.
+7. Complete `docs/POLISHED-UI-CHECKLIST.md`, including theme, UI scale, dropdown, focus, and no-channel placeholder checks.
+8. Close and reopen the app, then confirm favorites/hidden/custom group state persists.
+9. Open diagnostics and confirm no raw tokenized URLs are visible.
 
 ## 4. Packaging Gate
 

@@ -28,6 +28,20 @@ public enum RecentPlaylistSourceKind
     RemoteUrl
 }
 
+public enum AppTheme
+{
+    Dark,
+    Light,
+    HighContrast
+}
+
+public enum AppUiScale
+{
+    Normal,
+    Large,
+    Tv
+}
+
 public sealed record RecentPlaylistSourcePreference
 {
     public RecentPlaylistSourceKind Kind { get; init; }
@@ -68,6 +82,10 @@ public sealed record UiPreferences
     public bool FirstRunSetupCompleted { get; init; }
 
     public int LogoCacheLimitMegabytes { get; init; } = 100;
+
+    public AppTheme AppTheme { get; init; } = AppTheme.Dark;
+
+    public AppUiScale AppUiScale { get; init; } = AppUiScale.Normal;
 
     public RecentPlaylistSourcePreference[] RecentPlaylistSources { get; init; } = [];
 }

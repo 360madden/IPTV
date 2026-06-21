@@ -6,7 +6,7 @@
         Height="190"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
-        Background="{StaticResource AppBackgroundBrush}">
+        Background="{DynamicResource AppBackgroundBrush}">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -15,7 +15,7 @@
         </Grid.RowDefinitions>
 
         <TextBlock Text="Enter a user-provided M3U/M3U8 playlist URL"
-                   FontSize="17"
+                   FontSize="{DynamicResource AppFontSizeLarge}"
                    FontWeight="SemiBold" />
 
         <TextBox x:Name="UrlTextBox"
@@ -31,7 +31,8 @@
             <Button Content="Cancel"
                     Click="Cancel_Click" />
             <Button Content="Import"
-                    Background="{StaticResource AccentBrush}"
+                    Background="{DynamicResource AccentBrush}"
+                    Foreground="{DynamicResource AccentTextBrush}"
                     Click="Import_Click" />
         </StackPanel>
     </Grid>

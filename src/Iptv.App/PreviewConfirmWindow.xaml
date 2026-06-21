@@ -7,7 +7,7 @@
         MinWidth="500"
         MinHeight="320"
         WindowStartupLocation="CenterOwner"
-        Background="{StaticResource AppBackgroundBrush}"
+        Background="{DynamicResource AppBackgroundBrush}"
         AutomationProperties.Name="Preview Confirm Dialog">
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -18,20 +18,20 @@
 
         <StackPanel>
             <TextBlock Text="{Binding TitleText}"
-                       FontSize="18"
+                       FontSize="{DynamicResource AppFontSizeLarge}"
                        FontWeight="SemiBold"
                        TextWrapping="Wrap" />
             <TextBlock Text="{Binding MessageText}"
-                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
                        TextWrapping="Wrap"
                        Margin="0,8,0,14" />
         </StackPanel>
 
         <ListBox Grid.Row="1"
                  ItemsSource="{Binding PreviewLines}"
-                 Background="{StaticResource PanelAltBrush}"
-                 BorderBrush="#334056"
-                 Foreground="{StaticResource TextPrimaryBrush}"
+                 Background="{DynamicResource PanelAltBrush}"
+                 BorderBrush="{DynamicResource ControlBorderBrush}"
+                 Foreground="{DynamicResource TextPrimaryBrush}"
                  ScrollViewer.CanContentScroll="True"
                  VirtualizingPanel.IsVirtualizing="True"
                  AutomationProperties.Name="Preview Confirm List" />
@@ -43,7 +43,8 @@
             <Button Content="Cancel"
                     Click="Cancel_Click" />
             <Button Content="{Binding ConfirmText}"
-                    Background="{StaticResource AccentBrush}"
+                    Background="{DynamicResource AccentBrush}"
+                    Foreground="{DynamicResource AccentTextBrush}"
                     Click="Confirm_Click"
                     AutomationProperties.Name="Confirm Preview Changes" />
         </StackPanel>

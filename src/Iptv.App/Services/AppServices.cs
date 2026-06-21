@@ -33,6 +33,7 @@ public static class AppServices
         var smartGroupPresetFileService = new JsonSmartGroupPresetFileService();
         var uiPreferencesStore = new JsonUiPreferencesStore(appDataDirectory);
         var epgImportService = new XmltvImportService();
+        var themeService = new ThemeService();
         var dialogService = new PlaylistDialogService();
 
         return new MainViewModel(
@@ -47,11 +48,12 @@ public static class AppServices
             sourceProfileFileService,
             smartGroupPresetFileService,
             uiPreferencesStore,
+            themeService,
             epgImportService,
             dialogService);
     }
 
-    private static string? GetAppDataDirectoryOverride()
+    public static string? GetAppDataDirectoryOverride()
     {
         string? value = Environment.GetEnvironmentVariable(AppDataOverrideEnvironmentVariable);
         if (string.IsNullOrWhiteSpace(value))

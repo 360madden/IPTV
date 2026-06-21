@@ -1,0 +1,13 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <sys:Double x:Key="AppFontSizeSmall">14</sys:Double>
+    <sys:Double x:Key="AppFontSizeBase">16</sys:Double>
+    <sys:Double x:Key="AppFontSizeLarge">21</sys:Double>
+    <sys:Double x:Key="AppFontSizeSection">23</sys:Double>
+    <sys:Double x:Key="AppFontSizeTitle">30</sys:Double>
+    <sys:Double x:Key="AppControlMinHeight">40</sys:Double>
+    <Thickness x:Key="AppControlPadding">10,8</Thickness>
+    <Thickness x:Key="AppButtonPadding">14,10</Thickness>
+</ResourceDictionary>
+

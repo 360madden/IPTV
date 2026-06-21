@@ -8,7 +8,7 @@
         Width="1280"
         MinHeight="680"
         MinWidth="1040"
-        Background="{StaticResource AppBackgroundBrush}"
+        Background="{DynamicResource AppBackgroundBrush}"
         PreviewKeyDown="Window_PreviewKeyDown"
         Closing="Window_Closing">
     <Grid x:Name="RootGrid">
@@ -20,8 +20,8 @@
 
         <Border x:Name="HeaderBar"
                 Grid.Row="0"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="#283243"
+                Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource ControlBorderBrush}"
                 BorderThickness="0,0,0,1">
             <Grid Margin="24,0">
                 <Grid.ColumnDefinitions>
@@ -31,11 +31,11 @@
 
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="IPTV Viewer"
-                               FontSize="26"
+                               FontSize="{DynamicResource AppFontSizeTitle}"
                                FontWeight="Bold" />
                     <TextBlock Text="Content-neutral playlist viewer — import your own M3U/M3U8 sources"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               FontSize="13" />
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               FontSize="{DynamicResource AppFontSizeSmall}" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="1"
@@ -44,7 +44,7 @@
                     <CheckBox Content="Basic mode"
                               IsChecked="{Binding IsBasicMode}"
                               VerticalAlignment="Center"
-                              Foreground="{StaticResource TextPrimaryBrush}"
+                              Foreground="{DynamicResource TextPrimaryBrush}"
                               Margin="0,0,12,0"
                               AutomationProperties.Name="Basic Mode" />
                     <Button Content="Import File"
@@ -63,7 +63,8 @@
                     <Button Content="Export Org"
                             Command="{Binding ExportOrganizationCommand}" />
                     <Button Content="Import URL"
-                            Background="{StaticResource AccentBrush}"
+                            Background="{DynamicResource AccentBrush}"
+                            Foreground="{DynamicResource AccentTextBrush}"
                             Command="{Binding ImportUrlCommand}" />
                 </StackPanel>
             </Grid>
@@ -79,7 +80,7 @@
             </Grid.ColumnDefinitions>
 
             <Border x:Name="LibraryPanel"
-                    Background="{StaticResource PanelBrush}"
+                    Background="{DynamicResource PanelBrush}"
                     CornerRadius="14"
                     Padding="18"
                     Margin="0,0,14,0">
@@ -87,12 +88,12 @@
                               HorizontalScrollBarVisibility="Disabled">
                     <StackPanel>
                     <TextBlock Text="Library"
-                               FontSize="20"
+                               FontSize="{DynamicResource AppFontSizeSection}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,18" />
 
                     <TextBlock Text="Search"
-                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,6" />
                     <TextBox x:Name="SearchBox"
                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
@@ -100,14 +101,14 @@
                              AutomationProperties.Name="Channel Search" />
 
                     <TextBlock Text="Recent playlists"
-                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,6" />
                     <ComboBox ItemsSource="{Binding RecentPlaylistSources}"
                               SelectedItem="{Binding SelectedRecentPlaylistSource}"
                               DisplayMemberPath="DisplayText"
                               Margin="0,0,0,8"
                               Padding="8"
-                              Background="{StaticResource PanelAltBrush}"
+                              Background="{DynamicResource PanelAltBrush}"
                               AutomationProperties.Name="Recent Playlist Sources" />
                     <TextBox Text="{Binding RecentPlaylistSourceName, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,0,0,8"
@@ -144,25 +145,25 @@
                     </WrapPanel>
 
                     <TextBlock Text="Group"
-                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,6" />
                     <ComboBox ItemsSource="{Binding Groups}"
                               SelectedItem="{Binding SelectedGroup}"
                               Margin="0,0,0,14"
                               Padding="8"
-                              Background="{StaticResource PanelAltBrush}" />
+                              Background="{DynamicResource PanelAltBrush}" />
 
                     <TextBlock Text="Category"
-                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,6" />
                     <ComboBox ItemsSource="{Binding Categories}"
                               SelectedItem="{Binding SelectedCategory}"
                               Margin="0,0,0,14"
                               Padding="8"
-                              Background="{StaticResource PanelAltBrush}" />
+                              Background="{DynamicResource PanelAltBrush}" />
 
                     <TextBlock Text="Content"
-                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,6" />
                     <ComboBox ItemsSource="{Binding ContentKindFilterOptions}"
                               DisplayMemberPath="Label"
@@ -170,26 +171,26 @@
                               SelectedValue="{Binding SelectedContentKind}"
                               Margin="0,0,0,14"
                               Padding="8"
-                              Background="{StaticResource PanelAltBrush}"
+                              Background="{DynamicResource PanelAltBrush}"
                               AutomationProperties.Name="Content Type Filter" />
 
                     <TextBlock Text="VOD / Series Year"
-                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,6" />
                     <ComboBox ItemsSource="{Binding VodYears}"
                               SelectedItem="{Binding SelectedVodYear}"
                               Margin="0,0,0,14"
                               Padding="8"
-                              Background="{StaticResource PanelAltBrush}"
+                              Background="{DynamicResource PanelAltBrush}"
                               AutomationProperties.Name="VOD Year Filter" />
 
                     <CheckBox Content="Favorites only"
                               IsChecked="{Binding FavoritesOnly}"
-                              Foreground="{StaticResource TextPrimaryBrush}"
+                              Foreground="{DynamicResource TextPrimaryBrush}"
                               Margin="0,4,0,12" />
 
                     <TextBlock Text="Visibility"
-                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,6" />
                     <ComboBox ItemsSource="{Binding VisibilityFilterOptions}"
                               DisplayMemberPath="Label"
@@ -197,11 +198,11 @@
                               SelectedValue="{Binding SelectedHiddenFilter}"
                               Margin="0,0,0,14"
                               Padding="8"
-                              Background="{StaticResource PanelAltBrush}"
+                              Background="{DynamicResource PanelAltBrush}"
                               AutomationProperties.Name="Channel Visibility Filter" />
 
                     <TextBlock Text="Sort"
-                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,6" />
                     <ComboBox ItemsSource="{Binding SortModeOptions}"
                               DisplayMemberPath="Label"
@@ -209,11 +210,11 @@
                               SelectedValue="{Binding SelectedSortMode}"
                               Margin="0,0,0,16"
                               Padding="8"
-                              Background="{StaticResource PanelAltBrush}"
+                              Background="{DynamicResource PanelAltBrush}"
                               AutomationProperties.Name="Channel Sort Mode" />
 
                     <TextBlock Text="Saved smart view"
-                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,6" />
                     <ComboBox ItemsSource="{Binding SmartViewOptions}"
                               DisplayMemberPath="Label"
@@ -221,22 +222,22 @@
                               SelectedValue="{Binding SelectedSmartView}"
                               Margin="0,0,0,16"
                               Padding="8"
-                              Background="{StaticResource PanelAltBrush}"
+                              Background="{DynamicResource PanelAltBrush}"
                               AutomationProperties.Name="Saved Smart View" />
 
                     <CheckBox Content="Large library mode"
                               IsChecked="{Binding LargeLibraryMode}"
-                              Foreground="{StaticResource TextPrimaryBrush}"
+                              Foreground="{DynamicResource TextPrimaryBrush}"
                               Margin="0,0,0,4"
                               AutomationProperties.Name="Large Library Mode" />
                     <TextBlock Text="{Binding VisibleResultLimitText}"
                                TextWrapping="Wrap"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               FontSize="{DynamicResource AppFontSizeSmall}"
                                Margin="0,0,0,12" />
 
                     <TextBlock Text="View density"
-                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,6" />
                     <ComboBox ItemsSource="{Binding ChannelViewDensityOptions}"
                               DisplayMemberPath="Label"
@@ -244,7 +245,7 @@
                               SelectedValue="{Binding SelectedChannelViewDensity}"
                               Padding="8"
                               Margin="0,0,0,14"
-                              Background="{StaticResource PanelAltBrush}"
+                              Background="{DynamicResource PanelAltBrush}"
                               AutomationProperties.Name="Channel View Density" />
 
                     <Button Content="Clear Filters"
@@ -252,13 +253,13 @@
                             Margin="0,0,0,18" />
 
                     <Expander Header="Channel Organization"
-                              Foreground="{StaticResource TextPrimaryBrush}"
-                              Background="{StaticResource PanelAltBrush}"
+                              Foreground="{DynamicResource TextPrimaryBrush}"
+                              Background="{DynamicResource PanelAltBrush}"
                               Margin="0,0,0,14"
                               IsExpanded="True"
                               Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                               AutomationProperties.Name="Channel Organization">
-                        <Border Background="{StaticResource PanelAltBrush}"
+                        <Border Background="{DynamicResource PanelAltBrush}"
                                 CornerRadius="10"
                                 Padding="12"
                                 Margin="0,8,0,0">
@@ -268,7 +269,7 @@
                                            Margin="0,0,0,8" />
                                 <TextBlock Text="Add a group, then assign selected or batch-selected channels."
                                            TextWrapping="Wrap"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,10" />
                                 <TextBox Text="{Binding NewCustomGroupName, UpdateSourceTrigger=PropertyChanged}"
                                          Margin="0,0,0,8"
@@ -292,8 +293,8 @@
                                          AllowDrop="True"
                                          MaxHeight="120"
                                          Background="Transparent"
-                                         BorderBrush="#334056"
-                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         BorderBrush="{DynamicResource ControlBorderBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
                                          ScrollViewer.CanContentScroll="True"
                                          VirtualizingPanel.IsVirtualizing="True"
                                          DragOver="CustomGroups_DragOver"
@@ -304,7 +305,7 @@
                                             <DockPanel LastChildFill="True">
                                                 <TextBlock Text="{Binding ChannelCount, StringFormat={}{0:N0}}"
                                                            DockPanel.Dock="Right"
-                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                                            Margin="10,0,0,0" />
                                                 <TextBlock Text="{Binding Name}"
                                                            TextTrimming="CharacterEllipsis" />
@@ -313,7 +314,7 @@
                                     </ListBox.ItemTemplate>
                                 </ListBox>
                                 <TextBlock Text="Rename selected group"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,10,0,4" />
                                 <TextBox Text="{Binding RenameCustomGroupName, UpdateSourceTrigger=PropertyChanged}"
                                          Margin="0,0,0,8"
@@ -355,10 +356,10 @@
                                            Margin="0,0,0,6" />
                                 <TextBlock Text="Match by contains, starts-with, regex, group, or category. Apply preserves existing custom groups."
                                            TextWrapping="Wrap"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,8" />
                                 <TextBlock Text="Rule mode"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,4" />
                                 <ComboBox ItemsSource="{Binding SmartRuleMatchModeOptions}"
                                           DisplayMemberPath="Label"
@@ -368,13 +369,13 @@
                                           Margin="0,0,0,8"
                                           AutomationProperties.Name="Smart Group Rule Mode" />
                                 <TextBlock Text="Match text"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,4" />
                                 <TextBox Text="{Binding SmartGroupMatchText, UpdateSourceTrigger=PropertyChanged}"
                                          Margin="0,0,0,8"
                                          AutomationProperties.Name="Smart Group Match Text" />
                                 <TextBlock Text="Destination group"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,4" />
                                 <TextBox Text="{Binding SmartGroupName, UpdateSourceTrigger=PropertyChanged}"
                                          Margin="0,0,0,8"
@@ -392,10 +393,10 @@
                                 </WrapPanel>
                                 <TextBlock Text="{Binding SmartGroupPreviewText}"
                                            TextWrapping="Wrap"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,8" />
                                 <TextBlock Text="Preset name"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,4" />
                                 <TextBox Text="{Binding SmartGroupPresetName, UpdateSourceTrigger=PropertyChanged}"
                                          Margin="0,0,0,8"
@@ -418,8 +419,8 @@
                                          SelectedItem="{Binding SelectedSmartGroupPreset}"
                                          MaxHeight="100"
                                          Background="Transparent"
-                                         BorderBrush="#334056"
-                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         BorderBrush="{DynamicResource ControlBorderBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
                                          ScrollViewer.CanContentScroll="True"
                                          VirtualizingPanel.IsVirtualizing="True"
                                          AutomationProperties.Name="Smart Group Presets">
@@ -436,7 +437,7 @@
                                            Margin="0,0,0,6" />
                                 <TextBlock Text="{Binding DuplicateAssistantSummaryText}"
                                            TextWrapping="Wrap"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,8" />
                                 <WrapPanel>
                                     <Button Content="Refresh Duplicates"
@@ -451,8 +452,8 @@
                                          SelectedItem="{Binding SelectedDuplicateGroup}"
                                          MaxHeight="100"
                                          Background="Transparent"
-                                         BorderBrush="#334056"
-                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         BorderBrush="{DynamicResource ControlBorderBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
                                          ScrollViewer.CanContentScroll="True"
                                          VirtualizingPanel.IsVirtualizing="True"
                                          AutomationProperties.Name="Duplicate Channel Groups">
@@ -469,7 +470,7 @@
                                            Margin="0,0,0,6" />
                                 <TextBlock Text="{Binding AuditSummaryText}"
                                            TextWrapping="Wrap"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,8" />
                                 <WrapPanel>
                                     <Button Content="Refresh Audit"
@@ -486,8 +487,8 @@
                                          SelectedItem="{Binding SelectedAuditRow}"
                                          MaxHeight="110"
                                          Background="Transparent"
-                                         BorderBrush="#334056"
-                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         BorderBrush="{DynamicResource ControlBorderBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
                                          ScrollViewer.CanContentScroll="True"
                                          VirtualizingPanel.IsVirtualizing="True"
                                          AutomationProperties.Name="Hidden Locked Audit">
@@ -504,7 +505,7 @@
                                            Margin="0,0,0,6" />
                                 <TextBlock Text="{Binding ParentalLockStatusText}"
                                            TextWrapping="Wrap"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,8" />
                                 <PasswordBox x:Name="ParentalPinBox"
                                              MaxLength="12"
@@ -535,28 +536,28 @@
                     </Expander>
 
                     <Expander Header="Source Profiles"
-                              Foreground="{StaticResource TextPrimaryBrush}"
-                              Background="{StaticResource PanelAltBrush}"
+                              Foreground="{DynamicResource TextPrimaryBrush}"
+                              Background="{DynamicResource PanelAltBrush}"
                               Margin="0,0,0,14"
                               IsExpanded="False"
                               Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                               AutomationProperties.Name="Source Profiles">
-                        <Border Background="{StaticResource PanelAltBrush}"
+                        <Border Background="{DynamicResource PanelAltBrush}"
                                 CornerRadius="10"
                                 Padding="12"
                                 Margin="0,8,0,0">
                             <StackPanel>
                                 <TextBlock Text="Rename provider/source profiles without changing stream URLs or channel IDs. Import/export profiles to back up provider names, playback fallback settings, and default hidden group rules separately from full channel organization."
                                            TextWrapping="Wrap"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,8" />
                                 <ListBox ItemsSource="{Binding SourceProfiles}"
                                          SelectedItem="{Binding SelectedSourceProfile}"
                                          DisplayMemberPath="DisplayText"
                                          MaxHeight="100"
                                          Background="Transparent"
-                                         BorderBrush="#334056"
-                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         BorderBrush="{DynamicResource ControlBorderBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
                                          AutomationProperties.Name="Source Profile List" />
                                 <TextBox Text="{Binding RenameSourceProfileName, UpdateSourceTrigger=PropertyChanged}"
                                          Margin="0,8,0,8"
@@ -569,10 +570,10 @@
                                            Margin="0,0,0,6" />
                                 <TextBlock Text="Provider profile applies buffer preset and startup retries before playback."
                                            TextWrapping="Wrap"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,8" />
                                 <TextBlock Text="Retries"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,4" />
                                 <ComboBox ItemsSource="{Binding RetryCountOptions}"
                                           SelectedItem="{Binding SelectedSourceRetryCount}"
@@ -580,7 +581,7 @@
                                           Margin="0,0,0,8"
                                           AutomationProperties.Name="Source Retry Count" />
                                 <TextBlock Text="Buffer preset"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,4" />
                                 <ComboBox ItemsSource="{Binding BufferingPresets}"
                                           SelectedItem="{Binding SelectedSourceBufferingPreset}"
@@ -605,7 +606,7 @@
                                            Margin="0,0,0,6" />
                                 <TextBlock Text="{Binding SourceDefaultVisibilitySummaryText}"
                                            TextWrapping="Wrap"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,8" />
                                 <ComboBox ItemsSource="{Binding SourceDefaultVisibilityGroups}"
                                           SelectedItem="{Binding SelectedSourceDefaultVisibilityGroup}"
@@ -627,7 +628,7 @@
                                            Margin="0,0,0,6" />
                                 <CheckBox Content="Enable manual refresh reminders"
                                           IsChecked="{Binding RefreshScheduleEnabled}"
-                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Foreground="{DynamicResource TextPrimaryBrush}"
                                           Margin="0,0,0,8"
                                           AutomationProperties.Name="Enable Refresh Schedule" />
                                 <ComboBox ItemsSource="{Binding RefreshIntervalMinuteOptions}"
@@ -637,7 +638,7 @@
                                           AutomationProperties.Name="Refresh Interval Minutes" />
                                 <TextBlock Text="{Binding RefreshScheduleStatusText}"
                                            TextWrapping="Wrap"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,12" />
                                 <TextBlock Text="XMLTV URL"
                                            FontWeight="SemiBold"
@@ -647,7 +648,7 @@
                                          AutomationProperties.Name="XMLTV Guide URL" />
                                 <CheckBox Content="Auto-load XMLTV after playlist import"
                                           IsChecked="{Binding AutoLoadXmltvOnPlaylistImport}"
-                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Foreground="{DynamicResource TextPrimaryBrush}"
                                           Margin="0,0,0,8"
                                           AutomationProperties.Name="Auto Load XMLTV" />
                                 <Button Content="Import XMLTV URL"
@@ -659,37 +660,61 @@
                     </Expander>
 
                     <Expander Header="UI Settings"
-                              Foreground="{StaticResource TextPrimaryBrush}"
-                              Background="{StaticResource PanelAltBrush}"
+                              Foreground="{DynamicResource TextPrimaryBrush}"
+                              Background="{DynamicResource PanelAltBrush}"
                               Margin="0,0,0,14"
                               IsExpanded="False"
                               AutomationProperties.Name="UI Settings">
-                        <Border Background="{StaticResource PanelAltBrush}"
+                        <Border Background="{DynamicResource PanelAltBrush}"
                                 CornerRadius="10"
                                 Padding="12"
                                 Margin="0,8,0,0">
                             <StackPanel>
+                                <TextBlock Text="Appearance"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,8" />
+                                <TextBlock Text="Theme"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,0,0,4" />
+                                <ComboBox ItemsSource="{Binding AppThemeOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedAppTheme}"
+                                          Padding="6"
+                                          Margin="0,0,0,10"
+                                          AutomationProperties.Name="Application Theme" />
+                                <TextBlock Text="UI scale"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,0,0,4" />
+                                <ComboBox ItemsSource="{Binding AppUiScaleOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedAppUiScale}"
+                                          Padding="6"
+                                          Margin="0,0,0,14"
+                                          AutomationProperties.Name="Application UI Scale" />
+
                                 <TextBlock Text="Clock overlay"
                                            FontWeight="SemiBold"
                                            Margin="0,0,0,8" />
                                 <CheckBox Content="Show clock"
                                           IsChecked="{Binding Clock.IsVisible}"
-                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Foreground="{DynamicResource TextPrimaryBrush}"
                                           Margin="0,0,0,6"
                                           AutomationProperties.Name="Show Clock" />
                                 <CheckBox Content="Use 24-hour time"
                                           IsChecked="{Binding Clock.Use24HourClock}"
-                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Foreground="{DynamicResource TextPrimaryBrush}"
                                           Margin="0,0,0,6"
                                           AutomationProperties.Name="Use 24 Hour Clock" />
                                 <CheckBox Content="Show seconds"
                                           IsChecked="{Binding Clock.ShowSeconds}"
-                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Foreground="{DynamicResource TextPrimaryBrush}"
                                           Margin="0,0,0,12"
                                           AutomationProperties.Name="Show Clock Seconds" />
 
                                 <TextBlock Text="Position"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,4" />
                                 <ComboBox ItemsSource="{Binding Clock.PositionOptions}"
                                           DisplayMemberPath="Label"
@@ -700,7 +725,7 @@
                                           AutomationProperties.Name="Clock Position" />
 
                                 <TextBlock Text="Size"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,4" />
                                 <ComboBox ItemsSource="{Binding Clock.SizeOptions}"
                                           DisplayMemberPath="Label"
@@ -711,7 +736,7 @@
                                           AutomationProperties.Name="Clock Size" />
 
                                 <TextBlock Text="Background"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,4" />
                                 <ComboBox ItemsSource="{Binding Clock.BackgroundOptions}"
                                           DisplayMemberPath="Label"
@@ -724,10 +749,10 @@
                                 <DockPanel Margin="0,0,0,4">
                                     <TextBlock Text="Opacity"
                                                DockPanel.Dock="Left"
-                                               Foreground="{StaticResource TextSecondaryBrush}" />
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
                                     <TextBlock Text="{Binding Clock.OverlayOpacityPercent}"
                                                DockPanel.Dock="Right"
-                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                                HorizontalAlignment="Right" />
                                 </DockPanel>
                                 <Slider Minimum="0.35"
@@ -742,12 +767,12 @@
                                            Margin="0,2,0,8" />
                                 <CheckBox Content="Auto-hide fullscreen controls"
                                           IsChecked="{Binding Clock.AutoHideFullscreenControls}"
-                                          Foreground="{StaticResource TextPrimaryBrush}"
+                                          Foreground="{DynamicResource TextPrimaryBrush}"
                                           Margin="0,0,0,8"
                                           AutomationProperties.Name="Auto Hide Fullscreen Controls" />
 
                                 <TextBlock Text="Monitor"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,4" />
                                 <ComboBox ItemsSource="{Binding Clock.FullscreenMonitorOptions}"
                                           DisplayMemberPath="DisplayName"
@@ -761,7 +786,7 @@
                                            FontWeight="SemiBold"
                                            Margin="0,2,0,8" />
                                 <TextBlock Text="{Binding LogoCacheStatusText}"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            TextWrapping="Wrap"
                                            Margin="0,0,0,8" />
                                 <ComboBox ItemsSource="{Binding LogoCacheLimitMegabyteOptions}"
@@ -783,7 +808,7 @@
                         </Border>
                     </Expander>
 
-                    <Border Background="{StaticResource PanelAltBrush}"
+                    <Border Background="{DynamicResource PanelAltBrush}"
                             CornerRadius="10"
                             Padding="12"
                             Margin="0,0,0,14">
@@ -793,22 +818,22 @@
                                        Margin="0,0,0,6" />
                             <TextBlock Text="{Binding ImportSummaryText}"
                                        TextWrapping="Wrap"
-                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding RefreshDiffText}"
                                        Margin="0,8,0,0"
                                        TextWrapping="Wrap"
-                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding ProfileSummaryText}"
                                        Margin="0,8,0,0"
                                        TextWrapping="Wrap"
-                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding ReconciliationText}"
                                        Margin="0,8,0,0"
                                        TextWrapping="Wrap"
-                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
                             <Expander Header="{Binding LibraryHealthSummaryText}"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
-                                      Background="{StaticResource PanelAltBrush}"
+                                      Foreground="{DynamicResource TextPrimaryBrush}"
+                                      Background="{DynamicResource PanelAltBrush}"
                                       Margin="0,8,0,0"
                                       IsExpanded="False"
                                       Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
@@ -816,8 +841,8 @@
                                 <ListBox ItemsSource="{Binding LibraryHealthMetrics}"
                                          MaxHeight="160"
                                          Background="Transparent"
-                                         BorderBrush="#334056"
-                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         BorderBrush="{DynamicResource ControlBorderBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
                                          ScrollViewer.CanContentScroll="True"
                                          VirtualizingPanel.IsVirtualizing="True">
                                     <ListBox.ItemTemplate>
@@ -832,13 +857,13 @@
                             <TextBlock Text="{Binding ConflictReviewText}"
                                        Margin="0,8,0,0"
                                        TextWrapping="Wrap"
-                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
                             <Button Content="Clear Removed State"
                                     Command="{Binding ClearRemovedConflictStatesCommand}"
                                     Margin="0,8,0,0" />
                             <Expander Header="{Binding PendingRefreshSummaryText}"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
-                                      Background="{StaticResource PanelAltBrush}"
+                                      Foreground="{DynamicResource TextPrimaryBrush}"
+                                      Background="{DynamicResource PanelAltBrush}"
                                       Margin="0,8,0,0"
                                       IsExpanded="False"
                                       Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
@@ -855,8 +880,8 @@
                                     <ListBox ItemsSource="{Binding PendingRefreshChanges}"
                                              MaxHeight="110"
                                              Background="Transparent"
-                                             BorderBrush="#334056"
-                                             Foreground="{StaticResource TextSecondaryBrush}"
+                                             BorderBrush="{DynamicResource ControlBorderBrush}"
+                                             Foreground="{DynamicResource TextSecondaryBrush}"
                                              ScrollViewer.CanContentScroll="True"
                                              VirtualizingPanel.IsVirtualizing="True"
                                              AutomationProperties.Name="Refresh Approval Changes">
@@ -874,8 +899,8 @@
                                      MaxHeight="110"
                                      Margin="0,8,0,0"
                                      Background="Transparent"
-                                     BorderBrush="#334056"
-                                     Foreground="{StaticResource TextSecondaryBrush}"
+                                     BorderBrush="{DynamicResource ControlBorderBrush}"
+                                     Foreground="{DynamicResource TextSecondaryBrush}"
                                      ScrollViewer.CanContentScroll="True"
                                      VirtualizingPanel.IsVirtualizing="True"
                                      AutomationProperties.Name="Refresh Conflict Review">
@@ -890,10 +915,10 @@
                             <TextBlock Text="{Binding EpgSummaryText}"
                                        Margin="0,8,0,0"
                                        TextWrapping="Wrap"
-                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
                             <Expander Header="{Binding EpgTimelineSummaryText}"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
-                                      Background="{StaticResource PanelAltBrush}"
+                                      Foreground="{DynamicResource TextPrimaryBrush}"
+                                      Background="{DynamicResource PanelAltBrush}"
                                       Margin="0,8,0,0"
                                       IsExpanded="False"
                                       Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
@@ -916,9 +941,9 @@
                                               AutoGenerateColumns="False"
                                               IsReadOnly="True"
                                               MaxHeight="180"
-                                              Background="{StaticResource PanelAltBrush}"
-                                              Foreground="{StaticResource TextPrimaryBrush}"
-                                              BorderBrush="#334056"
+                                              Background="{DynamicResource PanelAltBrush}"
+                                              Foreground="{DynamicResource TextPrimaryBrush}"
+                                              BorderBrush="{DynamicResource ControlBorderBrush}"
                                               EnableRowVirtualization="True"
                                               EnableColumnVirtualization="True"
                                               VirtualizingPanel.IsVirtualizing="True"
@@ -941,8 +966,8 @@
                                 </StackPanel>
                             </Expander>
                             <Expander Header="{Binding SearchBenchmarkSummaryText}"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
-                                      Background="{StaticResource PanelAltBrush}"
+                                      Foreground="{DynamicResource TextPrimaryBrush}"
+                                      Background="{DynamicResource PanelAltBrush}"
                                       Margin="0,8,0,0"
                                       IsExpanded="False"
                                       Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
@@ -955,8 +980,8 @@
                                     <ListBox ItemsSource="{Binding SearchBenchmarkResults}"
                                              MaxHeight="110"
                                              Background="Transparent"
-                                             BorderBrush="#334056"
-                                             Foreground="{StaticResource TextSecondaryBrush}"
+                                             BorderBrush="{DynamicResource ControlBorderBrush}"
+                                             Foreground="{DynamicResource TextSecondaryBrush}"
                                              ScrollViewer.CanContentScroll="True"
                                              VirtualizingPanel.IsVirtualizing="True"
                                              AutomationProperties.Name="Search Benchmark Results">
@@ -973,7 +998,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Background="{StaticResource PanelAltBrush}"
+                    <Border Background="{DynamicResource PanelAltBrush}"
                             CornerRadius="10"
                             Padding="12">
                         <StackPanel>
@@ -982,7 +1007,7 @@
                                        Margin="0,0,0,6" />
                             <TextBlock Text="Raw stream URLs are hidden from normal UI and diagnostics. No playlists are bundled."
                                        TextWrapping="Wrap"
-                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
                         </StackPanel>
                     </Border>
 
@@ -993,7 +1018,7 @@
                              MaxHeight="180"
                              Background="Transparent"
                              BorderThickness="0"
-                             Foreground="{StaticResource TextSecondaryBrush}"
+                             Foreground="{DynamicResource TextSecondaryBrush}"
                              ScrollViewer.CanContentScroll="True"
                              VirtualizingPanel.IsVirtualizing="True">
                         <ListBox.ItemTemplate>
@@ -1001,7 +1026,7 @@
                                 <TextBlock Text="{Binding DisplayText}"
                                            TextWrapping="Wrap"
                                            Margin="0,0,0,8"
-                                           Foreground="{StaticResource TextSecondaryBrush}" />
+                                           Foreground="{DynamicResource TextSecondaryBrush}" />
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -1011,7 +1036,7 @@
 
             <Border x:Name="ChannelsPanel"
                     Grid.Column="1"
-                    Background="{StaticResource PanelBrush}"
+                    Background="{DynamicResource PanelBrush}"
                     CornerRadius="14"
                     Padding="12"
                     Margin="0,0,14,0">
@@ -1040,7 +1065,7 @@
                                     AutomationProperties.Name="Prefetch Visible Logos" />
                         </WrapPanel>
                         <TextBlock Text="Channels"
-                                   FontSize="20"
+                                   FontSize="{DynamicResource AppFontSizeSection}"
                                    FontWeight="SemiBold" />
                     </DockPanel>
 
@@ -1052,7 +1077,7 @@
                              AllowDrop="True"
                              Background="Transparent"
                              BorderThickness="0"
-                             Foreground="{StaticResource TextPrimaryBrush}"
+                             Foreground="{DynamicResource TextPrimaryBrush}"
                              ScrollViewer.CanContentScroll="True"
                              VirtualizingPanel.IsVirtualizing="True"
                              VirtualizingPanel.VirtualizationMode="Recycling"
@@ -1073,7 +1098,7 @@
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="{StaticResource PanelAltBrush}"
+                                <Border Background="{DynamicResource PanelAltBrush}"
                                         CornerRadius="10">
                                     <Border.Style>
                                         <Style TargetType="Border">
@@ -1116,13 +1141,13 @@
                                                 </TextBlock.Style>
                                             </TextBlock>
                                             <TextBlock Text="{Binding EffectiveGroupTitle}"
-                                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                                       FontSize="12"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       FontSize="{DynamicResource AppFontSizeSmall}"
                                                        TextTrimming="CharacterEllipsis" />
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="{Binding Category}"
-                                                           Foreground="{StaticResource TextSecondaryBrush}"
-                                                           FontSize="12">
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           FontSize="{DynamicResource AppFontSizeSmall}">
                                                     <TextBlock.Style>
                                                         <Style TargetType="TextBlock">
                                                             <Setter Property="Visibility" Value="Visible" />
@@ -1136,14 +1161,14 @@
                                                     </TextBlock.Style>
                                                 </TextBlock>
                                                 <TextBlock Text="{Binding ContentKind}"
-                                                           Foreground="{StaticResource TextSecondaryBrush}"
-                                                           FontSize="12"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           FontSize="{DynamicResource AppFontSizeSmall}"
                                                            Margin="8,0,0,0" />
                                             </StackPanel>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1"
                                                     HorizontalAlignment="Right">
-                                            <Border Background="{StaticResource AccentBrush}"
+                                            <Border Background="{DynamicResource AccentBrush}"
                                                     CornerRadius="8"
                                                     Padding="7,3"
                                                     Margin="0,0,0,6">
@@ -1156,12 +1181,12 @@
                                                 </Border.Visibility>
                                                 <TextBlock Text="NOW"
                                                            Foreground="#071018"
-                                                           FontSize="11"
+                                                           FontSize="{DynamicResource AppFontSizeSmall}"
                                                            FontWeight="Bold" />
                                             </Border>
                                             <TextBlock Text="★"
-                                                       Foreground="{StaticResource AccentBrush}"
-                                                       FontSize="18"
+                                                       Foreground="{DynamicResource AccentBrush}"
+                                                       FontSize="{DynamicResource AppFontSizeLarge}"
                                                        HorizontalAlignment="Right"
                                                        Visibility="{Binding IsFavorite, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <Border Background="#664EA7FF"
@@ -1183,7 +1208,7 @@
                                                 </Border.Style>
                                                 <TextBlock Text="LOGO"
                                                            Foreground="#EAF2FF"
-                                                           FontSize="11"
+                                                           FontSize="{DynamicResource AppFontSizeSmall}"
                                                            FontWeight="Bold" />
                                             </Border>
                                             <Border Background="#66FFB04E"
@@ -1193,7 +1218,7 @@
                                                     Visibility="{Binding IsHidden, Converter={StaticResource BooleanToVisibilityConverter}}">
                                                 <TextBlock Text="HIDDEN"
                                                            Foreground="#FFF7E4"
-                                                           FontSize="11"
+                                                           FontSize="{DynamicResource AppFontSizeSmall}"
                                                            FontWeight="Bold" />
                                             </Border>
                                         </StackPanel>
@@ -1205,11 +1230,11 @@
                     <StackPanel Grid.Row="2"
                                 Margin="6,8,6,0">
                         <TextBlock Text="{Binding LogoPrefetchStatusText}"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
                                    TextWrapping="Wrap" />
                         <Expander Header="{Binding VodLibrarySummaryText}"
-                                  Foreground="{StaticResource TextPrimaryBrush}"
-                                  Background="{StaticResource PanelAltBrush}"
+                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                  Background="{DynamicResource PanelAltBrush}"
                                   Margin="0,8,0,0"
                                   IsExpanded="False"
                                   Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
@@ -1227,8 +1252,8 @@
                                          SelectedItem="{Binding SelectedVodLibraryItem}"
                                          MaxHeight="260"
                                          Background="Transparent"
-                                         BorderBrush="#334056"
-                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         BorderBrush="{DynamicResource ControlBorderBrush}"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
                                          ScrollViewer.CanContentScroll="True"
                                          VirtualizingPanel.IsVirtualizing="True"
                                          VirtualizingPanel.VirtualizationMode="Recycling"
@@ -1245,11 +1270,11 @@
                                                     Margin="0,0,10,10"
                                                     Padding="8"
                                                     CornerRadius="8"
-                                                    Background="#111827">
+                                                    Background="{DynamicResource DropdownSurfaceBrush}">
                                                 <StackPanel>
                                                     <Border Height="128"
                                                             CornerRadius="6"
-                                                            Background="#050607"
+                                                            Background="{DynamicResource PlayerPlaceholderBrush}"
                                                             ClipToBounds="True">
                                                         <Image Source="{Binding PosterPath}"
                                                                Stretch="UniformToFill" />
@@ -1259,16 +1284,16 @@
                                                                TextWrapping="Wrap"
                                                                Margin="0,8,0,3" />
                                                     <TextBlock Text="{Binding ResumeText}"
-                                                               Foreground="{StaticResource AccentBrush}"
-                                                               FontSize="12" />
+                                                               Foreground="{DynamicResource AccentBrush}"
+                                                               FontSize="{DynamicResource AppFontSizeSmall}" />
                                                     <TextBlock Text="{Binding GroupName}"
-                                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                                                TextWrapping="Wrap"
-                                                               FontSize="11" />
+                                                               FontSize="{DynamicResource AppFontSizeSmall}" />
                                                     <TextBlock Text="{Binding PosterStatusText}"
-                                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                                                TextWrapping="Wrap"
-                                                               FontSize="11" />
+                                                               FontSize="{DynamicResource AppFontSizeSmall}" />
                                                 </StackPanel>
                                             </Border>
                                         </DataTemplate>
@@ -1282,13 +1307,14 @@
 
             <Border x:Name="PlayerPanel"
                     Grid.Column="2"
-                    Background="{StaticResource PanelBrush}"
+                    Background="{DynamicResource PanelBrush}"
                     CornerRadius="14"
                     Padding="16">
                 <Grid x:Name="PlayerContentGrid">
                     <Grid.RowDefinitions>
                         <RowDefinition x:Name="PlayerVideoRow"
-                                       Height="*" />
+                                       Height="*"
+                                       MinHeight="160" />
                         <RowDefinition x:Name="PlayerDetailsRow"
                                        Height="Auto" />
                         <RowDefinition x:Name="PlayerControlsRow"
@@ -1298,10 +1324,13 @@
                     </Grid.RowDefinitions>
 
                     <Border x:Name="PlayerVideoHost"
-                            Background="#050607"
+                            Background="{DynamicResource PlayerPlaceholderBrush}"
                             CornerRadius="12"
-                            ClipToBounds="True">
-                        <vlc:VideoView x:Name="PlayerView">
+                            ClipToBounds="True"
+                            MinHeight="160">
+                        <Grid>
+                        <vlc:VideoView x:Name="PlayerView"
+                                       Visibility="{Binding IsVideoSurfaceVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Grid x:Name="PlayerOverlayGrid"
                                   Background="#01000000"
                                   MouseLeftButtonDown="PlayerOverlay_MouseLeftButtonDown"
@@ -1367,17 +1396,17 @@
 
                                         <StackPanel VerticalAlignment="Center">
                                             <TextBlock Text="{Binding SelectedChannel.DisplayName, FallbackValue=No channel selected}"
-                                                       FontSize="18"
+                                                       FontSize="{DynamicResource AppFontSizeLarge}"
                                                        FontWeight="SemiBold"
                                                        TextTrimming="CharacterEllipsis" />
                                             <TextBlock Text="{Binding PlaybackStatusText}"
-                                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                                       FontSize="12"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       FontSize="{DynamicResource AppFontSizeSmall}"
                                                        TextTrimming="CharacterEllipsis"
                                                        Margin="0,4,0,0" />
                                             <TextBlock Text="F11 or double-click exits fullscreen · Esc restores window"
-                                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                                       FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       FontSize="{DynamicResource AppFontSizeSmall}"
                                                        Margin="0,6,0,0" />
                                         </StackPanel>
 
@@ -1393,32 +1422,58 @@
                                                     Command="{Binding StopCommand}" />
                                             <Button Content="Exit"
                                                     Click="FullscreenExit_Click"
-                                                    Background="{StaticResource AccentBrush}" />
+                                                    Background="{DynamicResource AccentBrush}"
+                                                    Foreground="{DynamicResource AccentTextBrush}" />
                                         </StackPanel>
                                     </Grid>
                                 </Border>
                             </Grid>
                         </vlc:VideoView>
+                        <Border Padding="12"
+                                Panel.ZIndex="10"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                Background="{DynamicResource PlayerPlaceholderBrush}"
+                                BorderBrush="{DynamicResource PlayerPlaceholderBorderBrush}"
+                                BorderThickness="1"
+                                MouseLeftButtonDown="PlayerOverlay_MouseLeftButtonDown"
+                                MouseMove="PlayerOverlay_MouseMove"
+                                AutomationProperties.Name="No Channel Video Placeholder"
+                                Visibility="{Binding IsVideoPlaceholderVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="No active playback"
+                                           FontSize="{DynamicResource AppFontSizeLarge}"
+                                           FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Text="Select a channel and press Play to start playback."
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap"
+                                           Margin="0,8,0,0" />
+                            </StackPanel>
+                        </Border>
+                        </Grid>
                     </Border>
 
                     <StackPanel x:Name="PlayerDetailsPanel"
                                 Grid.Row="1"
                                 Margin="0,14,0,10">
                         <TextBlock Text="{Binding SelectedChannel.DisplayName, FallbackValue=No channel selected}"
-                                   FontSize="22"
+                                   FontSize="{DynamicResource AppFontSizeSection}"
                                    FontWeight="SemiBold"
                                    TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding PlaybackStatusText}"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
                                    Margin="0,4,0,0"
                                    TextWrapping="Wrap" />
                         <TextBlock Text="{Binding PlaybackProgressText}"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
                                    Margin="0,4,0,0"
                                    TextWrapping="Wrap"
                                    AutomationProperties.Name="Playback Progress" />
                         <TextBlock Text="{Binding SelectedChannelDetails}"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
                                    Margin="0,6,0,0"
                                    TextWrapping="Wrap" />
                         <DockPanel Margin="0,8,0,0">
@@ -1426,7 +1481,7 @@
                                     Width="64"
                                     Height="42"
                                     CornerRadius="6"
-                                    Background="{StaticResource PanelAltBrush}"
+                                    Background="{DynamicResource PanelAltBrush}"
                                     Margin="0,0,10,0"
                                     ClipToBounds="True">
                                 <Image Source="{Binding SelectedChannelLogoPath}"
@@ -1448,31 +1503,31 @@
                             </Border>
                             <TextBlock Text="{Binding SelectedChannelLogoStatusText}"
                                        VerticalAlignment="Center"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                        TextWrapping="Wrap" />
                         </DockPanel>
                         <Expander Header="Channel details"
-                                  Foreground="{StaticResource TextPrimaryBrush}"
-                                  Background="{StaticResource PanelAltBrush}"
+                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                  Background="{DynamicResource PanelAltBrush}"
                                   Margin="0,8,0,0"
                                   IsExpanded="False">
-                            <Border Background="{StaticResource PanelAltBrush}"
+                            <Border Background="{DynamicResource PanelAltBrush}"
                                     CornerRadius="8"
                                     Padding="10"
                                     Margin="0,6,0,0">
                                 <TextBlock Text="{Binding SelectedChannelMetadataText}"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            TextWrapping="Wrap" />
                             </Border>
                         </Expander>
                         <Expander Header="{Binding FallbackSummaryText}"
-                                  Foreground="{StaticResource TextPrimaryBrush}"
-                                  Background="{StaticResource PanelAltBrush}"
+                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                  Background="{DynamicResource PanelAltBrush}"
                                   Margin="0,8,0,0"
                                   IsExpanded="False"
                                   Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                   AutomationProperties.Name="Fallback Streams">
-                            <Border Background="{StaticResource PanelAltBrush}"
+                            <Border Background="{DynamicResource PanelAltBrush}"
                                     CornerRadius="8"
                                     Padding="10"
                                     Margin="0,6,0,0">
@@ -1485,8 +1540,8 @@
                                              SelectedItem="{Binding SelectedChannelFallback}"
                                              MaxHeight="120"
                                              Background="Transparent"
-                                             BorderBrush="#334056"
-                                             Foreground="{StaticResource TextSecondaryBrush}"
+                                             BorderBrush="{DynamicResource ControlBorderBrush}"
+                                             Foreground="{DynamicResource TextSecondaryBrush}"
                                              ScrollViewer.CanContentScroll="True"
                                              VirtualizingPanel.IsVirtualizing="True"
                                              AutomationProperties.Name="Fallback Stream List">
@@ -1502,13 +1557,13 @@
                             </Border>
                         </Expander>
                         <Expander Header="VOD / Series details"
-                                  Foreground="{StaticResource TextPrimaryBrush}"
-                                  Background="{StaticResource PanelAltBrush}"
+                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                  Background="{DynamicResource PanelAltBrush}"
                                   Margin="0,8,0,0"
                                   IsExpanded="False"
                                   Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                   AutomationProperties.Name="VOD Detail Page">
-                            <Border Background="{StaticResource PanelAltBrush}"
+                            <Border Background="{DynamicResource PanelAltBrush}"
                                     CornerRadius="8"
                                     Padding="10"
                                     Margin="0,6,0,0">
@@ -1517,7 +1572,7 @@
                                             Width="110"
                                             Height="160"
                                             CornerRadius="8"
-                                            Background="#111827"
+                                            Background="{DynamicResource DropdownSurfaceBrush}"
                                             Margin="0,0,12,0"
                                             ClipToBounds="True">
                                         <Image Source="{Binding SelectedChannelLogoPath}"
@@ -1525,7 +1580,7 @@
                                     </Border>
                                     <StackPanel>
                                         <TextBlock Text="{Binding SelectedVodDetailText}"
-                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
                                                    TextWrapping="Wrap" />
                                         <TextBlock Text="{Binding ResumeProgressText}"
                                                    FontWeight="SemiBold"
@@ -1549,16 +1604,16 @@
                             </Border>
                         </Expander>
                         <Expander Header="EPG guide"
-                                  Foreground="{StaticResource TextPrimaryBrush}"
-                                  Background="{StaticResource PanelAltBrush}"
+                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                  Background="{DynamicResource PanelAltBrush}"
                                   Margin="0,8,0,0"
                                   IsExpanded="False">
                             <ListBox ItemsSource="{Binding SelectedChannelEpgPrograms}"
                                      MaxHeight="120"
                                      Margin="0,6,0,0"
-                                     Background="{StaticResource PanelAltBrush}"
-                                     BorderBrush="#334056"
-                                     Foreground="{StaticResource TextSecondaryBrush}"
+                                     Background="{DynamicResource PanelAltBrush}"
+                                     BorderBrush="{DynamicResource ControlBorderBrush}"
+                                     Foreground="{DynamicResource TextSecondaryBrush}"
                                      ScrollViewer.CanContentScroll="True"
                                      VirtualizingPanel.IsVirtualizing="True"
                                      AutomationProperties.Name="Selected Channel EPG">
@@ -1605,18 +1660,18 @@
                             <CheckBox Content="Clock"
                                       IsChecked="{Binding Clock.IsVisible}"
                                       VerticalAlignment="Center"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                       Margin="6,0,10,0"
                                       AutomationProperties.Name="Player Clock" />
                             <CheckBox Content="24h"
                                       IsChecked="{Binding Clock.Use24HourClock}"
                                       VerticalAlignment="Center"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                       Margin="0,0,10,0" />
                             <CheckBox Content="Sec"
                                       IsChecked="{Binding Clock.ShowSeconds}"
                                       VerticalAlignment="Center"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                       Margin="0,0,10,0" />
                             <Button Content="Fullscreen"
                                     Click="Fullscreen_Click" />
@@ -1628,7 +1683,7 @@
                                     VerticalAlignment="Center">
                             <TextBlock Text="Buffer"
                                        VerticalAlignment="Center"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                        Margin="0,0,10,0" />
                             <ComboBox Width="130"
                                       ItemsSource="{Binding BufferingPresets}"
@@ -1637,7 +1692,7 @@
                                       Padding="6" />
                             <TextBlock Text="Volume"
                                        VerticalAlignment="Center"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                        Margin="0,0,10,0" />
                             <Slider Width="160"
                                     Minimum="0"
@@ -1652,7 +1707,7 @@
                                     Margin="0,10,0,0">
                             <TextBlock Text="Selected group"
                                        VerticalAlignment="Center"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                        Margin="0,0,10,0" />
                             <ComboBox Width="180"
                                       ItemsSource="{Binding CustomGroupAssignments}"
@@ -1667,7 +1722,7 @@
 
                     <Border x:Name="DiagnosticsPanel"
                             Grid.Row="3"
-                            Background="{StaticResource PanelAltBrush}"
+                            Background="{DynamicResource PanelAltBrush}"
                             CornerRadius="10"
                             Padding="12"
                             Margin="0,14,0,0"
@@ -1696,8 +1751,8 @@
                             <Expander Grid.Row="1"
                                       Grid.ColumnSpan="2"
                                       Header="{Binding StreamHealthSummaryText}"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
-                                      Background="{StaticResource PanelAltBrush}"
+                                      Foreground="{DynamicResource TextPrimaryBrush}"
+                                      Background="{DynamicResource PanelAltBrush}"
                                       IsExpanded="False"
                                       Margin="0,0,0,8">
                                 <StackPanel>
@@ -1708,8 +1763,8 @@
                                     <ListBox ItemsSource="{Binding StreamHealthRows}"
                                              MaxHeight="90"
                                              Background="Transparent"
-                                             BorderBrush="#334056"
-                                             Foreground="{StaticResource TextSecondaryBrush}"
+                                             BorderBrush="{DynamicResource ControlBorderBrush}"
+                                             Foreground="{DynamicResource TextSecondaryBrush}"
                                              ScrollViewer.CanContentScroll="True"
                                              VirtualizingPanel.IsVirtualizing="True">
                                         <ListBox.ItemTemplate>
@@ -1727,7 +1782,7 @@
                                      ItemsSource="{Binding Diagnostics}"
                                      Background="Transparent"
                                      BorderThickness="0"
-                                     Foreground="{StaticResource TextSecondaryBrush}"
+                                     Foreground="{DynamicResource TextSecondaryBrush}"
                                      ScrollViewer.CanContentScroll="True"
                                      VirtualizingPanel.IsVirtualizing="True" />
                         </Grid>
@@ -1738,8 +1793,8 @@
 
         <Border x:Name="FooterBar"
                 Grid.Row="2"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="#283243"
+                Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource ControlBorderBrush}"
                 BorderThickness="0,1,0,0">
             <Grid Margin="18,0">
                 <Grid.ColumnDefinitions>
@@ -1748,7 +1803,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="{Binding StatusText}"
-                               Foreground="{StaticResource TextSecondaryBrush}" />
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
                     <StackPanel Orientation="Horizontal"
                                 Visibility="{Binding IsImporting, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <ProgressBar Width="150"
@@ -1757,8 +1812,8 @@
                                      IsIndeterminate="True"
                                      AutomationProperties.Name="Playlist Import Progress" />
                         <TextBlock Text="{Binding ImportProgressText}"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontSize="{DynamicResource AppFontSizeSmall}"
                                    VerticalAlignment="Center"
                                    AutomationProperties.Name="Playlist Import Progress Text" />
                     </StackPanel>

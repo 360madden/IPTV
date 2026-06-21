@@ -6,16 +6,16 @@
         Height="360"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{StaticResource AppBackgroundBrush}">
+        Background="{DynamicResource AppBackgroundBrush}">
     <Border Padding="24"
-            Background="{StaticResource PanelBrush}">
+            Background="{DynamicResource PanelBrush}">
         <StackPanel>
             <TextBlock Text="Welcome to IPTV Viewer"
-                       FontSize="24"
+                       FontSize="{DynamicResource AppFontSizeTitle}"
                        FontWeight="Bold"
                        Margin="0,0,0,8" />
             <TextBlock Text="This app is content-neutral. It does not include channels, streams, credentials, or playlist sources."
-                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
                        TextWrapping="Wrap"
                        Margin="0,0,0,16" />
             <TextBlock Text="Choose how you want to start:"
@@ -39,9 +39,9 @@
                     AutomationProperties.Name="First Run Import Playlist URL" />
 
             <TextBlock Text="Privacy reminder: avoid sharing screenshots, logs, or playlists that contain provider tokens or account details."
-                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
                        TextWrapping="Wrap"
-                       FontSize="12"
+                       FontSize="{DynamicResource AppFontSizeSmall}"
                        Margin="0,0,0,18" />
 
             <Button Content="Continue without importing"

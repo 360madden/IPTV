@@ -1,4 +1,7 @@
+using System.IO;
 using System.Windows;
+using Iptv.App.Services;
+using Iptv.Persistence;
 
 namespace Iptv.App;
 
@@ -6,6 +9,8 @@ public partial class App : Application
 {
     protected override void OnStartup(StartupEventArgs e)
     {
+        ApplyPersistedAppearancePreferences();
+
         base.OnStartup(e);
 
         var window = new MainWindow(GetStartupPlaylistUrl(e.Args), GetStartupPlaylistFile(e.Args));
@@ -51,5 +56,19 @@ public partial class App : Application
         }
 
         return null;
+    }
+
+    private static void ApplyPersistedAppearancePreferences()
+    {
+        try
+        {
+            var store = new JsonUiPreferencesStore(AppServices.GetAppDataDirectoryOverride());
+            UiPreferences preferences = store.LoadAsync(CancellationToken.None).GetAwaiter().GetResult();
+            ThemeService.ApplyTheme(Current.Resources, preferences.AppTheme, preferences.AppUiScale);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or System.Windows.Markup.XamlParseException)
+        {
+            ThemeService.ApplyTheme(Current.Resources, AppTheme.Dark, AppUiScale.Normal);
+        }
     }
 }
