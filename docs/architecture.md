@@ -15,7 +15,7 @@ Iptv.App           -> Core, Epg, Playlists, Search, Playback, Persistence
 Iptv.Smoke         -> Core, Epg, Playlists
 ```
 
-`Iptv.App` is the composition root. Lower-level projects must not reference the UI.
+`Iptv.App` is the composition root. `src/Iptv.App/Services/AppServices.cs` wires concrete services for the WPF shell so `MainWindow` does not own every dependency directly. Lower-level projects must not reference the UI.
 
 ## Core Flow
 

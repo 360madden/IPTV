@@ -44,4 +44,25 @@ public sealed class SensitiveUriTests
         Assert.DoesNotContain("letmein", redacted);
         Assert.Contains("token=REDACTED", redacted);
     }
+
+    [Fact]
+    public void RedactUri_RedactsAllQueryValuesBecauseProvidersUseCustomTokenNames()
+    {
+        bool created = SensitiveUri.TryCreate(
+            "https://example.com/live/channel.m3u8?quality=hd&profile=kids&opaque=provider-secret",
+            out SensitiveUri? uri,
+            out string? error);
+
+        Assert.True(created, error);
+        Assert.NotNull(uri);
+
+        string redacted = uri.ToString();
+
+        Assert.Contains("quality=REDACTED", redacted);
+        Assert.Contains("profile=REDACTED", redacted);
+        Assert.Contains("opaque=REDACTED", redacted);
+        Assert.DoesNotContain("hd", redacted);
+        Assert.DoesNotContain("kids", redacted);
+        Assert.DoesNotContain("provider-secret", redacted);
+    }
 }

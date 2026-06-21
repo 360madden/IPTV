@@ -96,11 +96,24 @@ public static class SensitiveTextRedactor
 
             int equalsIndex = pair.IndexOf('=');
             string key = equalsIndex >= 0 ? pair[..equalsIndex] : pair;
-            builder.Append(Uri.EscapeDataString(Uri.UnescapeDataString(key)));
-            builder.Append('=');
-            builder.Append(SensitiveQueryKeys.Contains(Uri.UnescapeDataString(key)) ? "REDACTED" : "REDACTED");
+            // Keep parameter names for diagnostics, but redact every value because providers often
+            // use custom token names that are not safe to classify by key alone.
+            builder.Append(EscapeQueryKey(key));
+            builder.Append("=REDACTED");
         }
 
         return builder.ToString();
+    }
+
+    private static string EscapeQueryKey(string key)
+    {
+        try
+        {
+            return Uri.EscapeDataString(Uri.UnescapeDataString(key));
+        }
+        catch (UriFormatException)
+        {
+            return Uri.EscapeDataString(key);
+        }
     }
 }

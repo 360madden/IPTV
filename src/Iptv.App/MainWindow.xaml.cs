@@ -11,13 +11,7 @@ using Iptv.App.Playback;
 using Iptv.App.Services;
 using Iptv.App.ViewModels;
 using Iptv.Core.Channels;
-using Iptv.Epg;
-using Iptv.Persistence;
-using Iptv.Persistence.Logos;
-using Iptv.Persistence.SmartGroups;
 using Iptv.Playback;
-using Iptv.Playlists;
-using Iptv.Search;
 
 namespace Iptv.App;
 
@@ -58,31 +52,7 @@ public partial class MainWindow : Window
         this.startupPlaylistFile = string.IsNullOrWhiteSpace(startupPlaylistFile) ? null : startupPlaylistFile.Trim();
         InitializeComponent();
 
-        var parser = new M3uPlaylistParser();
-        var importService = new PlaylistImportService(parser);
-        var searchService = new ChannelSearchService();
-        IPlaybackEngine playbackEngine = CreatePlaybackEngine();
-        var stateStore = new JsonChannelStateStore();
-        var organizationPreferencesStore = new JsonChannelOrganizationPreferencesStore();
-        var organizationBackupService = new JsonChannelOrganizationBackupService();
-        var logoCacheService = new LogoCacheService();
-        var smartGroupPresetFileService = new JsonSmartGroupPresetFileService();
-        var uiPreferencesStore = new JsonUiPreferencesStore();
-        var epgImportService = new XmltvImportService();
-        var dialogService = new PlaylistDialogService();
-
-        viewModel = new MainViewModel(
-            importService,
-            searchService,
-            playbackEngine,
-            stateStore,
-            organizationPreferencesStore,
-            organizationBackupService,
-            logoCacheService,
-            smartGroupPresetFileService,
-            uiPreferencesStore,
-            epgImportService,
-            dialogService);
+        viewModel = AppServices.CreateMainViewModel(CreatePlaybackEngine());
         DataContext = viewModel;
 
         fullscreenControlsHideTimer = new DispatcherTimer(DispatcherPriority.Background)
