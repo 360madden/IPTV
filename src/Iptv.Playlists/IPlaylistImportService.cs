@@ -4,7 +4,13 @@ namespace Iptv.Playlists;
 
 public interface IPlaylistImportService
 {
-    Task<PlaylistImportResult> ImportFileAsync(string path, CancellationToken cancellationToken);
+    Task<PlaylistImportResult> ImportFileAsync(
+        string path,
+        CancellationToken cancellationToken,
+        IProgress<PlaylistImportProgress>? progress = null);
 
-    Task<PlaylistImportResult> ImportUrlAsync(string url, CancellationToken cancellationToken);
+    Task<PlaylistImportResult> ImportUrlAsync(
+        string url,
+        CancellationToken cancellationToken,
+        IProgress<PlaylistImportProgress>? progress = null);
 }

@@ -99,6 +99,28 @@
                              Margin="0,0,0,14"
                              AutomationProperties.Name="Channel Search" />
 
+                    <TextBlock Text="Recent playlists"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="0,0,0,6" />
+                    <ComboBox ItemsSource="{Binding RecentPlaylistSources}"
+                              SelectedItem="{Binding SelectedRecentPlaylistSource}"
+                              DisplayMemberPath="DisplayText"
+                              Margin="0,0,0,8"
+                              Padding="8"
+                              Background="{StaticResource PanelAltBrush}"
+                              Foreground="Black"
+                              AutomationProperties.Name="Recent Playlist Sources" />
+                    <WrapPanel Margin="0,0,0,14">
+                        <Button Content="Open Recent"
+                                Command="{Binding OpenRecentPlaylistSourceCommand}"
+                                Margin="0,0,8,8"
+                                AutomationProperties.Name="Open Recent Playlist" />
+                        <Button Content="Clear"
+                                Command="{Binding ClearRecentPlaylistSourcesCommand}"
+                                Margin="0,0,8,8"
+                                AutomationProperties.Name="Clear Recent Playlists" />
+                    </WrapPanel>
+
                     <TextBlock Text="Group"
                                Foreground="{StaticResource TextSecondaryBrush}"
                                Margin="0,0,0,6" />
@@ -558,6 +580,16 @@
                                 <Button Content="Save Playback Profile"
                                         Command="{Binding SaveSourcePlaybackProfileCommand}"
                                         Margin="0,0,0,12" />
+                                <WrapPanel Margin="0,0,0,12">
+                                    <Button Content="Import Profiles"
+                                            Command="{Binding ImportSourceProfilesCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Import Source Profiles" />
+                                    <Button Content="Export Profiles"
+                                            Command="{Binding ExportSourceProfilesCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Export Source Profiles" />
+                                </WrapPanel>
                                 <TextBlock Text="Refresh schedule"
                                            FontWeight="SemiBold"
                                            Margin="0,0,0,6" />
@@ -694,8 +726,33 @@
                                           SelectedValuePath="Index"
                                           SelectedValue="{Binding Clock.FullscreenMonitorIndex}"
                                           Padding="6"
+                                          Margin="0,0,0,12"
                                           Foreground="Black"
                                           AutomationProperties.Name="Fullscreen Monitor" />
+
+                                <TextBlock Text="Logo cache"
+                                           FontWeight="SemiBold"
+                                           Margin="0,2,0,8" />
+                                <TextBlock Text="{Binding LogoCacheStatusText}"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,8" />
+                                <ComboBox ItemsSource="{Binding LogoCacheLimitMegabyteOptions}"
+                                          SelectedItem="{Binding SelectedLogoCacheLimitMegabytes}"
+                                          Padding="6"
+                                          Margin="0,0,0,8"
+                                          Foreground="Black"
+                                          AutomationProperties.Name="Logo Cache Limit" />
+                                <WrapPanel>
+                                    <Button Content="Trim Logo Cache"
+                                            Command="{Binding TrimLogoCacheCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Trim Logo Cache" />
+                                    <Button Content="Clear Logo Cache"
+                                            Command="{Binding ClearLogoCacheCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Clear Logo Cache" />
+                                </WrapPanel>
                             </StackPanel>
                         </Border>
                     </Expander>

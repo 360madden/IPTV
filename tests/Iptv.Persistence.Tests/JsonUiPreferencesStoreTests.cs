@@ -19,7 +19,20 @@ public sealed class JsonUiPreferencesStoreTests
                 ClockOverlayBackground = ClockOverlayBackground.Blue,
                 ClockOverlayOpacity = 0.7,
                 AutoHideFullscreenControls = false,
-                FullscreenMonitorIndex = 2
+                FullscreenMonitorIndex = 2,
+                IsBasicMode = true,
+                FirstRunSetupCompleted = true,
+                LogoCacheLimitMegabytes = 250,
+                RecentPlaylistSources =
+                [
+                    new RecentPlaylistSourcePreference
+                    {
+                        Kind = RecentPlaylistSourceKind.RemoteUrl,
+                        DisplayName = "Example",
+                        Value = "https://example.test/list.m3u",
+                        LastUsedAt = DateTimeOffset.Parse("2026-06-21T00:00:00Z")
+                    }
+                ]
             };
 
             await store.SaveAsync(preferences, CancellationToken.None);
@@ -34,6 +47,13 @@ public sealed class JsonUiPreferencesStoreTests
             Assert.Equal(0.7, loaded.ClockOverlayOpacity);
             Assert.False(loaded.AutoHideFullscreenControls);
             Assert.Equal(2, loaded.FullscreenMonitorIndex);
+            Assert.True(loaded.IsBasicMode);
+            Assert.True(loaded.FirstRunSetupCompleted);
+            Assert.Equal(250, loaded.LogoCacheLimitMegabytes);
+            RecentPlaylistSourcePreference recent = Assert.Single(loaded.RecentPlaylistSources);
+            Assert.Equal(RecentPlaylistSourceKind.RemoteUrl, recent.Kind);
+            Assert.Equal("Example", recent.DisplayName);
+            Assert.Equal("https://example.test/list.m3u", recent.Value);
         }
         finally
         {
@@ -63,6 +83,10 @@ public sealed class JsonUiPreferencesStoreTests
             Assert.Equal(UiPreferences.DefaultClockOverlayOpacity, loaded.ClockOverlayOpacity);
             Assert.True(loaded.AutoHideFullscreenControls);
             Assert.Equal(-1, loaded.FullscreenMonitorIndex);
+            Assert.False(loaded.IsBasicMode);
+            Assert.False(loaded.FirstRunSetupCompleted);
+            Assert.Equal(100, loaded.LogoCacheLimitMegabytes);
+            Assert.Empty(loaded.RecentPlaylistSources);
         }
         finally
         {
@@ -102,6 +126,37 @@ public sealed class JsonUiPreferencesStoreTests
             Assert.Equal(UiPreferences.DefaultClockOverlayOpacity, loaded.ClockOverlayOpacity);
             Assert.True(loaded.AutoHideFullscreenControls);
             Assert.Equal(-1, loaded.FullscreenMonitorIndex);
+            Assert.False(loaded.IsBasicMode);
+            Assert.False(loaded.FirstRunSetupCompleted);
+            Assert.Equal(100, loaded.LogoCacheLimitMegabytes);
+            Assert.Empty(loaded.RecentPlaylistSources);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDirectory))
+            {
+                Directory.Delete(tempDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task UpdateAsync_PreservesExistingFields()
+    {
+        string tempDirectory = Path.Combine(Path.GetTempPath(), $"iptv-ui-prefs-{Guid.NewGuid():N}");
+        try
+        {
+            var store = new JsonUiPreferencesStore(tempDirectory);
+            await store.SaveAsync(new UiPreferences { ShowClockOverlay = true, IsBasicMode = true }, CancellationToken.None);
+
+            await store.UpdateAsync(
+                preferences => preferences with { FirstRunSetupCompleted = true },
+                CancellationToken.None);
+            UiPreferences loaded = await store.LoadAsync(CancellationToken.None);
+
+            Assert.True(loaded.ShowClockOverlay);
+            Assert.True(loaded.IsBasicMode);
+            Assert.True(loaded.FirstRunSetupCompleted);
         }
         finally
         {

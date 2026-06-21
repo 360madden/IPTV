@@ -334,8 +334,8 @@ public sealed class ClockOverlayViewModel : ObservableObject, IDisposable
         {
             await saveGate.WaitAsync().ConfigureAwait(false);
             entered = true;
-            await preferencesStore.SaveAsync(
-                new UiPreferences
+            await preferencesStore.UpdateAsync(
+                preferences => preferences with
                 {
                     ShowClockOverlay = IsVisible,
                     Use24HourClock = Use24HourClock,

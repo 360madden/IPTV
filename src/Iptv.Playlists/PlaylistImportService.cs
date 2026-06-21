@@ -23,7 +23,10 @@ public sealed class PlaylistImportService : IPlaylistImportService
         this.options = options ?? new PlaylistImportOptions();
     }
 
-    public async Task<PlaylistImportResult> ImportFileAsync(string path, CancellationToken cancellationToken)
+    public async Task<PlaylistImportResult> ImportFileAsync(
+        string path,
+        CancellationToken cancellationToken,
+        IProgress<PlaylistImportProgress>? progress = null)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -54,11 +57,15 @@ public sealed class PlaylistImportService : IPlaylistImportService
             LocalPath = file.FullName
         };
 
+        progress?.Report(new PlaylistImportProgress("Opening local playlist", 0, file.Length));
         await using FileStream stream = file.OpenRead();
-        return await parser.ParseAsync(stream, source, cancellationToken).ConfigureAwait(false);
+        return await parser.ParseAsync(stream, source, cancellationToken, progress).ConfigureAwait(false);
     }
 
-    public async Task<PlaylistImportResult> ImportUrlAsync(string url, CancellationToken cancellationToken)
+    public async Task<PlaylistImportResult> ImportUrlAsync(
+        string url,
+        CancellationToken cancellationToken,
+        IProgress<PlaylistImportProgress>? progress = null)
     {
         if (!SensitiveUri.TryCreate(url, out SensitiveUri? remoteUrl, out string? error))
         {
@@ -80,6 +87,7 @@ public sealed class PlaylistImportService : IPlaylistImportService
             using var request = new HttpRequestMessage(HttpMethod.Get, playlistUri.Uri);
             request.Headers.UserAgent.ParseAdd("IptvViewer/1.0");
 
+            progress?.Report(new PlaylistImportProgress("Connecting to remote playlist"));
             using HttpResponseMessage response = await httpClient.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
@@ -97,7 +105,13 @@ public sealed class PlaylistImportService : IPlaylistImportService
 
             await using Stream remoteStream = await response.Content.ReadAsStreamAsync(timeoutCts.Token).ConfigureAwait(false);
             await using var bounded = new MemoryStream();
-            await CopyWithLimitAsync(remoteStream, bounded, options.MaxPlaylistBytes, timeoutCts.Token).ConfigureAwait(false);
+            await CopyWithLimitAsync(
+                remoteStream,
+                bounded,
+                options.MaxPlaylistBytes,
+                response.Content.Headers.ContentLength,
+                progress,
+                timeoutCts.Token).ConfigureAwait(false);
             bounded.Position = 0;
 
             var source = new PlaylistSource
@@ -108,7 +122,7 @@ public sealed class PlaylistImportService : IPlaylistImportService
                 RemoteUrl = playlistUri
             };
 
-            return await parser.ParseAsync(bounded, source, timeoutCts.Token).ConfigureAwait(false);
+            return await parser.ParseAsync(bounded, source, timeoutCts.Token, progress).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -128,21 +142,28 @@ public sealed class PlaylistImportService : IPlaylistImportService
         }
     }
 
-    private static async Task CopyWithLimitAsync(Stream source, Stream destination, long maxBytes, CancellationToken cancellationToken)
+    private static async Task CopyWithLimitAsync(
+        Stream source,
+        Stream destination,
+        long maxBytes,
+        long? expectedBytes,
+        IProgress<PlaylistImportProgress>? progress,
+        CancellationToken cancellationToken)
     {
         byte[] buffer = new byte[64 * 1024];
-        long totalBytes = 0;
+        long copiedBytes = 0;
         int read;
 
         while ((read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
         {
-            totalBytes += read;
-            if (totalBytes > maxBytes)
+            copiedBytes += read;
+            if (copiedBytes > maxBytes)
             {
                 throw new InvalidDataException($"Playlist exceeds the configured {maxBytes:N0} byte limit.");
             }
 
             await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            progress?.Report(new PlaylistImportProgress("Downloading playlist", copiedBytes, expectedBytes));
         }
     }
 

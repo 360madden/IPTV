@@ -40,15 +40,18 @@ Expected: import summaries are printed, full stream URLs are not printed, and pr
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -DryRun -CreateMsix
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\validate-release-zip.ps1 -LaunchSeconds 5 -PlaylistFile .\assets\sample-playlists\synthetic-news-sports.m3u
 ```
 
-Expected: the dry run reports the intended package identity and Windows SDK tooling. The default packaging command creates a portable self-contained ZIP under `artifacts/release/`.
+Expected: the dry run reports the intended package identity and Windows SDK tooling. The default packaging command creates a portable self-contained ZIP under `artifacts/release/`, and ZIP validation confirms required release assets plus a short app launch.
 
 For signed MSIX release candidates, configure `IPTV_MSIX_CERT_BASE64` and `IPTV_MSIX_CERT_PASSWORD`, then run:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -CreateMsix -SignCertificatePath <path-to-pfx>
 ```
+
+Use `tools\configure-msix-signing-secrets.ps1 -PfxPath <trusted-cert.pfx> -PfxPassword <password>` when replacing the temporary self-signed CI certificate with a trusted certificate. Use `tools\start-github-release.ps1 -TagName v0.1.0 -Prerelease -WhatIf` to preview release workflow dispatch before creating a tag/release.
 
 ## 5. Release Notes Check
 

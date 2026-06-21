@@ -28,6 +28,14 @@ PowerShell example:
 
 Do not commit certificates, passwords, private keys, or signed artifacts containing private test data.
 
+To configure secrets from a trusted PFX without exposing plaintext in logs:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\configure-msix-signing-secrets.ps1 -PfxPath .\private-signing-cert.pfx -PfxPassword "<password>"
+```
+
+Omit `-PfxPath` only for temporary self-signed tester builds.
+
 ## Local dry run
 
 ```powershell

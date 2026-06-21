@@ -116,6 +116,107 @@ public sealed class LogoCacheService : ILogoCacheService
         }
     }
 
+    public LogoCacheStatistics GetStatistics()
+    {
+        if (!Directory.Exists(cacheDirectory))
+        {
+            return new LogoCacheStatistics(0, 0);
+        }
+
+        FileInfo[] files = GetCacheFiles();
+        return new LogoCacheStatistics(files.Length, files.Sum(file => file.Length));
+    }
+
+    public Task<int> TrimAsync(long maxBytes, CancellationToken cancellationToken)
+    {
+        if (maxBytes < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxBytes), "Logo cache size limit cannot be negative.");
+        }
+
+        if (!Directory.Exists(cacheDirectory))
+        {
+            return Task.FromResult(0);
+        }
+
+        return Task.Run(() =>
+        {
+            FileInfo[] files = GetCacheFiles()
+                .OrderBy(file => file.LastAccessTimeUtc)
+                .ThenBy(file => file.LastWriteTimeUtc)
+                .ToArray();
+            long totalBytes = files.Sum(file => file.Length);
+            int removed = 0;
+
+            foreach (FileInfo file in files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (totalBytes <= maxBytes)
+                {
+                    break;
+                }
+
+                long length = file.Length;
+                try
+                {
+                    file.Delete();
+                    totalBytes -= length;
+                    removed++;
+                }
+                catch (IOException)
+                {
+                    // Best-effort cleanup; a logo currently in use can be retried later.
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // Best-effort cleanup; keep the app responsive if the cache is not writable.
+                }
+            }
+
+            return removed;
+        }, cancellationToken);
+    }
+
+    public Task<int> ClearAsync(CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(cacheDirectory))
+        {
+            return Task.FromResult(0);
+        }
+
+        return Task.Run(() =>
+        {
+            int removed = 0;
+            foreach (FileInfo file in GetCacheFiles())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    file.Delete();
+                    removed++;
+                }
+                catch (IOException)
+                {
+                    // Best-effort cleanup; a logo currently in use can be retried later.
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // Best-effort cleanup; keep the app responsive if the cache is not writable.
+                }
+            }
+
+            return removed;
+        }, cancellationToken);
+    }
+
+    private FileInfo[] GetCacheFiles()
+    {
+        return new DirectoryInfo(cacheDirectory)
+            .EnumerateFiles("*.*", SearchOption.TopDirectoryOnly)
+            .Where(file => KnownImageExtensions.Contains(file.Extension) || file.Extension.Equals(".img", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+    }
+
     private static async Task CopyWithLimitAsync(Stream source, string tempPath, int maxBytes, CancellationToken cancellationToken)
     {
         byte[] buffer = ArrayPool<byte>.Shared.Rent(16 * 1024);
