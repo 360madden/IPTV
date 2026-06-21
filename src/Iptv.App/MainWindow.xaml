@@ -108,7 +108,6 @@
                               Margin="0,0,0,8"
                               Padding="8"
                               Background="{StaticResource PanelAltBrush}"
-                              Foreground="Black"
                               AutomationProperties.Name="Recent Playlist Sources" />
                     <TextBox Text="{Binding RecentPlaylistSourceName, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,0,0,8"
@@ -151,8 +150,7 @@
                               SelectedItem="{Binding SelectedGroup}"
                               Margin="0,0,0,14"
                               Padding="8"
-                              Background="{StaticResource PanelAltBrush}"
-                              Foreground="Black" />
+                              Background="{StaticResource PanelAltBrush}" />
 
                     <TextBlock Text="Category"
                                Foreground="{StaticResource TextSecondaryBrush}"
@@ -161,8 +159,7 @@
                               SelectedItem="{Binding SelectedCategory}"
                               Margin="0,0,0,14"
                               Padding="8"
-                              Background="{StaticResource PanelAltBrush}"
-                              Foreground="Black" />
+                              Background="{StaticResource PanelAltBrush}" />
 
                     <TextBlock Text="Content"
                                Foreground="{StaticResource TextSecondaryBrush}"
@@ -174,7 +171,6 @@
                               Margin="0,0,0,14"
                               Padding="8"
                               Background="{StaticResource PanelAltBrush}"
-                              Foreground="Black"
                               AutomationProperties.Name="Content Type Filter" />
 
                     <TextBlock Text="VOD / Series Year"
@@ -185,7 +181,6 @@
                               Margin="0,0,0,14"
                               Padding="8"
                               Background="{StaticResource PanelAltBrush}"
-                              Foreground="Black"
                               AutomationProperties.Name="VOD Year Filter" />
 
                     <CheckBox Content="Favorites only"
@@ -203,7 +198,6 @@
                               Margin="0,0,0,14"
                               Padding="8"
                               Background="{StaticResource PanelAltBrush}"
-                              Foreground="Black"
                               AutomationProperties.Name="Channel Visibility Filter" />
 
                     <TextBlock Text="Sort"
@@ -216,7 +210,6 @@
                               Margin="0,0,0,16"
                               Padding="8"
                               Background="{StaticResource PanelAltBrush}"
-                              Foreground="Black"
                               AutomationProperties.Name="Channel Sort Mode" />
 
                     <TextBlock Text="Saved smart view"
@@ -229,7 +222,6 @@
                               Margin="0,0,0,16"
                               Padding="8"
                               Background="{StaticResource PanelAltBrush}"
-                              Foreground="Black"
                               AutomationProperties.Name="Saved Smart View" />
 
                     <CheckBox Content="Large library mode"
@@ -253,7 +245,6 @@
                               Padding="8"
                               Margin="0,0,0,14"
                               Background="{StaticResource PanelAltBrush}"
-                              Foreground="Black"
                               AutomationProperties.Name="Channel View Density" />
 
                     <Button Content="Clear Filters"
@@ -340,7 +331,6 @@
                                           SelectedItem="{Binding SelectedBatchGroupAssignment}"
                                           Padding="6"
                                           Margin="0,0,0,8"
-                                          Foreground="Black"
                                           AutomationProperties.Name="Batch Custom Group" />
                                 <WrapPanel>
                                     <Button Content="Batch Favorite"
@@ -376,7 +366,6 @@
                                           SelectedValue="{Binding SelectedSmartRuleMatchMode}"
                                           Padding="6"
                                           Margin="0,0,0,8"
-                                          Foreground="Black"
                                           AutomationProperties.Name="Smart Group Rule Mode" />
                                 <TextBlock Text="Match text"
                                            Foreground="{StaticResource TextSecondaryBrush}"
@@ -589,7 +578,6 @@
                                           SelectedItem="{Binding SelectedSourceRetryCount}"
                                           Padding="6"
                                           Margin="0,0,0,8"
-                                          Foreground="Black"
                                           AutomationProperties.Name="Source Retry Count" />
                                 <TextBlock Text="Buffer preset"
                                            Foreground="{StaticResource TextSecondaryBrush}"
@@ -598,7 +586,6 @@
                                           SelectedItem="{Binding SelectedSourceBufferingPreset}"
                                           Padding="6"
                                           Margin="0,0,0,8"
-                                          Foreground="Black"
                                           AutomationProperties.Name="Source Buffer Preset" />
                                 <Button Content="Save Playback Profile"
                                         Command="{Binding SaveSourcePlaybackProfileCommand}"
@@ -624,7 +611,6 @@
                                           SelectedItem="{Binding SelectedSourceDefaultVisibilityGroup}"
                                           Padding="6"
                                           Margin="0,0,0,8"
-                                          Foreground="Black"
                                           AutomationProperties.Name="Source Default Visibility Group" />
                                 <WrapPanel Margin="0,0,0,12">
                                     <Button Content="Hide By Default"
@@ -648,7 +634,6 @@
                                           SelectedItem="{Binding SelectedRefreshIntervalMinutes}"
                                           Padding="6"
                                           Margin="0,0,0,8"
-                                          Foreground="Black"
                                           AutomationProperties.Name="Refresh Interval Minutes" />
                                 <TextBlock Text="{Binding RefreshScheduleStatusText}"
                                            TextWrapping="Wrap"
@@ -712,7 +697,6 @@
                                           SelectedValue="{Binding Clock.Position}"
                                           Padding="6"
                                           Margin="0,0,0,10"
-                                          Foreground="Black"
                                           AutomationProperties.Name="Clock Position" />
 
                                 <TextBlock Text="Size"
@@ -724,7 +708,6 @@
                                           SelectedValue="{Binding Clock.Size}"
                                           Padding="6"
                                           Margin="0,0,0,10"
-                                          Foreground="Black"
                                           AutomationProperties.Name="Clock Size" />
 
                                 <TextBlock Text="Background"
@@ -736,7 +719,6 @@
                                           SelectedValue="{Binding Clock.Background}"
                                           Padding="6"
                                           Margin="0,0,0,10"
-                                          Foreground="Black"
                                           AutomationProperties.Name="Clock Background" />
 
                                 <DockPanel Margin="0,0,0,4">
@@ -773,7 +755,6 @@
                                           SelectedValue="{Binding Clock.FullscreenMonitorIndex}"
                                           Padding="6"
                                           Margin="0,0,0,12"
-                                          Foreground="Black"
                                           AutomationProperties.Name="Fullscreen Monitor" />
 
                                 <TextBlock Text="Logo cache"
@@ -787,7 +768,6 @@
                                           SelectedItem="{Binding SelectedLogoCacheLimitMegabytes}"
                                           Padding="6"
                                           Margin="0,0,0,8"
-                                          Foreground="Black"
                                           AutomationProperties.Name="Logo Cache Limit" />
                                 <WrapPanel>
                                     <Button Content="Trim Logo Cache"
@@ -927,7 +907,6 @@
                                               HorizontalAlignment="Left"
                                               Padding="6"
                                               Margin="0,6,0,8"
-                                              Foreground="Black"
                                               AutomationProperties.Name="EPG Timeline Window" />
                                     <TextBox Text="{Binding EpgSearchText, UpdateSourceTrigger=PropertyChanged, Delay=250}"
                                              Margin="0,0,0,8"
@@ -1655,8 +1634,7 @@
                                       ItemsSource="{Binding BufferingPresets}"
                                       SelectedItem="{Binding SelectedBufferingPreset}"
                                       Margin="0,0,18,0"
-                                      Padding="6"
-                                      Foreground="Black" />
+                                      Padding="6" />
                             <TextBlock Text="Volume"
                                        VerticalAlignment="Center"
                                        Foreground="{StaticResource TextSecondaryBrush}"
@@ -1681,7 +1659,6 @@
                                       SelectedItem="{Binding SelectedCustomGroupAssignment}"
                                       Padding="6"
                                       Margin="0,0,8,0"
-                                      Foreground="Black"
                                       AutomationProperties.Name="Selected Channel Custom Group" />
                             <Button Content="Clear Group"
                                     Command="{Binding ClearCustomGroupCommand}" />
