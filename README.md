@@ -29,6 +29,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 
 
 Use **Load Sample** in the app to verify import/search/playback plumbing before importing a private playlist. On Windows, `launch-iptv.cmd` starts the WPF app from the repository root and forwards advanced arguments unchanged; a single `http://` or `https://` argument is treated as `--playlist-url`, and a single existing file path is treated as `--playlist-file`.
 
+## Practical Checklists
+
+- `docs/playlist-test-checklist.md` — manual feature checklist for import, playback, fullscreen, organization, EPG, VOD, and privacy checks.
+- `docs/RELEASE-TEST-CHECKLIST.md` — build, smoke, packaging, and release-note gate before sharing ZIP/MSIX artifacts.
+- `docs/windows-msix-signing.md` — optional MSIX signing setup for release candidates.
+
+For normal testers, prefer the portable self-contained ZIP first; treat signed MSIX as a later distribution path once signing secrets and trust prompts are settled.
+
 ## Live Playlist Smoke Test
 
 Use the smoke CLI for repeatable playlist URL checks without driving the GUI:
