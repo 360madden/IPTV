@@ -12,7 +12,8 @@ public static class LibraryHealthAnalyzer
         IReadOnlyDictionary<string, string[]> sourceDefaultHiddenGroups,
         int epgProgramCount,
         TimeSpan? lastImportDuration,
-        PlaylistImportSummary? importSummary)
+        PlaylistImportSummary? importSummary,
+        LibraryHealthResourceMetrics? resourceMetrics)
     {
         ArgumentNullException.ThrowIfNull(channels);
         ArgumentNullException.ThrowIfNull(savedStateIds);
@@ -50,6 +51,14 @@ public static class LibraryHealthAnalyzer
             metrics.Add(new LibraryHealthMetricViewModel("Last import time", FormatDuration(lastImportDuration.Value), "Includes parsing and service-level import work."));
         }
 
+        if (resourceMetrics is not null)
+        {
+            metrics.Add(new LibraryHealthMetricViewModel(
+                "Import memory",
+                FormatBytes(resourceMetrics.ManagedMemoryAfterBytes),
+                $"delta {FormatSignedBytes(resourceMetrics.ManagedMemoryDeltaBytes)}, GC {resourceMetrics.Gen0Collections:N0}/{resourceMetrics.Gen1Collections:N0}/{resourceMetrics.Gen2Collections:N0}"));
+        }
+
         if (importSummary is not null)
         {
             metrics.Add(new LibraryHealthMetricViewModel(
@@ -66,5 +75,30 @@ public static class LibraryHealthAnalyzer
         return duration.TotalSeconds >= 1
             ? $"{duration.TotalSeconds:N1}s"
             : $"{duration.TotalMilliseconds:N0}ms";
+    }
+
+    private static string FormatSignedBytes(long bytes)
+    {
+        return bytes >= 0 ? $"+{FormatBytes(bytes)}" : $"-{FormatBytes(Math.Abs(bytes))}";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes >= 1024L * 1024L * 1024L)
+        {
+            return $"{bytes / 1024d / 1024d / 1024d:N1} GB";
+        }
+
+        if (bytes >= 1024L * 1024L)
+        {
+            return $"{bytes / 1024d / 1024d:N1} MB";
+        }
+
+        if (bytes >= 1024L)
+        {
+            return $"{bytes / 1024d:N1} KB";
+        }
+
+        return $"{bytes:N0} bytes";
     }
 }

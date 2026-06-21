@@ -43,6 +43,7 @@ public sealed class JsonChannelStateStore : IChannelStateStore
                     ChannelId = id,
                     IsFavorite = favoriteIds.Contains(id),
                     IsHidden = existing?.IsHidden ?? false,
+                    HasExplicitVisibility = existing?.HasExplicitVisibility ?? existing?.IsHidden == true,
                     CustomGroup = NormalizeCustomGroup(existing?.CustomGroup),
                     CustomSortIndex = NormalizeCustomSortIndex(existing?.CustomSortIndex),
                     LastWatchedAt = existing?.LastWatchedAt,
@@ -155,6 +156,7 @@ public sealed class JsonChannelStateStore : IChannelStateStore
         {
             IsFavorite = snapshot.Any(state => state.IsFavorite),
             IsHidden = snapshot.Any(state => state.IsHidden),
+            HasExplicitVisibility = snapshot.Any(state => state.HasExplicitVisibility || state.IsHidden),
             CustomGroup = NormalizeCustomGroup(customGroup),
             CustomSortIndex = snapshot.LastOrDefault(state => state.CustomSortIndex.HasValue)?.CustomSortIndex,
             LastWatchedAt = snapshot
@@ -181,6 +183,7 @@ public sealed class JsonChannelStateStore : IChannelStateStore
         return state.ChannelId != Guid.Empty &&
             (state.IsFavorite ||
                 state.IsHidden ||
+                state.HasExplicitVisibility ||
                 !string.IsNullOrWhiteSpace(state.CustomGroup) ||
                 state.CustomSortIndex.HasValue ||
                 state.LastWatchedAt.HasValue ||

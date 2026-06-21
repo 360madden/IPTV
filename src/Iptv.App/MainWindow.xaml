@@ -557,7 +557,7 @@
                                 Padding="12"
                                 Margin="0,8,0,0">
                             <StackPanel>
-                                <TextBlock Text="Rename provider/source profiles without changing stream URLs or channel IDs."
+                                <TextBlock Text="Rename provider/source profiles without changing stream URLs or channel IDs. Import/export profiles to back up provider names, playback fallback settings, and default hidden group rules separately from full channel organization."
                                            TextWrapping="Wrap"
                                            Foreground="{StaticResource TextSecondaryBrush}"
                                            Margin="0,0,0,8" />
