@@ -28,6 +28,11 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
                     {
                         [" source-a "] = new() { RetryCount = 9, BufferingPreset = BufferingPreset.PoorNetwork }
                     },
+                    SourceAppearancePresets = new Dictionary<string, AppAppearancePreset>
+                    {
+                        [" source-a "] = AppAppearancePreset.LivingRoom,
+                        [" source-b "] = AppAppearancePreset.Custom
+                    },
                     SourceDefaultHiddenGroups = new Dictionary<string, string[]>
                     {
                         [" source-a "] = [" Kids ", "Kids", "Premium"]
@@ -51,6 +56,8 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
             Assert.Equal("Provider A", loaded.SourceProfileNames["source-a"]);
             Assert.Equal(3, loaded.SourcePlaybackProfiles["source-a"].RetryCount);
             Assert.Equal(BufferingPreset.PoorNetwork, loaded.SourcePlaybackProfiles["source-a"].BufferingPreset);
+            Assert.Equal(AppAppearancePreset.LivingRoom, loaded.SourceAppearancePresets["source-a"]);
+            Assert.False(loaded.SourceAppearancePresets.ContainsKey("source-b"));
             Assert.Equal(["Kids", "Premium"], loaded.SourceDefaultHiddenGroups["source-a"]);
             Assert.True(loaded.RefreshScheduleEnabled);
             Assert.Equal(5, loaded.RefreshIntervalMinutes);
@@ -82,6 +89,7 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
             Assert.Equal(ChannelSortMode.FavoritesFirst, loaded.SortMode);
             Assert.False(loaded.LargeLibraryMode);
             Assert.Equal(ChannelViewDensity.Comfortable, loaded.ChannelViewDensity);
+            Assert.Empty(loaded.SourceAppearancePresets);
             Assert.Equal(60, loaded.RefreshIntervalMinutes);
             Assert.Null(loaded.XmltvGuideUrl);
             Assert.False(loaded.AutoLoadXmltvOnPlaylistImport);

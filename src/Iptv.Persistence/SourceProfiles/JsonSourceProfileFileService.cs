@@ -92,6 +92,15 @@ public sealed class JsonSourceProfileFileService : ISourceProfileFileService
             SourcePlaybackProfiles = (export.SourcePlaybackProfiles ?? new Dictionary<string, ProviderPlaybackProfile>(StringComparer.OrdinalIgnoreCase))
                 .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
                 .ToDictionary(pair => pair.Key.Trim(), pair => Normalize(pair.Value), StringComparer.OrdinalIgnoreCase),
+            SourceAppearancePresets = (export.SourceAppearancePresets ?? new Dictionary<string, AppAppearancePreset>(StringComparer.OrdinalIgnoreCase))
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
+                .Select(pair => new
+                {
+                    SourceId = pair.Key.Trim(),
+                    Preset = NormalizeAppearancePreset(pair.Value)
+                })
+                .Where(pair => pair.Preset != AppAppearancePreset.Custom)
+                .ToDictionary(pair => pair.SourceId, pair => pair.Preset, StringComparer.OrdinalIgnoreCase),
             SourceDefaultHiddenGroups = (export.SourceDefaultHiddenGroups ?? new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase))
                 .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
                 .Select(pair => new
@@ -102,6 +111,11 @@ public sealed class JsonSourceProfileFileService : ISourceProfileFileService
                 .Where(pair => pair.Groups.Length > 0)
                 .ToDictionary(pair => pair.SourceId, pair => pair.Groups, StringComparer.OrdinalIgnoreCase)
         };
+    }
+
+    private static AppAppearancePreset NormalizeAppearancePreset(AppAppearancePreset preset)
+    {
+        return Enum.IsDefined(preset) ? preset : AppAppearancePreset.Custom;
     }
 
     private static ProviderPlaybackProfile Normalize(ProviderPlaybackProfile profile)

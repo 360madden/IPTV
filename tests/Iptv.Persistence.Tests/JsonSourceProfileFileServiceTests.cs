@@ -24,6 +24,11 @@ public sealed class JsonSourceProfileFileServiceTests
                 {
                     ["source-a"] = new() { RetryCount = 2, BufferingPreset = BufferingPreset.LowLatency }
                 },
+                SourceAppearancePresets = new Dictionary<string, AppAppearancePreset>
+                {
+                    ["source-a"] = AppAppearancePreset.LivingRoom,
+                    ["source-b"] = AppAppearancePreset.Custom
+                },
                 SourceDefaultHiddenGroups = new Dictionary<string, string[]>
                 {
                     ["source-a"] = ["  Kids ", "Kids", "Premium"]
@@ -36,6 +41,8 @@ public sealed class JsonSourceProfileFileServiceTests
             Assert.Equal("Provider A", imported.SourceProfileNames["source-a"]);
             Assert.Equal(2, imported.SourcePlaybackProfiles["source-a"].RetryCount);
             Assert.Equal(BufferingPreset.LowLatency, imported.SourcePlaybackProfiles["source-a"].BufferingPreset);
+            Assert.Equal(AppAppearancePreset.LivingRoom, imported.SourceAppearancePresets["source-a"]);
+            Assert.False(imported.SourceAppearancePresets.ContainsKey("source-b"));
             Assert.Equal(["Kids", "Premium"], imported.SourceDefaultHiddenGroups["source-a"]);
         }
         finally

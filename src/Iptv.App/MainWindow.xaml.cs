@@ -270,6 +270,20 @@ public partial class MainWindow : Window
     {
         Key key = e.Key == Key.System ? e.SystemKey : e.Key;
 
+        if (key == Key.F1 || (key == Key.OemQuestion && Keyboard.Modifiers is ModifierKeys.None or ModifierKeys.Shift))
+        {
+            viewModel.IsShortcutHelpVisible = !viewModel.IsShortcutHelpVisible;
+            e.Handled = true;
+            return;
+        }
+
+        if (key == Key.Escape && viewModel.IsShortcutHelpVisible)
+        {
+            viewModel.IsShortcutHelpVisible = false;
+            e.Handled = true;
+            return;
+        }
+
         if (key == Key.F11 || (key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Alt))
         {
             ToggleFullscreen();

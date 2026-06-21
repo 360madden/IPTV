@@ -25,6 +25,8 @@ dotnet run --project .\src\Iptv.App\Iptv.App.csproj -- --playlist-url https://ww
 dotnet run --project .\tools\Iptv.SearchBench\Iptv.SearchBench.csproj -- --count 50000
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -DryRun
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -CreateMsix
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-ui-dropdowns.ps1 -NoBuild
+python .\scripts\compare_ui_smoke_screenshots.py
 ```
 
 Use **Load Sample** in the app to verify import/search/playback plumbing before importing a private playlist. On Windows, `launch-iptv.cmd` starts the WPF app from the repository root and forwards advanced arguments unchanged; a single `http://` or `https://` argument is treated as `--playlist-url`, and a single existing file path is treated as `--playlist-file`.
@@ -77,11 +79,29 @@ The GUI smoke uses an isolated local app-data profile by default. Add `-UseRealU
 - GitHub Actions workflow for Windows Release build/test/MSIX packaging, with optional PFX signing through repository secrets.
 - MSIX signing setup is documented in `docs/windows-msix-signing.md`.
 - GUI smoke can capture window/fullscreen screenshots into ignored `artifacts/gui-smoke/` for layout regression review.
+- UI dropdown smoke captures readable theme/dropdown screenshots into ignored `artifacts/ui-smoke/dropdowns/`; `scripts/compare_ui_smoke_screenshots.py` validates PNG integrity and optional baseline dimensions.
 - LibVLC playback with fullscreen toggle, volume, buffering presets, and startup timeout guidance.
+- Selectable Dark, Light, and High contrast themes with Desktop, Living room, High contrast, and Custom appearance presets, TV-distance scale, reset button, source/profile-specific appearance presets, and a live appearance preview card.
+- Compact/dense channel-list modes and large-library mode for providers with many thousands of channels or VOD entries.
 - Optional clock overlay with position, size, background, opacity, 24-hour, and seconds settings.
 - True app-managed fullscreen with video overlay clock, mini-HUD controls, auto-hide, double-click toggle, and monitor preference.
-- Keyboard shortcuts: `Ctrl+F` search, `Ctrl+L` import URL, `Ctrl+O` import file, `Ctrl+R` refresh, `Ctrl+A` select visible, `Ctrl+D` clear selection, `Space` play, `P` pause, `S` stop, `V` favorite, `H` hide/unhide, `B` batch favorite, `Delete` batch hide, `U` batch unhide, `C` clock, `F`/`F11` fullscreen, `Esc` exit fullscreen.
+- Keyboard shortcuts: `F1`/`?` shortcut help, `Ctrl+F` search, `Ctrl+L` import URL, `Ctrl+O` import file, `Ctrl+R` refresh, `Ctrl+A` select visible, `Ctrl+D` clear selection, `Space` play, `P` pause, `S` stop, `V` favorite, `H` hide/unhide, `B` batch favorite, `Delete` batch hide, `U` batch unhide, `C` clock, `F`/`F11` fullscreen, `Esc` exit fullscreen/close help.
 - Redacted diagnostics panel for import/playback events.
+
+## Screenshot Review
+
+Generate local review screenshots before UI-heavy releases:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-ui-dropdowns.ps1 -NoBuild
+python .\scripts\compare_ui_smoke_screenshots.py
+```
+
+The screenshots are intentionally ignored by Git so private playlist/provider data is not committed accidentally.
+
+## GitHub Workflow
+
+Prefer PR-based changes for normal development so branch protection and the `Build and Test` check gate merges. Direct pushes to `main` should be intentional maintenance actions only, followed by watching `Windows CI` and `Windows MSIX` to completion.
 
 ## Privacy Policy for Development
 

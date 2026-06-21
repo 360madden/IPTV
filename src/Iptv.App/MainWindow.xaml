@@ -10,6 +10,7 @@
         MinWidth="1040"
         Background="{DynamicResource AppBackgroundBrush}"
         PreviewKeyDown="Window_PreviewKeyDown"
+        KeyboardNavigation.TabNavigation="Cycle"
         Closing="Window_Closing">
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
@@ -55,6 +56,10 @@
                             Command="{Binding RefreshPlaylistCommand}" />
                     <Button Content="Import XMLTV"
                             Command="{Binding ImportEpgCommand}" />
+                    <Button Content="Shortcuts"
+                            Command="{Binding ToggleShortcutHelpCommand}"
+                            ToolTip="Show keyboard shortcut help (F1 or ?)"
+                            AutomationProperties.Name="Show Keyboard Shortcuts" />
                     <Button Content="XMLTV URL"
                             Command="{Binding ImportEpgUrlCommand}"
                             AutomationProperties.Name="Import XMLTV URL" />
@@ -547,7 +552,7 @@
                                 Padding="12"
                                 Margin="0,8,0,0">
                             <StackPanel>
-                                <TextBlock Text="Rename provider/source profiles without changing stream URLs or channel IDs. Import/export profiles to back up provider names, playback fallback settings, and default hidden group rules separately from full channel organization."
+                                <TextBlock Text="Rename provider/source profiles without changing stream URLs or channel IDs. Import/export profiles to back up provider names, playback fallback settings, appearance presets, and default hidden group rules separately from full channel organization."
                                            TextWrapping="Wrap"
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,8" />
@@ -591,6 +596,30 @@
                                 <Button Content="Save Playback Profile"
                                         Command="{Binding SaveSourcePlaybackProfileCommand}"
                                         Margin="0,0,0,12" />
+                                <TextBlock Text="Source appearance"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,6" />
+                                <TextBlock Text="Save a preset for this provider so desktop, living-room, or high-contrast layout returns automatically when the playlist is loaded."
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,0,0,8" />
+                                <ComboBox ItemsSource="{Binding AppearancePresetOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedSourceAppearancePreset}"
+                                          Padding="6"
+                                          Margin="0,0,0,8"
+                                          AutomationProperties.Name="Source Appearance Preset" />
+                                <WrapPanel Margin="0,0,0,12">
+                                    <Button Content="Save Source Appearance"
+                                            Command="{Binding SaveSourceAppearancePresetCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Save Source Appearance" />
+                                    <Button Content="Use Source Appearance"
+                                            Command="{Binding ApplySourceAppearancePresetCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Use Source Appearance" />
+                                </WrapPanel>
                                 <WrapPanel Margin="0,0,0,12">
                                     <Button Content="Import Profiles"
                                             Command="{Binding ImportSourceProfilesCommand}"
@@ -673,6 +702,26 @@
                                 <TextBlock Text="Appearance"
                                            FontWeight="SemiBold"
                                            Margin="0,0,0,8" />
+                                <TextBlock Text="Preset"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,0,0,4" />
+                                <ComboBox ItemsSource="{Binding AppearancePresetOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedAppearancePreset}"
+                                          Padding="6"
+                                          Margin="0,0,0,8"
+                                          AutomationProperties.Name="Appearance Preset" />
+                                <WrapPanel Margin="0,0,0,10">
+                                    <Button Content="Apply Preset"
+                                            Command="{Binding ApplyAppearancePresetCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Apply Appearance Preset" />
+                                    <Button Content="Reset Appearance"
+                                            Command="{Binding ResetAppearanceCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Reset Appearance Settings" />
+                                </WrapPanel>
                                 <TextBlock Text="Theme"
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,4" />
@@ -693,6 +742,36 @@
                                           Padding="6"
                                           Margin="0,0,0,14"
                                           AutomationProperties.Name="Application UI Scale" />
+                                <Border Background="{DynamicResource ControlSurfaceBrush}"
+                                        BorderBrush="{DynamicResource ControlBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="10"
+                                        Margin="0,0,0,14"
+                                        AutomationProperties.Name="Appearance Preview">
+                                    <StackPanel>
+                                        <TextBlock Text="Preview"
+                                                   FontWeight="SemiBold"
+                                                   Margin="0,0,0,4" />
+                                        <TextBlock Text="{Binding AppearanceSummaryText}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,8" />
+                                        <Border Background="{DynamicResource DropdownSurfaceBrush}"
+                                                BorderBrush="{DynamicResource FocusRingBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6"
+                                                Padding="8">
+                                            <StackPanel>
+                                                <TextBlock Text="Sample channel row"
+                                                           FontWeight="SemiBold" />
+                                                <TextBlock Text="Dropdown, focus ring, and text contrast update immediately."
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
 
                                 <TextBlock Text="Clock overlay"
                                            FontWeight="SemiBold"
@@ -1825,6 +1904,55 @@
                         Visibility="{Binding IsImporting, Converter={StaticResource BooleanToVisibilityConverter}}"
                         AutomationProperties.Name="Cancel Playlist Import" />
             </Grid>
+        </Border>
+
+        <Border Grid.RowSpan="3"
+                Background="#99000000"
+                Visibility="{Binding IsShortcutHelpVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                Panel.ZIndex="50"
+                AutomationProperties.Name="Keyboard Shortcut Help Overlay">
+            <Border Width="520"
+                    MaxWidth="620"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="{DynamicResource PanelBrush}"
+                    BorderBrush="{DynamicResource FocusRingBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16"
+                    Padding="22">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,12"
+                               LastChildFill="False">
+                        <TextBlock Text="Keyboard Shortcuts"
+                                   DockPanel.Dock="Left"
+                                   FontSize="{DynamicResource AppFontSizeSection}"
+                                   FontWeight="Bold" />
+                        <Button Content="Close"
+                                DockPanel.Dock="Right"
+                                Command="{Binding ToggleShortcutHelpCommand}"
+                                HorizontalAlignment="Right"
+                                AutomationProperties.Name="Close Keyboard Shortcuts" />
+                    </DockPanel>
+                    <UniformGrid Columns="2"
+                                 Margin="0,0,0,10">
+                        <TextBlock Text="Ctrl+F" FontWeight="SemiBold" />
+                        <TextBlock Text="Focus search" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <TextBlock Text="Ctrl+L / Ctrl+O" FontWeight="SemiBold" />
+                        <TextBlock Text="Import URL / file" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <TextBlock Text="Space / P / S" FontWeight="SemiBold" />
+                        <TextBlock Text="Play / pause / stop" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <TextBlock Text="V / H" FontWeight="SemiBold" />
+                        <TextBlock Text="Favorite / hide channel" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <TextBlock Text="F11 or Alt+Enter" FontWeight="SemiBold" />
+                        <TextBlock Text="True fullscreen" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <TextBlock Text="C" FontWeight="SemiBold" />
+                        <TextBlock Text="Toggle clock overlay" Foreground="{DynamicResource TextSecondaryBrush}" />
+                    </UniformGrid>
+                    <TextBlock Text="Press F1 or ? to show this panel, Esc to exit fullscreen, and use Tab/Shift+Tab to move through controls."
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
+            </Border>
         </Border>
     </Grid>
 </Window>

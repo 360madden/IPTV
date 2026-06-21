@@ -10,5 +10,7 @@ public sealed record SourceProfileExport
 
     public Dictionary<string, ProviderPlaybackProfile> SourcePlaybackProfiles { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 
+    public Dictionary<string, AppAppearancePreset> SourceAppearancePresets { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
     public Dictionary<string, string[]> SourceDefaultHiddenGroups { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 }

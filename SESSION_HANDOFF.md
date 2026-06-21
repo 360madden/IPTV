@@ -3,61 +3,62 @@
 Date: 2026-06-21
 Repo: `C:\RIFT MODDING\iptv`
 Remote: `https://github.com/360madden/IPTV.git`
-Active branch: `codex/next-1-10-modular-health-overrides`
-Baseline for this slice: `8a6b859` (`Add library management polish (#9)` on `main`)
+Branch: `main`
+Base before this slice: `af43fd5` (`Improve UI themes and dropdown contrast`)
 
 ## Current Product State
 
-The repo contains a functional .NET 10 WPF IPTV viewer for user-supplied M3U/M3U8 playlists. Playback uses LibVLC. The app supports URL/local/sample import, search, grouping, favorites, hidden channels, custom groups, source profiles, recent playlist sources, EPG, VOD resume surfaces, fullscreen/clock overlay, diagnostics, release packaging, and redacted smoke tooling. Keep it content-neutral: do not commit private playlists, credentials, generated user-library data, or proprietary stream URLs.
+The app is a functional .NET 10 WPF IPTV viewer for user-supplied M3U/M3U8 playlists. It remains content-neutral: do not commit private playlists, tokenized stream URLs, credentials, provider screenshots, or raw IPTV logs. Playback uses LibVLC behind the app playback boundary. The UI now has modular themes, high-contrast dropdowns, TV-distance scale, and no-channel placeholder coverage.
 
-## This Slice
+## This Slice Completed
 
-The next 1-10 follow-up is implemented on top of merged PR #9:
+Completed the requested 1-10 follow-up set as practical:
 
-- Merged PR #9 into `main`, then started `codex/next-1-10-modular-health-overrides`.
-- Extracted recent playlist source logic into `RecentPlaylistSourceManager`.
-- Extracted source default visibility rule logic into `SourceDefaultVisibilityManager`.
-- Added explicit per-channel visibility override persistence via `ChannelUserState.HasExplicitVisibility`, allowing “show despite default hidden rule” without losing legacy hidden behavior.
-- Added import memory/GC metrics to `LibraryHealthAnalyzer` and surfaced them in library health.
-- Added library health output to redacted diagnostics exports.
-- Improved source profile help text to explain backup/restore scope.
-- Added `Iptv.App.Tests` with manager and library health unit coverage.
-- Expanded persistence tests for explicit visible/hidden override roundtrips.
-- Expanded GUI smoke with recent-source import/export and source-profile conflict-preview coverage using an isolated seeded source profile.
-- Added CI upload of the large search benchmark timing artifact.
+1. Added appearance presets: **Desktop**, **Living room**, **High contrast**, and **Custom**.
+2. Added a live **Appearance Preview** card plus **Reset Appearance** in UI settings.
+3. Persisted selected appearance preset in `UiPreferences`.
+4. Added per-source/per-playlist appearance presets under **Source Profiles** with save/apply support.
+5. Included source appearance presets in organization preferences, organization backups, and source-profile import/export.
+6. Added `F1`/`?` keyboard shortcut help overlay and header shortcut button.
+7. Kept existing compact/dense/large-library modes and wired presets to density/large-library choices.
+8. Added screenshot regression validator: `scripts/compare_ui_smoke_screenshots.py`.
+9. Added tests for appearance preset mapping, MainWindow structure, UI preference persistence, organization persistence, and source-profile export/import.
+10. Updated README, release checklist, and polished UI checklist with screenshot review, PR workflow guidance, shortcuts, presets, and source appearance checks.
 
 ## Validation Snapshot
 
 Local validation passed on 2026-06-21:
 
-- `dotnet restore .\Iptv.slnx` — succeeded.
-- `dotnet format .\Iptv.slnx --verify-no-changes` — clean.
-- `dotnet build .\Iptv.slnx --no-restore` — succeeded, 0 warnings/errors.
-- `dotnet test .\Iptv.slnx --no-build` — 70/70 passed.
-- `dotnet build .\Iptv.slnx --configuration Release --no-restore` — succeeded, 0 warnings/errors.
-- `dotnet test .\Iptv.slnx --configuration Release --no-build` — 70/70 passed.
-- `dotnet run --project .\tools\Iptv.SearchBench\Iptv.SearchBench.csproj --configuration Release --no-build -- --count 75000` — completed; name search 500 results in 108 ms.
-- `dotnet run --project .\tools\Iptv.Smoke\Iptv.Smoke.csproj --no-build -- --url https://www.apsattv.com/xumo.m3u --probe-count 5 --timeout-seconds 20` — imported 389 channels; 5/5 probes reached `Playing`.
-- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\xumo-gui-smoke.ps1 -SkipBuild -TimeoutSeconds 90 -PlaybackTimeoutSeconds 35 -ExerciseLibraryManagementDialogs` — passed; live playback did not reach `Playing` before timeout but UI regression, clock, fullscreen, recent-source, and source-profile conflict-preview checks completed.
-- `git diff --check` — clean.
+```powershell
+dotnet format .\Iptv.slnx --verify-no-changes
+dotnet build .\Iptv.slnx --no-restore
+dotnet test .\Iptv.slnx --no-build
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-ui-dropdowns.ps1 -NoBuild
+python .\scripts\compare_ui_smoke_screenshots.py
+git diff --check
+```
 
-## GitHub / Branch State
+Latest observed test totals after this slice: 83 tests passed, 0 failed.
 
-- Default branch: `main`.
-- Branch protection requires PRs and strict `Build and Test` on `main`.
-- Push this branch as `codex/next-1-10-modular-health-overrides`, open a PR, wait for CI, then merge through protected `main` if checks pass.
+## Files Most Relevant to Resume
+
+- UI: `src/Iptv.App/MainWindow.xaml`, `src/Iptv.App/MainWindow.xaml.cs`
+- View model: `src/Iptv.App/ViewModels/MainViewModel.cs`
+- Presets: `src/Iptv.App/Services/AppearancePresetCatalog.cs`
+- Persistence: `src/Iptv.Persistence/UiPreferences.cs`, `src/Iptv.Persistence/ChannelOrganizationPreferences.cs`, source profile and organization store/backup services
+- Tests: `tests/Iptv.App.Tests/*Appearance*`, `tests/Iptv.App.Tests/MainWindowStructureTests.cs`, updated persistence tests
+- Smoke guard: `scripts/compare_ui_smoke_screenshots.py`
+- Docs: `README.md`, `docs/POLISHED-UI-CHECKLIST.md`, `docs/RELEASE-TEST-CHECKLIST.md`
 
 ## Known Cautions
 
-- `MainViewModel` is still large; this slice peels out two managers but further feature extraction remains high leverage.
-- Source default hidden rules are defaults. Explicit per-channel hide/show overrides now win when `HasExplicitVisibility` is stored.
-- GUI smoke uses real app windows and a public Xumo playlist URL; playback timing can be transient, so playback remains non-required unless `-RequirePlayback` is passed.
-- The source-profile conflict smoke seeds an isolated profile by deterministic source ID for the playlist host; keep that path isolated from real user profiles.
+- `MainViewModel` remains large. Future appearance/source-profile work should be peeled into smaller feature view models/controllers before adding more UI state.
+- UI smoke screenshots are ignored under `artifacts/`; do not commit generated screenshots unless they are sanitized release assets.
+- Branch protection prefers PR-based changes, but this workflow may directly push to `main` when explicitly requested by the user. Always watch `Windows CI` and `Windows MSIX` after push.
 
 ## Best Resume Flow
 
-1. Run `git status --short --branch` and inspect the diff.
-2. Push `codex/next-1-10-modular-health-overrides` and open the PR.
-3. Watch CI, especially the benchmark artifact upload step.
-4. If CI is green, merge through the protected flow.
-5. Next highest-impact work: continue splitting `MainViewModel` into feature controllers/view models, starting with source profiles or library health.
+1. Run `git status --short --branch` and confirm whether this handoff's commit has already been pushed.
+2. If pushed, check GitHub Actions for `Windows CI` and `Windows MSIX` on the pushed commit.
+3. If continuing locally, run the validation snapshot above before further UI work.
+4. Next high-impact work: split `MainViewModel` appearance/source-profile state into modular view models, then add automated UIA coverage for shortcut overlay behavior.

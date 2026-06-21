@@ -4,8 +4,10 @@ Use this checklist before packaging or publishing a user-facing build. It focuse
 
 ## Theme Coverage
 
+- Verify **Desktop**, **Living room**, and **High contrast** presets from **UI Settings > Appearance > Preset**.
 - Verify **Dark**, **Light**, and **High contrast** from **UI Settings > Appearance > Theme**.
 - Confirm theme choice persists after app restart.
+- Confirm **Reset Appearance** returns the app to the desktop preset.
 - Confirm app background, panels, channel list, player details, dialogs, and dropdown popups all update.
 - Confirm accent buttons keep readable text in every theme.
 
@@ -23,13 +25,20 @@ Use this checklist before packaging or publishing a user-facing build. It focuse
 
 ```powershell
 .\scripts\smoke-ui-dropdowns.ps1 -NoBuild
+python .\scripts\compare_ui_smoke_screenshots.py
 ```
 
 ## Keyboard & Focus
 
 - Tab through major controls and confirm the focus ring is visible.
 - Check buttons, checkboxes, dropdowns, text boxes, sliders, expanders, tab items, and menus/tooltips if present.
-- Confirm shortcuts still work: `Ctrl+F`, `Ctrl+O`, `Ctrl+L`, `Ctrl+R`, `F11`, `Esc`.
+- Confirm shortcuts still work: `F1`/`?` shortcut help, `Ctrl+F`, `Ctrl+O`, `Ctrl+L`, `Ctrl+R`, `F11`, `Esc`.
+
+## Source Appearance Presets
+
+- In **Source Profiles**, save a source appearance preset and confirm it persists after restart.
+- Reopen the playlist and confirm the saved source preset reapplies when the source profile is selected.
+- Export/import source profiles and confirm appearance presets are included without stream URLs.
 
 ## Playback Panel
 
@@ -44,4 +53,5 @@ dotnet format .\Iptv.slnx --verify-no-changes
 dotnet build .\Iptv.slnx --no-restore
 dotnet test .\Iptv.slnx --no-build
 .\scripts\smoke-ui-dropdowns.ps1 -NoBuild
+python .\scripts\compare_ui_smoke_screenshots.py
 ```

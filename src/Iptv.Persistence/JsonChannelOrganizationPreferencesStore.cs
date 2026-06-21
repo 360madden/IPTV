@@ -98,6 +98,7 @@ public sealed class JsonChannelOrganizationPreferencesStore : IChannelOrganizati
             .ToArray();
         Dictionary<string, string> profileNames = NormalizeProfileNames(preferences.SourceProfileNames);
         Dictionary<string, ProviderPlaybackProfile> playbackProfiles = NormalizePlaybackProfiles(preferences.SourcePlaybackProfiles);
+        Dictionary<string, AppAppearancePreset> appearancePresets = NormalizeAppearancePresets(preferences.SourceAppearancePresets);
         Dictionary<string, string[]> sourceHiddenGroups = NormalizeSourceHiddenGroups(preferences.SourceDefaultHiddenGroups);
         string[] lockedGroups = NormalizeGroups(preferences.LockedGroups);
 
@@ -112,6 +113,7 @@ public sealed class JsonChannelOrganizationPreferencesStore : IChannelOrganizati
                 : ChannelViewDensity.Comfortable,
             SourceProfileNames = profileNames,
             SourcePlaybackProfiles = playbackProfiles,
+            SourceAppearancePresets = appearancePresets,
             SourceDefaultHiddenGroups = sourceHiddenGroups,
             RefreshIntervalMinutes = NormalizeRefreshInterval(preferences.RefreshIntervalMinutes),
             LockedGroups = lockedGroups,
@@ -181,6 +183,32 @@ public sealed class JsonChannelOrganizationPreferencesStore : IChannelOrganizati
                 RetryCount = Math.Clamp(profile.RetryCount, 0, 3),
                 BufferingPreset = bufferingPreset
             };
+        }
+
+        return normalized;
+    }
+
+    private static Dictionary<string, AppAppearancePreset> NormalizeAppearancePresets(
+        IDictionary<string, AppAppearancePreset>? appearancePresets)
+    {
+        var normalized = new Dictionary<string, AppAppearancePreset>(StringComparer.OrdinalIgnoreCase);
+        if (appearancePresets is null)
+        {
+            return normalized;
+        }
+
+        foreach ((string sourceId, AppAppearancePreset preset) in appearancePresets)
+        {
+            if (string.IsNullOrWhiteSpace(sourceId))
+            {
+                continue;
+            }
+
+            AppAppearancePreset normalizedPreset = Enum.IsDefined(preset) ? preset : AppAppearancePreset.Custom;
+            if (normalizedPreset != AppAppearancePreset.Custom)
+            {
+                normalized[sourceId.Trim()] = normalizedPreset;
+            }
         }
 
         return normalized;

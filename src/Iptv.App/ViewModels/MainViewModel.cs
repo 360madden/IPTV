@@ -67,6 +67,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly HashSet<Guid> selectedChannelIds = [];
     private readonly Dictionary<string, string> sourceProfileNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ProviderPlaybackProfile> sourcePlaybackProfiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, AppAppearancePreset> sourceAppearancePresets = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string[]> sourceDefaultHiddenGroups = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> lockedGroups = new(StringComparer.OrdinalIgnoreCase);
     private readonly StreamHealthTracker streamHealthTracker = new();
@@ -158,6 +159,11 @@ public sealed class MainViewModel : ObservableObject
     private int selectedLogoCacheLimitMegabytes = 100;
     private AppTheme selectedAppTheme = AppTheme.Dark;
     private AppUiScale selectedAppUiScale = AppUiScale.Normal;
+    private AppAppearancePreset selectedAppearancePreset = AppAppearancePreset.Desktop;
+    private AppAppearancePreset selectedSourceAppearancePreset = AppAppearancePreset.Custom;
+    private string appearanceSummaryText = "Appearance: desktop preset, dark theme, normal scale.";
+    private bool isShortcutHelpVisible;
+    private bool suppressAppearancePresetTracking;
     private string statusText = "Import a user-provided M3U/M3U8 playlist to begin.";
     private string playbackStatusText = "Playback idle.";
     private string importSummaryText = "No playlist imported yet.";
@@ -252,7 +258,12 @@ public sealed class MainViewModel : ObservableObject
         RenameSourceProfileCommand = new RelayCommand(_ => RenameSelectedSourceProfile(), _ => SelectedSourceProfile is not null);
         SaveSourcePlaybackProfileCommand = new RelayCommand(_ => SaveSelectedSourcePlaybackProfile(), _ => SelectedSourceProfile is not null);
         ImportSourceProfilesCommand = new AsyncRelayCommand(_ => ImportSourceProfilesAsync(), _ => !IsBusy);
-        ExportSourceProfilesCommand = new AsyncRelayCommand(_ => ExportSourceProfilesAsync(), _ => !IsBusy && (sourceProfileNames.Count > 0 || sourcePlaybackProfiles.Count > 0 || sourceDefaultHiddenGroups.Count > 0));
+        ExportSourceProfilesCommand = new AsyncRelayCommand(_ => ExportSourceProfilesAsync(), _ => !IsBusy && (sourceProfileNames.Count > 0 || sourcePlaybackProfiles.Count > 0 || sourceAppearancePresets.Count > 0 || sourceDefaultHiddenGroups.Count > 0));
+        ApplyAppearancePresetCommand = new RelayCommand(_ => ApplySelectedAppearancePreset());
+        ResetAppearanceCommand = new RelayCommand(_ => ResetAppearance());
+        SaveSourceAppearancePresetCommand = new RelayCommand(_ => SaveSelectedSourceAppearancePreset(), _ => SelectedSourceProfile is not null);
+        ApplySourceAppearancePresetCommand = new RelayCommand(_ => ApplySelectedSourceAppearancePreset(), _ => SelectedSourceAppearancePreset != AppAppearancePreset.Custom);
+        ToggleShortcutHelpCommand = new RelayCommand(_ => IsShortcutHelpVisible = !IsShortcutHelpVisible);
         HideSourceDefaultGroupCommand = new RelayCommand(_ => HideSelectedSourceDefaultGroup(), _ => CanChangeSelectedSourceDefaultVisibilityGroup);
         ShowSourceDefaultGroupCommand = new RelayCommand(_ => ShowSelectedSourceDefaultGroup(), _ => CanChangeSelectedSourceDefaultVisibilityGroup);
         RefreshDuplicateGroupsCommand = new RelayCommand(_ => RefreshDuplicateGroups());
@@ -408,6 +419,14 @@ public sealed class MainViewModel : ObservableObject
         new(AppUiScale.Tv, "TV distance")
     ];
 
+    public IReadOnlyList<UiSelectionOption<AppAppearancePreset>> AppearancePresetOptions { get; } =
+    [
+        new(AppAppearancePreset.Desktop, "Desktop"),
+        new(AppAppearancePreset.LivingRoom, "Living room"),
+        new(AppAppearancePreset.HighContrast, "High contrast"),
+        new(AppAppearancePreset.Custom, "Custom")
+    ];
+
     public IReadOnlyList<UiSelectionOption<SmartViewFilter>> SmartViewOptions { get; } =
     [
         new(SmartViewFilter.All, "All channels"),
@@ -513,6 +532,16 @@ public sealed class MainViewModel : ObservableObject
     public ICommand ImportSourceProfilesCommand { get; }
 
     public ICommand ExportSourceProfilesCommand { get; }
+
+    public ICommand ApplyAppearancePresetCommand { get; }
+
+    public ICommand ResetAppearanceCommand { get; }
+
+    public ICommand SaveSourceAppearancePresetCommand { get; }
+
+    public ICommand ApplySourceAppearancePresetCommand { get; }
+
+    public ICommand ToggleShortcutHelpCommand { get; }
 
     public ICommand HideSourceDefaultGroupCommand { get; }
 
@@ -690,6 +719,8 @@ public sealed class MainViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(VisibleResultLimitText));
                 ScheduleSearch();
+                MarkAppearanceAsCustom();
+                UpdateAppearanceSummary();
                 _ = SaveOrganizationPreferencesSafelyAsync();
             }
         }
@@ -711,6 +742,8 @@ public sealed class MainViewModel : ObservableObject
 
             if (SetProperty(ref selectedChannelViewDensity, value))
             {
+                MarkAppearanceAsCustom();
+                UpdateAppearanceSummary();
                 _ = SaveOrganizationPreferencesSafelyAsync();
             }
         }
@@ -787,6 +820,7 @@ public sealed class MainViewModel : ObservableObject
             {
                 RenameSourceProfileName = value?.DisplayName ?? string.Empty;
                 LoadSelectedSourcePlaybackProfile(value?.SourceId);
+                LoadSelectedSourceAppearancePreset(value?.SourceId);
                 RefreshSourceDefaultVisibilityOptions();
                 RaiseProfileCommandStates();
             }
@@ -1269,6 +1303,8 @@ public sealed class MainViewModel : ObservableObject
             if (SetProperty(ref selectedAppTheme, normalized))
             {
                 themeService.ApplyTheme(normalized, SelectedAppUiScale);
+                MarkAppearanceAsCustom();
+                UpdateAppearanceSummary();
                 _ = SaveUiPreferencesSafelyAsync();
             }
         }
@@ -1283,9 +1319,57 @@ public sealed class MainViewModel : ObservableObject
             if (SetProperty(ref selectedAppUiScale, normalized))
             {
                 themeService.ApplyTheme(SelectedAppTheme, normalized);
+                MarkAppearanceAsCustom();
+                UpdateAppearanceSummary();
                 _ = SaveUiPreferencesSafelyAsync();
             }
         }
+    }
+
+    public AppAppearancePreset SelectedAppearancePreset
+    {
+        get => selectedAppearancePreset;
+        set
+        {
+            AppAppearancePreset normalized = AppearancePresetCatalog.Normalize(value);
+            if (SetProperty(ref selectedAppearancePreset, normalized))
+            {
+                if (normalized != AppAppearancePreset.Custom)
+                {
+                    ApplyAppearancePreset(normalized, save: true);
+                    StatusText = $"Applied {FormatAppearancePreset(normalized)} appearance preset.";
+                    return;
+                }
+
+                UpdateAppearanceSummary();
+                _ = SaveUiPreferencesSafelyAsync();
+            }
+        }
+    }
+
+    public AppAppearancePreset SelectedSourceAppearancePreset
+    {
+        get => selectedSourceAppearancePreset;
+        set
+        {
+            AppAppearancePreset normalized = AppearancePresetCatalog.Normalize(value);
+            if (SetProperty(ref selectedSourceAppearancePreset, normalized))
+            {
+                RaiseSourceAppearanceCommandStates();
+            }
+        }
+    }
+
+    public string AppearanceSummaryText
+    {
+        get => appearanceSummaryText;
+        private set => SetProperty(ref appearanceSummaryText, value);
+    }
+
+    public bool IsShortcutHelpVisible
+    {
+        get => isShortcutHelpVisible;
+        set => SetProperty(ref isShortcutHelpVisible, value);
     }
 
     public string StreamHealthSummaryText
@@ -1463,9 +1547,12 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedLogoCacheLimitMegabytes));
         selectedAppTheme = ThemeService.NormalizeTheme(uiPreferences.AppTheme);
         selectedAppUiScale = ThemeService.NormalizeUiScale(uiPreferences.AppUiScale);
+        selectedAppearancePreset = AppearancePresetCatalog.Normalize(uiPreferences.AppearancePreset);
         themeService.ApplyTheme(selectedAppTheme, selectedAppUiScale);
         OnPropertyChanged(nameof(SelectedAppTheme));
         OnPropertyChanged(nameof(SelectedAppUiScale));
+        OnPropertyChanged(nameof(SelectedAppearancePreset));
+        UpdateAppearanceSummary();
         ApplyRecentPlaylistSources(uiPreferences.RecentPlaylistSources);
         RefreshLogoCacheStatus();
         RefreshLibraryHealth();
@@ -1499,6 +1586,16 @@ public sealed class MainViewModel : ObservableObject
             if (!string.IsNullOrWhiteSpace(sourceId))
             {
                 sourcePlaybackProfiles[sourceId] = NormalizePlaybackProfile(profile);
+            }
+        }
+
+        sourceAppearancePresets.Clear();
+        foreach ((string sourceId, AppAppearancePreset preset) in preferences.SourceAppearancePresets)
+        {
+            AppAppearancePreset normalizedPreset = AppearancePresetCatalog.Normalize(preset);
+            if (!string.IsNullOrWhiteSpace(sourceId) && normalizedPreset != AppAppearancePreset.Custom)
+            {
+                sourceAppearancePresets[sourceId] = normalizedPreset;
             }
         }
 
@@ -1902,6 +1999,7 @@ public sealed class MainViewModel : ObservableObject
 
             PlaylistDiffSummary diff = CalculateDiff(previousIds, allChannels.Select(channel => channel.Id));
             PopulateSourceProfiles();
+            ApplyCurrentSourceAppearancePresetIfAvailable();
             PopulateRefreshConflicts(previousChannels, allChannels, diff);
             RefreshDiffText = FormatDiff(diff);
             ProfileSummaryText = FormatProfileSummary();
@@ -3229,6 +3327,9 @@ public sealed class MainViewModel : ObservableObject
             SourcePlaybackProfiles = sourcePlaybackProfiles
                 .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
                 .ToDictionary(pair => pair.Key, pair => NormalizePlaybackProfile(pair.Value), StringComparer.OrdinalIgnoreCase),
+            SourceAppearancePresets = sourceAppearancePresets
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && AppearancePresetCatalog.Normalize(pair.Value) != AppAppearancePreset.Custom)
+                .ToDictionary(pair => pair.Key, pair => AppearancePresetCatalog.Normalize(pair.Value), StringComparer.OrdinalIgnoreCase),
             SourceDefaultHiddenGroups = sourceDefaultHiddenGroups
                 .Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && pair.Value.Length > 0)
                 .ToDictionary(pair => pair.Key, pair => NormalizeGroups(pair.Value), StringComparer.OrdinalIgnoreCase),
@@ -3306,6 +3407,16 @@ public sealed class MainViewModel : ObservableObject
             }
         }
 
+        sourceAppearancePresets.Clear();
+        foreach ((string sourceId, AppAppearancePreset preset) in backup.Preferences.SourceAppearancePresets)
+        {
+            AppAppearancePreset normalizedPreset = AppearancePresetCatalog.Normalize(preset);
+            if (!string.IsNullOrWhiteSpace(sourceId) && normalizedPreset != AppAppearancePreset.Custom)
+            {
+                sourceAppearancePresets[sourceId] = normalizedPreset;
+            }
+        }
+
         selectedRefreshIntervalMinutes = NormalizeRefreshInterval(backup.Preferences.RefreshIntervalMinutes);
         OnPropertyChanged(nameof(SelectedRefreshIntervalMinutes));
         refreshScheduleEnabled = backup.Preferences.RefreshScheduleEnabled;
@@ -3369,6 +3480,7 @@ public sealed class MainViewModel : ObservableObject
                     LogoCacheLimitMegabytes = SelectedLogoCacheLimitMegabytes,
                     AppTheme = SelectedAppTheme,
                     AppUiScale = SelectedAppUiScale,
+                    AppearancePreset = SelectedAppearancePreset,
                     RecentPlaylistSources = recentSources
                 },
                 CancellationToken.None).ConfigureAwait(false);
@@ -3764,8 +3876,9 @@ public sealed class MainViewModel : ObservableObject
     {
         int sourceCount = allChannels.Select(channel => channel.SourceId).Distinct().Count();
         int defaultRuleCount = sourceDefaultHiddenGroups.Values.Sum(groups => groups.Length);
+        int appearancePresetCount = sourceAppearancePresets.Count;
         string sourceText = sourceCount == 1 ? "source" : "sources";
-        return $"Profile: automatic per-playlist/source organization across {sourceCount:N0} {sourceText}; saved favorites, hidden channels, custom groups, default visibility rules ({defaultRuleCount:N0}), and order are matched by stable channel IDs.";
+        return $"Profile: automatic per-playlist/source organization across {sourceCount:N0} {sourceText}; saved favorites, hidden channels, custom groups, default visibility rules ({defaultRuleCount:N0}), appearance presets ({appearancePresetCount:N0}), and order are matched by stable channel IDs.";
     }
 
     private string FormatOrganizationReconciliation(PlaylistDiffSummary diff)
@@ -4005,6 +4118,123 @@ public sealed class MainViewModel : ObservableObject
         StatusText = $"Renamed source profile to '{normalized}'.";
     }
 
+    private void ApplySelectedAppearancePreset()
+    {
+        if (SelectedAppearancePreset == AppAppearancePreset.Custom)
+        {
+            StatusText = "Custom appearance is already active; choose Desktop, Living room, or High contrast to apply a preset.";
+            return;
+        }
+
+        ApplyAppearancePreset(SelectedAppearancePreset, save: true);
+        StatusText = $"Applied {FormatAppearancePreset(SelectedAppearancePreset)} appearance preset.";
+    }
+
+    private void ResetAppearance()
+    {
+        ApplyAppearancePreset(AppAppearancePreset.Desktop, save: true);
+        StatusText = "Reset appearance to the desktop preset.";
+    }
+
+    private void ApplyAppearancePreset(AppAppearancePreset preset, bool save)
+    {
+        if (!AppearancePresetCatalog.TryGetSettings(preset, out AppearancePresetSettings settings))
+        {
+            return;
+        }
+
+        suppressAppearancePresetTracking = true;
+        try
+        {
+            SelectedAppTheme = settings.Theme;
+            SelectedAppUiScale = settings.UiScale;
+            SelectedChannelViewDensity = settings.ChannelViewDensity;
+            LargeLibraryMode = settings.LargeLibraryMode;
+        }
+        finally
+        {
+            suppressAppearancePresetTracking = false;
+        }
+
+        selectedAppearancePreset = AppearancePresetCatalog.Normalize(preset);
+        OnPropertyChanged(nameof(SelectedAppearancePreset));
+        UpdateAppearanceSummary();
+        if (save)
+        {
+            _ = SaveUiPreferencesSafelyAsync();
+            _ = SaveOrganizationPreferencesSafelyAsync();
+        }
+    }
+
+    private void ApplyCurrentSourceAppearancePresetIfAvailable()
+    {
+        string? sourceId = SelectedSourceProfile?.SourceId;
+        if (sourceId is null || !sourceAppearancePresets.TryGetValue(sourceId, out AppAppearancePreset preset))
+        {
+            return;
+        }
+
+        AppAppearancePreset normalizedPreset = AppearancePresetCatalog.Normalize(preset);
+        if (normalizedPreset == AppAppearancePreset.Custom)
+        {
+            return;
+        }
+
+        selectedSourceAppearancePreset = normalizedPreset;
+        OnPropertyChanged(nameof(SelectedSourceAppearancePreset));
+        ApplyAppearancePreset(normalizedPreset, save: true);
+        AddDiagnostic($"Applied source appearance preset: {FormatAppearancePreset(normalizedPreset)}.");
+    }
+
+    private void MarkAppearanceAsCustom()
+    {
+        if (suppressAppearancePresetTracking || selectedAppearancePreset == AppAppearancePreset.Custom)
+        {
+            return;
+        }
+
+        selectedAppearancePreset = AppAppearancePreset.Custom;
+        OnPropertyChanged(nameof(SelectedAppearancePreset));
+        _ = SaveUiPreferencesSafelyAsync();
+    }
+
+    private void UpdateAppearanceSummary()
+    {
+        AppearanceSummaryText =
+            $"Appearance: {FormatAppearancePreset(SelectedAppearancePreset)} preset, {FormatTheme(SelectedAppTheme)} theme, {FormatUiScale(SelectedAppUiScale)} scale, {SelectedChannelViewDensity} rows.";
+    }
+
+    private static string FormatAppearancePreset(AppAppearancePreset preset)
+    {
+        return AppearancePresetCatalog.Normalize(preset) switch
+        {
+            AppAppearancePreset.Desktop => "desktop",
+            AppAppearancePreset.LivingRoom => "living room",
+            AppAppearancePreset.HighContrast => "high contrast",
+            _ => "custom"
+        };
+    }
+
+    private static string FormatTheme(AppTheme theme)
+    {
+        return ThemeService.NormalizeTheme(theme) switch
+        {
+            AppTheme.Light => "light",
+            AppTheme.HighContrast => "high contrast",
+            _ => "dark"
+        };
+    }
+
+    private static string FormatUiScale(AppUiScale scale)
+    {
+        return ThemeService.NormalizeUiScale(scale) switch
+        {
+            AppUiScale.Large => "large",
+            AppUiScale.Tv => "TV distance",
+            _ => "normal"
+        };
+    }
+
     private void LoadSelectedSourcePlaybackProfile(string? sourceId)
     {
         ProviderPlaybackProfile profile = sourceId is not null && sourcePlaybackProfiles.TryGetValue(sourceId, out ProviderPlaybackProfile? saved)
@@ -4015,6 +4245,16 @@ public sealed class MainViewModel : ObservableObject
         selectedSourceBufferingPreset = profile.BufferingPreset;
         OnPropertyChanged(nameof(SelectedSourceRetryCount));
         OnPropertyChanged(nameof(SelectedSourceBufferingPreset));
+    }
+
+    private void LoadSelectedSourceAppearancePreset(string? sourceId)
+    {
+        selectedSourceAppearancePreset = sourceId is not null &&
+            sourceAppearancePresets.TryGetValue(sourceId, out AppAppearancePreset saved)
+            ? AppearancePresetCatalog.Normalize(saved)
+            : AppAppearancePreset.Custom;
+        OnPropertyChanged(nameof(SelectedSourceAppearancePreset));
+        RaiseSourceAppearanceCommandStates();
     }
 
     private void SaveSelectedSourcePlaybackProfile()
@@ -4035,6 +4275,42 @@ public sealed class MainViewModel : ObservableObject
         StatusText = $"Saved playback profile for '{SelectedSourceProfile.DisplayName}': {SelectedSourceRetryCount:N0} retries, {SelectedSourceBufferingPreset} buffer.";
     }
 
+    private void SaveSelectedSourceAppearancePreset()
+    {
+        if (SelectedSourceProfile is null)
+        {
+            StatusText = "Select a source profile before saving an appearance preset.";
+            return;
+        }
+
+        AppAppearancePreset normalizedPreset = AppearancePresetCatalog.Normalize(SelectedSourceAppearancePreset);
+        if (normalizedPreset == AppAppearancePreset.Custom)
+        {
+            sourceAppearancePresets.Remove(SelectedSourceProfile.SourceId);
+            StatusText = $"Cleared source appearance preset for '{SelectedSourceProfile.DisplayName}'.";
+        }
+        else
+        {
+            sourceAppearancePresets[SelectedSourceProfile.SourceId] = normalizedPreset;
+            StatusText = $"Saved {FormatAppearancePreset(normalizedPreset)} appearance for '{SelectedSourceProfile.DisplayName}'.";
+        }
+
+        _ = SaveOrganizationPreferencesSafelyAsync();
+        RaiseProfileCommandStates();
+    }
+
+    private void ApplySelectedSourceAppearancePreset()
+    {
+        if (SelectedSourceAppearancePreset == AppAppearancePreset.Custom)
+        {
+            StatusText = "Select a saved source appearance preset first.";
+            return;
+        }
+
+        ApplyAppearancePreset(SelectedSourceAppearancePreset, save: true);
+        StatusText = $"Applied {FormatAppearancePreset(SelectedSourceAppearancePreset)} appearance preset.";
+    }
+
     private IReadOnlyList<string> BuildSourceProfileImportConflicts(SourceProfileExport imported)
     {
         var conflicts = new List<string>();
@@ -4050,6 +4326,11 @@ public sealed class MainViewModel : ObservableObject
             conflicts.Add($"Playback profile for source {sourceId}: {current.RetryCount:N0}/{current.BufferingPreset} -> {incoming.RetryCount:N0}/{incoming.BufferingPreset}.");
         }
 
+        foreach (string sourceId in imported.SourceAppearancePresets.Keys.Where(sourceId => sourceAppearancePresets.ContainsKey(sourceId)).Take(25))
+        {
+            conflicts.Add($"Appearance preset for source {sourceId}: {sourceAppearancePresets[sourceId]} -> {AppearancePresetCatalog.Normalize(imported.SourceAppearancePresets[sourceId])}.");
+        }
+
         foreach (string sourceId in imported.SourceDefaultHiddenGroups.Keys.Where(sourceId => sourceDefaultHiddenGroups.ContainsKey(sourceId)).Take(25))
         {
             string current = string.Join(", ", sourceDefaultHiddenGroups[sourceId]);
@@ -4062,7 +4343,7 @@ public sealed class MainViewModel : ObservableObject
             return conflicts;
         }
 
-        int importedTotal = imported.SourceProfileNames.Count + imported.SourcePlaybackProfiles.Count + imported.SourceDefaultHiddenGroups.Count;
+        int importedTotal = imported.SourceProfileNames.Count + imported.SourcePlaybackProfiles.Count + imported.SourceAppearancePresets.Count + imported.SourceDefaultHiddenGroups.Count;
         conflicts.Insert(0, $"Import contains {importedTotal:N0} source profile setting group(s); {conflicts.Count:N0} shown may overwrite existing settings.");
         return conflicts;
     }
@@ -4105,6 +4386,17 @@ public sealed class MainViewModel : ObservableObject
                 }
             }
 
+            int importedAppearanceCount = 0;
+            foreach ((string sourceId, AppAppearancePreset preset) in imported.SourceAppearancePresets)
+            {
+                AppAppearancePreset normalizedPreset = AppearancePresetCatalog.Normalize(preset);
+                if (!string.IsNullOrWhiteSpace(sourceId) && normalizedPreset != AppAppearancePreset.Custom)
+                {
+                    sourceAppearancePresets[sourceId.Trim()] = normalizedPreset;
+                    importedAppearanceCount++;
+                }
+            }
+
             int importedDefaultGroupCount = 0;
             foreach ((string sourceId, string[] hiddenGroups) in imported.SourceDefaultHiddenGroups)
             {
@@ -4126,10 +4418,11 @@ public sealed class MainViewModel : ObservableObject
             int defaultVisibilityAffected = ReapplySourceDefaultVisibilityToLoadedChannels();
             PopulateSourceProfiles();
             LoadSelectedSourcePlaybackProfile(SelectedSourceProfile?.SourceId);
+            LoadSelectedSourceAppearancePreset(SelectedSourceProfile?.SourceId);
             await SaveOrganizationPreferencesSafelyAsync().ConfigureAwait(true);
             ProfileSummaryText = FormatProfileSummary();
             RefreshLibraryHealth();
-            StatusText = $"Imported {importedNameCount:N0} source profile names, {importedPlaybackCount:N0} playback profiles, and {importedDefaultGroupCount:N0} default hidden group rules; updated {defaultVisibilityAffected:N0} loaded channel(s).";
+            StatusText = $"Imported {importedNameCount:N0} source profile names, {importedPlaybackCount:N0} playback profiles, {importedAppearanceCount:N0} appearance presets, and {importedDefaultGroupCount:N0} default hidden group rules; updated {defaultVisibilityAffected:N0} loaded channel(s).";
             AddDiagnostic(StatusText);
         }
         catch (OperationCanceledException)
@@ -4164,13 +4457,16 @@ public sealed class MainViewModel : ObservableObject
                 SourcePlaybackProfiles = sourcePlaybackProfiles
                     .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
                     .ToDictionary(pair => pair.Key, pair => NormalizePlaybackProfile(pair.Value), StringComparer.OrdinalIgnoreCase),
+                SourceAppearancePresets = sourceAppearancePresets
+                    .Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && AppearancePresetCatalog.Normalize(pair.Value) != AppAppearancePreset.Custom)
+                    .ToDictionary(pair => pair.Key, pair => AppearancePresetCatalog.Normalize(pair.Value), StringComparer.OrdinalIgnoreCase),
                 SourceDefaultHiddenGroups = sourceDefaultHiddenGroups
                     .Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && pair.Value.Length > 0)
                     .ToDictionary(pair => pair.Key, pair => NormalizeGroups(pair.Value), StringComparer.OrdinalIgnoreCase)
             };
             await sourceProfileFileService.ExportAsync(path, export, shutdownCts.Token).ConfigureAwait(true);
             int defaultRuleCount = export.SourceDefaultHiddenGroups.Values.Sum(groups => groups.Length);
-            StatusText = $"Exported {export.SourceProfileNames.Count:N0} source profile names, {export.SourcePlaybackProfiles.Count:N0} playback profiles, and {defaultRuleCount:N0} default hidden group rules.";
+            StatusText = $"Exported {export.SourceProfileNames.Count:N0} source profile names, {export.SourcePlaybackProfiles.Count:N0} playback profiles, {export.SourceAppearancePresets.Count:N0} appearance presets, and {defaultRuleCount:N0} default hidden group rules.";
             AddDiagnostic(StatusText);
         }
         catch (OperationCanceledException)
@@ -4583,6 +4879,7 @@ public sealed class MainViewModel : ObservableObject
 
             PlaylistDiffSummary diff = CalculateDiff(previousChannels.Select(channel => channel.Id).ToHashSet(), allChannels.Select(channel => channel.Id));
             PopulateSourceProfiles();
+            ApplyCurrentSourceAppearancePresetIfAvailable();
             PopulateRefreshConflicts(previousChannels, allChannels, diff);
             RefreshDiffText = FormatDiff(diff);
             ProfileSummaryText = FormatProfileSummary();
@@ -5951,7 +6248,21 @@ public sealed class MainViewModel : ObservableObject
             exportProfiles.RaiseCanExecuteChanged();
         }
 
+        RaiseSourceAppearanceCommandStates();
         RaiseSourceDefaultVisibilityCommandStates();
+    }
+
+    private void RaiseSourceAppearanceCommandStates()
+    {
+        if (SaveSourceAppearancePresetCommand is RelayCommand saveAppearance)
+        {
+            saveAppearance.RaiseCanExecuteChanged();
+        }
+
+        if (ApplySourceAppearancePresetCommand is RelayCommand applyAppearance)
+        {
+            applyAppearance.RaiseCanExecuteChanged();
+        }
     }
 
     private void RaiseRecentPlaylistCommandStates()

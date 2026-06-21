@@ -42,6 +42,14 @@ public enum AppUiScale
     Tv
 }
 
+public enum AppAppearancePreset
+{
+    Custom,
+    Desktop,
+    LivingRoom,
+    HighContrast
+}
+
 public sealed record RecentPlaylistSourcePreference
 {
     public RecentPlaylistSourceKind Kind { get; init; }
@@ -86,6 +94,8 @@ public sealed record UiPreferences
     public AppTheme AppTheme { get; init; } = AppTheme.Dark;
 
     public AppUiScale AppUiScale { get; init; } = AppUiScale.Normal;
+
+    public AppAppearancePreset AppearancePreset { get; init; } = AppAppearancePreset.Desktop;
 
     public RecentPlaylistSourcePreference[] RecentPlaylistSources { get; init; } = [];
 }

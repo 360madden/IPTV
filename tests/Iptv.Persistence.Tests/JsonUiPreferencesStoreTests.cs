@@ -25,6 +25,7 @@ public sealed class JsonUiPreferencesStoreTests
                 LogoCacheLimitMegabytes = 250,
                 AppTheme = AppTheme.HighContrast,
                 AppUiScale = AppUiScale.Tv,
+                AppearancePreset = AppAppearancePreset.HighContrast,
                 RecentPlaylistSources =
                 [
                     new RecentPlaylistSourcePreference
@@ -55,6 +56,7 @@ public sealed class JsonUiPreferencesStoreTests
             Assert.Equal(250, loaded.LogoCacheLimitMegabytes);
             Assert.Equal(AppTheme.HighContrast, loaded.AppTheme);
             Assert.Equal(AppUiScale.Tv, loaded.AppUiScale);
+            Assert.Equal(AppAppearancePreset.HighContrast, loaded.AppearancePreset);
             RecentPlaylistSourcePreference recent = Assert.Single(loaded.RecentPlaylistSources);
             Assert.Equal(RecentPlaylistSourceKind.RemoteUrl, recent.Kind);
             Assert.Equal("Example", recent.DisplayName);
@@ -94,6 +96,7 @@ public sealed class JsonUiPreferencesStoreTests
             Assert.Equal(100, loaded.LogoCacheLimitMegabytes);
             Assert.Equal(AppTheme.Dark, loaded.AppTheme);
             Assert.Equal(AppUiScale.Normal, loaded.AppUiScale);
+            Assert.Equal(AppAppearancePreset.Desktop, loaded.AppearancePreset);
             Assert.Empty(loaded.RecentPlaylistSources);
         }
         finally
@@ -139,6 +142,7 @@ public sealed class JsonUiPreferencesStoreTests
             Assert.Equal(100, loaded.LogoCacheLimitMegabytes);
             Assert.Equal(AppTheme.Dark, loaded.AppTheme);
             Assert.Equal(AppUiScale.Normal, loaded.AppUiScale);
+            Assert.Equal(AppAppearancePreset.Desktop, loaded.AppearancePreset);
             Assert.Empty(loaded.RecentPlaylistSources);
         }
         finally
