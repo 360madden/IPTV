@@ -89,6 +89,35 @@ public sealed class PlaylistDialogService : IPlaylistDialogService
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
+    public string? PickSourceProfileImportFile()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import source profiles",
+            Filter = "IPTV source profiles (*.json)|*.json|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
+    public string? PickSourceProfileExportFile()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export source profiles",
+            Filter = "IPTV source profiles (*.json)|*.json|All files (*.*)|*.*",
+            DefaultExt = ".json",
+            AddExtension = true,
+            CheckPathExists = true,
+            OverwritePrompt = true,
+            FileName = $"iptv-source-profiles-{DateTime.Now:yyyyMMdd-HHmmss}.json"
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
     public string? PickCustomGroupCsvImportFile()
     {
         var dialog = new OpenFileDialog

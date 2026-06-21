@@ -10,6 +10,7 @@ public sealed class JsonUiPreferencesStore : IUiPreferencesStore
     };
 
     private readonly string filePath;
+    private readonly SemaphoreSlim saveGate = new(1, 1);
 
     public JsonUiPreferencesStore(string? appDataDirectory = null)
     {
@@ -48,6 +49,61 @@ public sealed class JsonUiPreferencesStore : IUiPreferencesStore
     {
         ArgumentNullException.ThrowIfNull(preferences);
 
+        await saveGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await SaveUnsafeAsync(preferences, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            saveGate.Release();
+        }
+    }
+
+    public async Task UpdateAsync(Func<UiPreferences, UiPreferences> update, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+
+        await saveGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            UiPreferences current = await LoadUnsafeAsync(cancellationToken).ConfigureAwait(false);
+            UiPreferences next = update(current) ?? throw new InvalidOperationException("UI preference update returned null.");
+            await SaveUnsafeAsync(next, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            saveGate.Release();
+        }
+    }
+
+    private async Task<UiPreferences> LoadUnsafeAsync(CancellationToken cancellationToken)
+    {
+        if (!File.Exists(filePath))
+        {
+            return new UiPreferences();
+        }
+
+        try
+        {
+            await using FileStream stream = File.OpenRead(filePath);
+            UiPreferences? preferences = await JsonSerializer
+                .DeserializeAsync<UiPreferences>(stream, JsonOptions, cancellationToken)
+                .ConfigureAwait(false);
+            return preferences ?? new UiPreferences();
+        }
+        catch (JsonException)
+        {
+            return new UiPreferences();
+        }
+        catch (IOException)
+        {
+            return new UiPreferences();
+        }
+    }
+
+    private async Task SaveUnsafeAsync(UiPreferences preferences, CancellationToken cancellationToken)
+    {
         string directory = Path.GetDirectoryName(filePath) ?? ".";
         Directory.CreateDirectory(directory);
 

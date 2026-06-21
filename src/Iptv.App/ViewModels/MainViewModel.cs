@@ -16,6 +16,7 @@ using Iptv.Persistence;
 using Iptv.Persistence.CustomGroups;
 using Iptv.Persistence.Logos;
 using Iptv.Persistence.SmartGroups;
+using Iptv.Persistence.SourceProfiles;
 using Iptv.Playback;
 using Iptv.Playlists;
 using Iptv.Search;
@@ -24,6 +25,10 @@ namespace Iptv.App.ViewModels;
 
 public sealed class MainViewModel : ObservableObject
 {
+    private delegate Task<PlaylistImportResult> PlaylistImportOperation(
+        CancellationToken cancellationToken,
+        IProgress<PlaylistImportProgress>? progress);
+
     private const string AllGroupsOption = "All Groups";
     private const string AllCategoriesOption = "All Categories";
     private const string AllYearsOption = "All Years";
@@ -37,6 +42,7 @@ public sealed class MainViewModel : ObservableObject
     private const int VodLibraryPageSize = 60;
     private const int SearchBenchmarkChannelCount = 50_000;
     private const long MaximumRemoteXmltvBytes = 50L * 1024 * 1024;
+    private const int MaximumRecentPlaylistSources = 10;
 
     private readonly IPlaylistImportService playlistImportService;
     private readonly IChannelSearchService channelSearchService;
@@ -45,7 +51,9 @@ public sealed class MainViewModel : ObservableObject
     private readonly IChannelOrganizationPreferencesStore organizationPreferencesStore;
     private readonly IChannelOrganizationBackupService organizationBackupService;
     private readonly ILogoCacheService logoCacheService;
+    private readonly ISourceProfileFileService sourceProfileFileService;
     private readonly ISmartGroupPresetFileService smartGroupPresetFileService;
+    private readonly IUiPreferencesStore uiPreferencesStore;
     private readonly CustomGroupCsvService customGroupCsvService = new();
     private readonly HttpClient logoHttpClient = new() { Timeout = TimeSpan.FromSeconds(6) };
     private readonly HttpClient xmltvHttpClient = new() { Timeout = TimeSpan.FromSeconds(20) };
@@ -54,7 +62,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly List<Channel> allChannels = [];
     private readonly CancellationTokenSource shutdownCts = new();
     private CancellationTokenSource? searchCts;
-    private Func<CancellationToken, Task<PlaylistImportResult>>? lastPlaylistImport;
+    private PlaylistImportOperation? lastPlaylistImport;
     private readonly Dictionary<Guid, ChannelUserState> channelStates = [];
     private readonly HashSet<string> knownCustomGroups = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<Guid> selectedChannelIds = [];
@@ -87,6 +95,7 @@ public sealed class MainViewModel : ObservableObject
     private ChannelSortMode selectedSortMode = ChannelSortMode.FavoritesFirst;
     private string? selectedManagedCustomGroup;
     private SourceProfileViewModel? selectedSourceProfile;
+    private RecentPlaylistSourceViewModel? selectedRecentPlaylistSource;
     private string renameSourceProfileName = string.Empty;
     private string renameCustomGroupName = string.Empty;
     private string selectedBatchGroupAssignment = SourceGroupAssignmentOption;
@@ -111,6 +120,7 @@ public sealed class MainViewModel : ObservableObject
     private string playbackProgressText = "Playback position unavailable.";
     private string conflictReviewText = "Refresh conflicts unavailable until a playlist is refreshed.";
     private string logoPrefetchStatusText = "Logo prefetch idle.";
+    private string logoCacheStatusText = "Logo cache: not checked yet.";
     private string streamHealthSummaryText = "Stream health appears after playback attempts.";
     private string epgTimelineSummaryText = "EPG timeline appears after importing XMLTV guide data.";
     private string selectedVodDetailText = "Select VOD or series content to view detail and resume controls.";
@@ -134,6 +144,8 @@ public sealed class MainViewModel : ObservableObject
     private string importProgressText = "Import idle.";
     private CancellationTokenSource? importCts;
     private bool isBasicMode;
+    private bool firstRunSetupCompleted;
+    private int selectedLogoCacheLimitMegabytes = 100;
     private string statusText = "Import a user-provided M3U/M3U8 playlist to begin.";
     private string playbackStatusText = "Playback idle.";
     private string importSummaryText = "No playlist imported yet.";
@@ -160,6 +172,7 @@ public sealed class MainViewModel : ObservableObject
         IChannelOrganizationPreferencesStore organizationPreferencesStore,
         IChannelOrganizationBackupService organizationBackupService,
         ILogoCacheService logoCacheService,
+        ISourceProfileFileService sourceProfileFileService,
         ISmartGroupPresetFileService smartGroupPresetFileService,
         IUiPreferencesStore uiPreferencesStore,
         IXmltvImportService xmltvImportService,
@@ -172,7 +185,9 @@ public sealed class MainViewModel : ObservableObject
         this.organizationPreferencesStore = organizationPreferencesStore;
         this.organizationBackupService = organizationBackupService;
         this.logoCacheService = logoCacheService;
+        this.sourceProfileFileService = sourceProfileFileService;
         this.smartGroupPresetFileService = smartGroupPresetFileService;
+        this.uiPreferencesStore = uiPreferencesStore;
         this.xmltvImportService = xmltvImportService;
         this.dialogService = dialogService;
         Clock = new ClockOverlayViewModel(uiPreferencesStore);
@@ -180,6 +195,8 @@ public sealed class MainViewModel : ObservableObject
         ImportFileCommand = new AsyncRelayCommand(_ => ImportFileAsync(), _ => !IsBusy);
         ImportUrlCommand = new AsyncRelayCommand(_ => ImportUrlAsync(), _ => !IsBusy);
         LoadSampleCommand = new AsyncRelayCommand(_ => LoadSampleAsync(), _ => !IsBusy);
+        OpenRecentPlaylistSourceCommand = new AsyncRelayCommand(_ => OpenRecentPlaylistSourceAsync(), _ => !IsBusy && SelectedRecentPlaylistSource is not null);
+        ClearRecentPlaylistSourcesCommand = new RelayCommand(_ => ClearRecentPlaylistSources(), _ => RecentPlaylistSources.Count > 0);
         CancelImportCommand = new RelayCommand(_ => CancelImport(), _ => IsImporting);
         RefreshPlaylistCommand = new AsyncRelayCommand(_ => RefreshPlaylistAsync(), _ => !IsBusy && lastPlaylistImport is not null);
         ImportEpgCommand = new AsyncRelayCommand(_ => ImportEpgAsync(), _ => !IsBusy);
@@ -213,6 +230,8 @@ public sealed class MainViewModel : ObservableObject
         ExportSmartGroupPresetsCommand = new AsyncRelayCommand(_ => ExportSmartGroupPresetsAsync(), _ => !IsBusy && SmartGroupPresets.Count > 0);
         RenameSourceProfileCommand = new RelayCommand(_ => RenameSelectedSourceProfile(), _ => SelectedSourceProfile is not null);
         SaveSourcePlaybackProfileCommand = new RelayCommand(_ => SaveSelectedSourcePlaybackProfile(), _ => SelectedSourceProfile is not null);
+        ImportSourceProfilesCommand = new AsyncRelayCommand(_ => ImportSourceProfilesAsync(), _ => !IsBusy);
+        ExportSourceProfilesCommand = new AsyncRelayCommand(_ => ExportSourceProfilesAsync(), _ => !IsBusy && (sourceProfileNames.Count > 0 || sourcePlaybackProfiles.Count > 0));
         RefreshDuplicateGroupsCommand = new RelayCommand(_ => RefreshDuplicateGroups());
         HideSelectedDuplicateGroupCommand = new RelayCommand(_ => HideSelectedDuplicateGroup(), _ => SelectedDuplicateGroup is not null);
         RefreshAuditCommand = new RelayCommand(_ => RefreshHiddenLockedAudit());
@@ -231,6 +250,8 @@ public sealed class MainViewModel : ObservableObject
         ClearResumeCommand = new RelayCommand(_ => SetSelectedResumeProgress(null), _ => SelectedChannel is not null);
         ClearRemovedConflictStatesCommand = new RelayCommand(_ => ClearRemovedConflictStates(), _ => lastRemovedChannelIds.Count > 0);
         PrefetchVisibleLogosCommand = new AsyncRelayCommand(_ => PrefetchVisibleLogosAsync(), _ => VisibleChannels.Count > 0);
+        TrimLogoCacheCommand = new AsyncRelayCommand(_ => TrimLogoCacheAsync(), _ => !IsBusy);
+        ClearLogoCacheCommand = new AsyncRelayCommand(_ => ClearLogoCacheAsync(), _ => !IsBusy);
         UndoOrganizationActionCommand = new RelayCommand(_ => UndoLastOrganizationAction(), _ => organizationUndoStack.Count > 0);
         ClearStreamHealthCommand = new RelayCommand(_ => ClearStreamHealth(), _ => StreamHealthRows.Count > 0);
         ExportDiagnosticsCommand = new AsyncRelayCommand(_ => ExportDiagnosticsAsync(), _ => Diagnostics.Count > 0);
@@ -257,6 +278,8 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<string> CustomGroupAssignments { get; } = [SourceGroupAssignmentOption];
 
     public ObservableCollection<SourceProfileViewModel> SourceProfiles { get; } = [];
+
+    public ObservableCollection<RecentPlaylistSourceViewModel> RecentPlaylistSources { get; } = [];
 
     public ObservableCollection<SmartGroupRulePresetViewModel> SmartGroupPresets { get; } = [];
 
@@ -342,6 +365,8 @@ public sealed class MainViewModel : ObservableObject
 
     public IReadOnlyList<int> RetryCountOptions { get; } = [0, 1, 2, 3];
 
+    public IReadOnlyList<int> LogoCacheLimitMegabyteOptions { get; } = [25, 50, 100, 250, 500];
+
     public IReadOnlyList<UiSelectionOption<SmartViewFilter>> SmartViewOptions { get; } =
     [
         new(SmartViewFilter.All, "All channels"),
@@ -363,6 +388,10 @@ public sealed class MainViewModel : ObservableObject
     public ICommand ImportUrlCommand { get; }
 
     public ICommand LoadSampleCommand { get; }
+
+    public ICommand OpenRecentPlaylistSourceCommand { get; }
+
+    public ICommand ClearRecentPlaylistSourcesCommand { get; }
 
     public ICommand CancelImportCommand { get; }
 
@@ -430,6 +459,10 @@ public sealed class MainViewModel : ObservableObject
 
     public ICommand SaveSourcePlaybackProfileCommand { get; }
 
+    public ICommand ImportSourceProfilesCommand { get; }
+
+    public ICommand ExportSourceProfilesCommand { get; }
+
     public ICommand RefreshDuplicateGroupsCommand { get; }
 
     public ICommand HideSelectedDuplicateGroupCommand { get; }
@@ -465,6 +498,10 @@ public sealed class MainViewModel : ObservableObject
     public ICommand ClearRemovedConflictStatesCommand { get; }
 
     public ICommand PrefetchVisibleLogosCommand { get; }
+
+    public ICommand TrimLogoCacheCommand { get; }
+
+    public ICommand ClearLogoCacheCommand { get; }
 
     public ICommand UndoOrganizationActionCommand { get; }
 
@@ -696,6 +733,19 @@ public sealed class MainViewModel : ObservableObject
                 RenameSourceProfileName = value?.DisplayName ?? string.Empty;
                 LoadSelectedSourcePlaybackProfile(value?.SourceId);
                 RaiseProfileCommandStates();
+            }
+        }
+    }
+
+    public RecentPlaylistSourceViewModel? SelectedRecentPlaylistSource
+    {
+        get => selectedRecentPlaylistSource;
+        set
+        {
+            if (SetProperty(ref selectedRecentPlaylistSource, value) &&
+                OpenRecentPlaylistSourceCommand is AsyncRelayCommand openRecent)
+            {
+                openRecent.RaiseCanExecuteChanged();
             }
         }
     }
@@ -992,11 +1042,26 @@ public sealed class MainViewModel : ObservableObject
                 StatusText = value
                     ? "Basic mode enabled: advanced organization, EPG, VOD, diagnostics, and release panels are hidden."
                     : "Advanced mode enabled: full IPTV organization and diagnostics panels are visible.";
+                _ = SaveUiPreferencesSafelyAsync();
             }
         }
     }
 
     public bool IsAdvancedModeVisible => !IsBasicMode;
+
+    public bool FirstRunSetupCompleted
+    {
+        get => firstRunSetupCompleted;
+        private set
+        {
+            if (SetProperty(ref firstRunSetupCompleted, value))
+            {
+                OnPropertyChanged(nameof(ShouldShowFirstRunSetup));
+            }
+        }
+    }
+
+    public bool ShouldShowFirstRunSetup => !FirstRunSetupCompleted && !HasChannels;
 
     public bool HasChannels => allChannels.Count > 0;
 
@@ -1076,6 +1141,26 @@ public sealed class MainViewModel : ObservableObject
     {
         get => logoPrefetchStatusText;
         private set => SetProperty(ref logoPrefetchStatusText, value);
+    }
+
+    public string LogoCacheStatusText
+    {
+        get => logoCacheStatusText;
+        private set => SetProperty(ref logoCacheStatusText, value);
+    }
+
+    public int SelectedLogoCacheLimitMegabytes
+    {
+        get => selectedLogoCacheLimitMegabytes;
+        set
+        {
+            int normalized = NormalizeLogoCacheLimit(value);
+            if (SetProperty(ref selectedLogoCacheLimitMegabytes, normalized))
+            {
+                _ = SaveUiPreferencesSafelyAsync();
+                RefreshLogoCacheStatus();
+            }
+        }
     }
 
     public string StreamHealthSummaryText
@@ -1231,6 +1316,18 @@ public sealed class MainViewModel : ObservableObject
     public async Task InitializeAsync()
     {
         await Clock.InitializeAsync(shutdownCts.Token).ConfigureAwait(true);
+        UiPreferences uiPreferences = await uiPreferencesStore.LoadAsync(shutdownCts.Token).ConfigureAwait(true);
+        isBasicMode = uiPreferences.IsBasicMode;
+        OnPropertyChanged(nameof(IsBasicMode));
+        OnPropertyChanged(nameof(IsAdvancedModeVisible));
+        firstRunSetupCompleted = uiPreferences.FirstRunSetupCompleted;
+        OnPropertyChanged(nameof(FirstRunSetupCompleted));
+        OnPropertyChanged(nameof(ShouldShowFirstRunSetup));
+        selectedLogoCacheLimitMegabytes = NormalizeLogoCacheLimit(uiPreferences.LogoCacheLimitMegabytes);
+        OnPropertyChanged(nameof(SelectedLogoCacheLimitMegabytes));
+        ApplyRecentPlaylistSources(uiPreferences.RecentPlaylistSources);
+        RefreshLogoCacheStatus();
+
         ChannelOrganizationPreferences preferences = await organizationPreferencesStore
             .LoadAsync(shutdownCts.Token)
             .ConfigureAwait(true);
@@ -1311,6 +1408,8 @@ public sealed class MainViewModel : ObservableObject
         }
 
         RestartRefreshScheduleLoop();
+        RaiseProfileCommandStates();
+        RaiseRecentPlaylistCommandStates();
     }
 
     public async Task ImportPlaylistUrlAsync(string playlistUrl)
@@ -1320,9 +1419,13 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        Func<CancellationToken, Task<PlaylistImportResult>> import =
-            ct => playlistImportService.ImportUrlAsync(playlistUrl.Trim(), ct);
-        await ImportAsync(import, rememberForRefresh: true).ConfigureAwait(true);
+        string trimmedUrl = playlistUrl.Trim();
+        PlaylistImportOperation import =
+            (ct, progress) => playlistImportService.ImportUrlAsync(trimmedUrl, ct, progress);
+        await ImportAsync(
+            import,
+            rememberForRefresh: true,
+            recentSource: CreateRecentPlaylistSource(RecentPlaylistSourceKind.RemoteUrl, trimmedUrl, null)).ConfigureAwait(true);
     }
 
     public async Task ImportPlaylistFileAsync(string playlistPath)
@@ -1332,9 +1435,19 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        Func<CancellationToken, Task<PlaylistImportResult>> import =
-            ct => playlistImportService.ImportFileAsync(playlistPath.Trim(), ct);
-        await ImportAsync(import, rememberForRefresh: true).ConfigureAwait(true);
+        string trimmedPath = playlistPath.Trim();
+        PlaylistImportOperation import =
+            (ct, progress) => playlistImportService.ImportFileAsync(trimmedPath, ct, progress);
+        await ImportAsync(
+            import,
+            rememberForRefresh: true,
+            recentSource: CreateRecentPlaylistSource(RecentPlaylistSourceKind.LocalFile, trimmedPath, null)).ConfigureAwait(true);
+    }
+
+    public void MarkFirstRunSetupCompleted()
+    {
+        FirstRunSetupCompleted = true;
+        _ = SaveUiPreferencesSafelyAsync();
     }
 
     public void SetSelectedChannels(IEnumerable<Channel> channels)
@@ -1570,8 +1683,11 @@ public sealed class MainViewModel : ObservableObject
                 return;
             }
 
-            Func<CancellationToken, Task<PlaylistImportResult>> import = ct => playlistImportService.ImportFileAsync(samplePath, ct);
-            await ImportAsync(import, rememberForRefresh: true).ConfigureAwait(true);
+            PlaylistImportOperation import = (ct, progress) => playlistImportService.ImportFileAsync(samplePath, ct, progress);
+            await ImportAsync(
+                import,
+                rememberForRefresh: true,
+                recentSource: CreateRecentPlaylistSource(RecentPlaylistSourceKind.LocalFile, samplePath, "Bundled sample playlist")).ConfigureAwait(true);
         }
         catch (Exception ex)
         {
@@ -1579,7 +1695,10 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private async Task ImportAsync(Func<CancellationToken, Task<PlaylistImportResult>> import, bool rememberForRefresh)
+    private async Task ImportAsync(
+        PlaylistImportOperation import,
+        bool rememberForRefresh,
+        RecentPlaylistSourceViewModel? recentSource = null)
     {
         CancellationTokenSource? activeImportCts = null;
         try
@@ -1596,7 +1715,8 @@ public sealed class MainViewModel : ObservableObject
             AddDiagnostic("Playlist import started.");
             Channel[] previousChannels = allChannels.ToArray();
             HashSet<Guid> previousIds = previousChannels.Select(channel => channel.Id).ToHashSet();
-            PlaylistImportResult result = await import(importToken).ConfigureAwait(true);
+            var progress = new Progress<PlaylistImportProgress>(ApplyPlaylistImportProgress);
+            PlaylistImportResult result = await import(importToken, progress).ConfigureAwait(true);
 
             if (result.Summary.ErrorCount > 0 && result.Channels.Count == 0)
             {
@@ -1612,6 +1732,7 @@ public sealed class MainViewModel : ObservableObject
             allChannels.Clear();
             allChannels.AddRange(result.Channels.Select(ApplyUserState));
             OnPropertyChanged(nameof(HasChannels));
+            OnPropertyChanged(nameof(ShouldShowFirstRunSetup));
             SelectedChannel = null;
             RefreshGroupsAndCategories();
             PopulateImportIssues(result.Issues);
@@ -1641,6 +1762,11 @@ public sealed class MainViewModel : ObservableObject
             if (rememberForRefresh)
             {
                 lastPlaylistImport = import;
+            }
+
+            if (recentSource is not null)
+            {
+                RememberRecentPlaylistSource(recentSource);
             }
 
             lastPlaylistImportedAt = DateTimeOffset.UtcNow;
@@ -1686,6 +1812,15 @@ public sealed class MainViewModel : ObservableObject
         importCts.Cancel();
     }
 
+    private void ApplyPlaylistImportProgress(PlaylistImportProgress progress)
+    {
+        string message = progress.DisplayText;
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            ImportProgressText = message;
+        }
+    }
+
     private async Task RefreshPlaylistAsync()
     {
         if (lastPlaylistImport is null)
@@ -1697,14 +1832,15 @@ public sealed class MainViewModel : ObservableObject
         await PreviewRefreshAsync(lastPlaylistImport).ConfigureAwait(true);
     }
 
-    private async Task PreviewRefreshAsync(Func<CancellationToken, Task<PlaylistImportResult>> import)
+    private async Task PreviewRefreshAsync(PlaylistImportOperation import)
     {
         try
         {
             IsBusy = true;
             StatusText = "Refreshing playlist for approval preview...";
             AddDiagnostic("Playlist refresh approval preview started.");
-            PlaylistImportResult result = await import(shutdownCts.Token).ConfigureAwait(true);
+            var progress = new Progress<PlaylistImportProgress>(ApplyPlaylistImportProgress);
+            PlaylistImportResult result = await import(shutdownCts.Token, progress).ConfigureAwait(true);
             if (result.Summary.ErrorCount > 0 && result.Channels.Count == 0)
             {
                 string error = result.Issues.FirstOrDefault(issue => issue.Severity == ImportIssueSeverity.Error)?.Message
@@ -3043,6 +3179,131 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private async Task SaveUiPreferencesSafelyAsync()
+    {
+        try
+        {
+            RecentPlaylistSourcePreference[] recentSources = RecentPlaylistSources
+                .Select(source => source.ToPreference())
+                .ToArray();
+            await uiPreferencesStore.UpdateAsync(
+                preferences => preferences with
+                {
+                    IsBasicMode = IsBasicMode,
+                    FirstRunSetupCompleted = FirstRunSetupCompleted,
+                    LogoCacheLimitMegabytes = SelectedLogoCacheLimitMegabytes,
+                    RecentPlaylistSources = recentSources
+                },
+                CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            string message = SensitiveTextRedactor.RedactText(ex.Message);
+            UiDispatcher.Run(() => AddDiagnostic($"UI preference save failed: {message}"));
+        }
+    }
+
+    private void ApplyRecentPlaylistSources(IEnumerable<RecentPlaylistSourcePreference> sources)
+    {
+        RecentPlaylistSources.Clear();
+        foreach (RecentPlaylistSourceViewModel source in sources
+                     .Select(RecentPlaylistSourceViewModel.FromPreference)
+                     .Where(source => IsUsableRecentPlaylistSource(source))
+                     .GroupBy(source => $"{source.Kind}|{source.Value}", StringComparer.OrdinalIgnoreCase)
+                     .Select(group => group.OrderByDescending(source => source.LastUsedAt).First())
+                     .OrderByDescending(source => source.LastUsedAt)
+                     .Take(MaximumRecentPlaylistSources))
+        {
+            RecentPlaylistSources.Add(source);
+        }
+
+        SelectedRecentPlaylistSource = RecentPlaylistSources.FirstOrDefault();
+        RaiseRecentPlaylistCommandStates();
+    }
+
+    private void RememberRecentPlaylistSource(RecentPlaylistSourceViewModel source)
+    {
+        if (!IsUsableRecentPlaylistSource(source))
+        {
+            return;
+        }
+
+        for (int index = RecentPlaylistSources.Count - 1; index >= 0; index--)
+        {
+            RecentPlaylistSourceViewModel existing = RecentPlaylistSources[index];
+            if (existing.Kind == source.Kind &&
+                existing.Value.Equals(source.Value, StringComparison.OrdinalIgnoreCase))
+            {
+                RecentPlaylistSources.RemoveAt(index);
+            }
+        }
+
+        RecentPlaylistSources.Insert(0, source with { LastUsedAt = DateTimeOffset.UtcNow });
+        while (RecentPlaylistSources.Count > MaximumRecentPlaylistSources)
+        {
+            RecentPlaylistSources.RemoveAt(RecentPlaylistSources.Count - 1);
+        }
+
+        SelectedRecentPlaylistSource = RecentPlaylistSources.FirstOrDefault();
+        RaiseRecentPlaylistCommandStates();
+        _ = SaveUiPreferencesSafelyAsync();
+    }
+
+    private static RecentPlaylistSourceViewModel CreateRecentPlaylistSource(
+        RecentPlaylistSourceKind kind,
+        string value,
+        string? displayName)
+    {
+        string normalizedValue = value.Trim();
+        string normalizedDisplayName = string.IsNullOrWhiteSpace(displayName)
+            ? RecentPlaylistSourceViewModel.CreateDisplayName(kind, normalizedValue)
+            : displayName.Trim();
+        return new RecentPlaylistSourceViewModel(kind, normalizedDisplayName, normalizedValue, DateTimeOffset.UtcNow);
+    }
+
+    private static bool IsUsableRecentPlaylistSource(RecentPlaylistSourceViewModel source)
+    {
+        if (string.IsNullOrWhiteSpace(source.Value) ||
+            !Enum.IsDefined(source.Kind))
+        {
+            return false;
+        }
+
+        return source.Kind switch
+        {
+            RecentPlaylistSourceKind.LocalFile => true,
+            RecentPlaylistSourceKind.RemoteUrl => SensitiveUri.TryCreate(source.Value, out _, out _),
+            _ => false
+        };
+    }
+
+    private async Task OpenRecentPlaylistSourceAsync()
+    {
+        RecentPlaylistSourceViewModel? source = SelectedRecentPlaylistSource;
+        if (source is null)
+        {
+            StatusText = "Select a recent playlist source first.";
+            return;
+        }
+
+        if (source.Kind == RecentPlaylistSourceKind.RemoteUrl)
+        {
+            await ImportPlaylistUrlAsync(source.Value).ConfigureAwait(true);
+            return;
+        }
+
+        await ImportPlaylistFileAsync(source.Value).ConfigureAwait(true);
+    }
+
+    private void ClearRecentPlaylistSources()
+    {
+        RecentPlaylistSources.Clear();
+        SelectedRecentPlaylistSource = null;
+        RaiseRecentPlaylistCommandStates();
+        _ = SaveUiPreferencesSafelyAsync();
+        StatusText = "Cleared recent playlist sources.";
+    }
+
     private int ReplaceCustomGroup(string sourceGroup, string? replacementGroup)
     {
         string? normalizedReplacement = NormalizeCustomGroup(replacementGroup);
@@ -3313,6 +3574,7 @@ public sealed class MainViewModel : ObservableObject
         sourceProfileNames[SelectedSourceProfile.SourceId] = normalized;
         PopulateSourceProfiles();
         _ = SaveOrganizationPreferencesSafelyAsync();
+        RaiseProfileCommandStates();
         StatusText = $"Renamed source profile to '{normalized}'.";
     }
 
@@ -3342,7 +3604,92 @@ public sealed class MainViewModel : ObservableObject
             BufferingPreset = SelectedSourceBufferingPreset
         };
         _ = SaveOrganizationPreferencesSafelyAsync();
+        RaiseProfileCommandStates();
         StatusText = $"Saved playback profile for '{SelectedSourceProfile.DisplayName}': {SelectedSourceRetryCount:N0} retries, {SelectedSourceBufferingPreset} buffer.";
+    }
+
+    private async Task ImportSourceProfilesAsync()
+    {
+        try
+        {
+            string? path = dialogService.PickSourceProfileImportFile();
+            if (path is null)
+            {
+                return;
+            }
+
+            SourceProfileExport imported = await sourceProfileFileService.ImportAsync(path, shutdownCts.Token).ConfigureAwait(true);
+            int importedNameCount = 0;
+            foreach ((string sourceId, string profileName) in imported.SourceProfileNames)
+            {
+                if (!string.IsNullOrWhiteSpace(sourceId) && !string.IsNullOrWhiteSpace(profileName))
+                {
+                    sourceProfileNames[sourceId] = profileName;
+                    importedNameCount++;
+                }
+            }
+
+            int importedPlaybackCount = 0;
+            foreach ((string sourceId, ProviderPlaybackProfile profile) in imported.SourcePlaybackProfiles)
+            {
+                if (!string.IsNullOrWhiteSpace(sourceId))
+                {
+                    sourcePlaybackProfiles[sourceId] = NormalizePlaybackProfile(profile);
+                    importedPlaybackCount++;
+                }
+            }
+
+            PopulateSourceProfiles();
+            LoadSelectedSourcePlaybackProfile(SelectedSourceProfile?.SourceId);
+            await SaveOrganizationPreferencesSafelyAsync().ConfigureAwait(true);
+            StatusText = $"Imported {importedNameCount:N0} source profile names and {importedPlaybackCount:N0} playback profiles.";
+            AddDiagnostic(StatusText);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Source profile import cancelled.";
+        }
+        catch (Exception ex)
+        {
+            ShowSafeError("Source profile import failed", ex);
+        }
+        finally
+        {
+            RaiseProfileCommandStates();
+        }
+    }
+
+    private async Task ExportSourceProfilesAsync()
+    {
+        try
+        {
+            string? path = dialogService.PickSourceProfileExportFile();
+            if (path is null)
+            {
+                return;
+            }
+
+            var export = new SourceProfileExport
+            {
+                SourceProfileNames = sourceProfileNames
+                    .Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value))
+                    .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase),
+                SourcePlaybackProfiles = sourcePlaybackProfiles
+                    .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
+                    .ToDictionary(pair => pair.Key, pair => NormalizePlaybackProfile(pair.Value), StringComparer.OrdinalIgnoreCase)
+            };
+            await sourceProfileFileService.ExportAsync(path, export, shutdownCts.Token).ConfigureAwait(true);
+            StatusText = $"Exported {export.SourceProfileNames.Count:N0} source profile names and {export.SourcePlaybackProfiles.Count:N0} playback profiles.";
+            AddDiagnostic(StatusText);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Source profile export cancelled.";
+        }
+        catch (Exception ex)
+        {
+            ShowSafeError("Source profile export failed", ex);
+        }
     }
 
     private ProviderPlaybackProfile GetPlaybackProfile(Guid sourceId)
@@ -3702,6 +4049,7 @@ public sealed class MainViewModel : ObservableObject
             allChannels.Clear();
             allChannels.AddRange(pendingRefreshChannels);
             OnPropertyChanged(nameof(HasChannels));
+            OnPropertyChanged(nameof(ShouldShowFirstRunSetup));
             SelectedChannel = null;
             RefreshGroupsAndCategories();
             PopulateImportIssues(result.Issues);
@@ -4270,6 +4618,63 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private async Task TrimLogoCacheAsync()
+    {
+        try
+        {
+            IsBusy = true;
+            long maxBytes = Math.Max(1, SelectedLogoCacheLimitMegabytes) * 1024L * 1024L;
+            int removed = await logoCacheService.TrimAsync(maxBytes, shutdownCts.Token).ConfigureAwait(true);
+            RefreshLogoCacheStatus();
+            StatusText = $"Trimmed logo cache to {SelectedLogoCacheLimitMegabytes:N0} MB; removed {removed:N0} files.";
+            AddDiagnostic(StatusText);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Logo cache trim cancelled.";
+        }
+        catch (Exception ex)
+        {
+            ShowSafeError("Logo cache trim failed", ex);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task ClearLogoCacheAsync()
+    {
+        try
+        {
+            IsBusy = true;
+            int removed = await logoCacheService.ClearAsync(shutdownCts.Token).ConfigureAwait(true);
+            SelectedChannelLogoPath = null;
+            RefreshLogoCacheStatus();
+            RefreshVodLibrary();
+            StatusText = $"Cleared logo cache; removed {removed:N0} files.";
+            AddDiagnostic(StatusText);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Logo cache clear cancelled.";
+        }
+        catch (Exception ex)
+        {
+            ShowSafeError("Logo cache clear failed", ex);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void RefreshLogoCacheStatus()
+    {
+        LogoCacheStatistics statistics = logoCacheService.GetStatistics();
+        LogoCacheStatusText = $"{statistics.DisplayText} Limit: {SelectedLogoCacheLimitMegabytes:N0} MB.";
+    }
+
     private void RestartRefreshScheduleLoop()
     {
         refreshScheduleCts?.Cancel();
@@ -4457,6 +4862,11 @@ public sealed class MainViewModel : ObservableObject
     private static int NormalizeRefreshInterval(int value)
     {
         return Math.Clamp(value <= 0 ? 60 : value, 5, 24 * 60);
+    }
+
+    private static int NormalizeLogoCacheLimit(int value)
+    {
+        return Math.Clamp(value <= 0 ? 100 : value, 25, 500);
     }
 
     private static ProviderPlaybackProfile NormalizePlaybackProfile(ProviderPlaybackProfile profile)
@@ -4767,6 +5177,7 @@ public sealed class MainViewModel : ObservableObject
                 SelectedChannelLogoStatusText = result.Success && !canPreview
                     ? "Logo: cached, but preview format is unsupported."
                     : result.Message;
+                RefreshLogoCacheStatus();
             });
         }
         catch (OperationCanceledException)
@@ -4989,6 +5400,29 @@ public sealed class MainViewModel : ObservableObject
         {
             playbackProfile.RaiseCanExecuteChanged();
         }
+
+        if (ImportSourceProfilesCommand is AsyncRelayCommand importProfiles)
+        {
+            importProfiles.RaiseCanExecuteChanged();
+        }
+
+        if (ExportSourceProfilesCommand is AsyncRelayCommand exportProfiles)
+        {
+            exportProfiles.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void RaiseRecentPlaylistCommandStates()
+    {
+        if (OpenRecentPlaylistSourceCommand is AsyncRelayCommand openRecent)
+        {
+            openRecent.RaiseCanExecuteChanged();
+        }
+
+        if (ClearRecentPlaylistSourcesCommand is RelayCommand clearRecent)
+        {
+            clearRecent.RaiseCanExecuteChanged();
+        }
     }
 
     private void RefreshParentalLockCommandStates()
@@ -5080,6 +5514,11 @@ public sealed class MainViewModel : ObservableObject
             sample.RaiseCanExecuteChanged();
         }
 
+        if (OpenRecentPlaylistSourceCommand is AsyncRelayCommand openRecent)
+        {
+            openRecent.RaiseCanExecuteChanged();
+        }
+
         if (RefreshPlaylistCommand is AsyncRelayCommand refresh)
         {
             refresh.RaiseCanExecuteChanged();
@@ -5143,6 +5582,16 @@ public sealed class MainViewModel : ObservableObject
         if (PrefetchVisibleLogosCommand is AsyncRelayCommand logoPrefetch)
         {
             logoPrefetch.RaiseCanExecuteChanged();
+        }
+
+        if (TrimLogoCacheCommand is AsyncRelayCommand trimLogos)
+        {
+            trimLogos.RaiseCanExecuteChanged();
+        }
+
+        if (ClearLogoCacheCommand is AsyncRelayCommand clearLogos)
+        {
+            clearLogos.RaiseCanExecuteChanged();
         }
     }
 

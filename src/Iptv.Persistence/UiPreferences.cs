@@ -22,6 +22,23 @@ public enum ClockOverlayBackground
     Minimal
 }
 
+public enum RecentPlaylistSourceKind
+{
+    LocalFile,
+    RemoteUrl
+}
+
+public sealed record RecentPlaylistSourcePreference
+{
+    public RecentPlaylistSourceKind Kind { get; init; }
+
+    public string DisplayName { get; init; } = string.Empty;
+
+    public string Value { get; init; } = string.Empty;
+
+    public DateTimeOffset LastUsedAt { get; init; } = DateTimeOffset.UtcNow;
+}
+
 public sealed record UiPreferences
 {
     public const double DefaultClockOverlayOpacity = 0.86;
@@ -43,4 +60,12 @@ public sealed record UiPreferences
     public bool AutoHideFullscreenControls { get; init; } = true;
 
     public int FullscreenMonitorIndex { get; init; } = -1;
+
+    public bool IsBasicMode { get; init; }
+
+    public bool FirstRunSetupCompleted { get; init; }
+
+    public int LogoCacheLimitMegabytes { get; init; } = 100;
+
+    public RecentPlaylistSourcePreference[] RecentPlaylistSources { get; init; } = [];
 }

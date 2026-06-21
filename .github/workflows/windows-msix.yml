@@ -80,6 +80,10 @@ jobs:
           }
           & .\tools\package-release.ps1 @packageArgs
 
+      - name: Validate release ZIP
+        shell: pwsh
+        run: .\tools\validate-release-zip.ps1
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:

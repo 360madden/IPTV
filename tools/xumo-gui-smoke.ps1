@@ -7,6 +7,8 @@ param(
     [int]$TimeoutSeconds = 60,
     [int]$PlaybackTimeoutSeconds = 35,
     [int]$DuplicateDialogTimeoutSeconds = 120,
+    [ValidateSet("None", "LoadSample", "ImportUrl", "OpenFile", "Continue")]
+    [string]$FirstRunAction = "None",
     [switch]$SkipBuild,
     [switch]$RequirePlayback,
     [switch]$RequireClockOverlay,
@@ -22,6 +24,10 @@ if (-not [string]::IsNullOrWhiteSpace($PlaylistFile) -and $UseDialogImport) {
     throw "-PlaylistFile cannot be combined with -UseDialogImport because the dialog smoke path imports URLs only."
 }
 
+if ($FirstRunAction -ne "None" -and (-not [string]::IsNullOrWhiteSpace($PlaylistFile) -or $UseDialogImport)) {
+    throw "-FirstRunAction must launch without startup import arguments."
+}
+
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type -AssemblyName System.Windows.Forms
@@ -29,9 +35,24 @@ Add-Type -AssemblyName System.Drawing
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 public static class NativeMouse
 {
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+
     [DllImport("user32.dll")]
     public static extern bool SetCursorPos(int x, int y);
 
@@ -45,6 +66,7 @@ $appProject = Join-Path $repoRoot "src\Iptv.App\Iptv.App.csproj"
 $appExe = Join-Path $repoRoot "src\Iptv.App\bin\Debug\net10.0-windows\Iptv.App.exe"
 $process = $null
 $originalLocalAppData = $env:LOCALAPPDATA
+$originalAppDataOverride = $env:IPTV_VIEWER_APPDATA_DIR
 $isolatedProfileRoot = $null
 $screenshotRoot = Join-Path $repoRoot "artifacts\gui-smoke"
 
@@ -226,6 +248,54 @@ function Get-AppWindow {
     return $best
 }
 
+function Get-ProcessWindowByName {
+    param(
+        [int]$ProcessId,
+        [string]$Name
+    )
+
+    $processCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+        $ProcessId)
+    $nameCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::NameProperty,
+        $Name)
+    $condition = [System.Windows.Automation.AndCondition]::new($processCondition, $nameCondition)
+    $window = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst(
+        [System.Windows.Automation.TreeScope]::Children,
+        $condition)
+    if ($null -ne $window) {
+        return $window
+    }
+
+    $script:matchedWindowHandle = [IntPtr]::Zero
+    $callback = [NativeMouse+EnumWindowsProc]{
+        param([IntPtr]$WindowHandle, [IntPtr]$Parameter)
+
+        $windowProcessId = [uint32]0
+        [NativeMouse]::GetWindowThreadProcessId($WindowHandle, [ref]$windowProcessId) | Out-Null
+        if ($windowProcessId -ne [uint32]$ProcessId -or -not [NativeMouse]::IsWindowVisible($WindowHandle)) {
+            return $true
+        }
+
+        $title = [System.Text.StringBuilder]::new(256)
+        [NativeMouse]::GetWindowText($WindowHandle, $title, $title.Capacity) | Out-Null
+        if ([string]::Equals($title.ToString(), $Name, [StringComparison]::OrdinalIgnoreCase)) {
+            $script:matchedWindowHandle = $WindowHandle
+            return $false
+        }
+
+        return $true
+    }
+
+    [NativeMouse]::EnumWindows($callback, [IntPtr]::Zero) | Out-Null
+    if ($script:matchedWindowHandle -ne [IntPtr]::Zero) {
+        return [System.Windows.Automation.AutomationElement]::FromHandle($script:matchedWindowHandle)
+    }
+
+    return $null
+}
+
 function Assert-Fullscreen {
     param(
         [System.Windows.Automation.AutomationElement]$Window,
@@ -282,6 +352,7 @@ try {
         $isolatedProfileRoot = Join-Path ([System.IO.Path]::GetTempPath()) "iptv-gui-smoke-$([Guid]::NewGuid().ToString('N'))"
         New-Item -ItemType Directory -Force -Path $isolatedProfileRoot | Out-Null
         $env:LOCALAPPDATA = $isolatedProfileRoot
+        $env:IPTV_VIEWER_APPDATA_DIR = $isolatedProfileRoot
         Write-Host "Using isolated LOCALAPPDATA: $isolatedProfileRoot"
     }
 
@@ -298,7 +369,10 @@ try {
     }
 
     Write-Host "Launching IPTV app..."
-    if (-not [string]::IsNullOrWhiteSpace($PlaylistFile)) {
+    if ($FirstRunAction -ne "None") {
+        $startArguments = @()
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($PlaylistFile)) {
         $playlistFilePath = (Resolve-Path -LiteralPath $PlaylistFile).Path
         $startArguments = @("--playlist-file", "`"$playlistFilePath`"")
     }
@@ -308,8 +382,65 @@ try {
     else {
         $startArguments = @("--playlist-url", $PlaylistUrl)
     }
-    $process = Start-Process -FilePath $appExe -ArgumentList $startArguments -PassThru
+    if ($startArguments.Count -gt 0) {
+        $process = Start-Process -FilePath $appExe -ArgumentList $startArguments -PassThru
+    } else {
+        $process = Start-Process -FilePath $appExe -PassThru
+    }
     $main = Wait-Until { Get-AppWindow -ProcessId $process.Id } $TimeoutSeconds "main app window"
+
+    if ($FirstRunAction -ne "None") {
+        Write-Host "Exercising first-run action: $FirstRunAction"
+        $firstRun = Wait-Until {
+            $window = Get-ProcessWindowByName -ProcessId $process.Id -Name "Get started"
+            if ($null -ne $window) { return $window }
+            Find-ByNameContains -Root ([System.Windows.Automation.AutomationElement]::RootElement) -Text "Welcome to IPTV Viewer"
+        } $TimeoutSeconds "first-run setup window"
+
+        switch ($FirstRunAction) {
+            "LoadSample" {
+                Invoke-Element (Wait-Until { Find-ByName $firstRun "First Run Load Sample" } $TimeoutSeconds "first-run sample button")
+                $main = Wait-Until { Get-AppWindow -ProcessId $process.Id } $TimeoutSeconds "main app window after first-run sample"
+                Wait-Until { Find-ByNameContains $main "Imported " } $TimeoutSeconds "first-run sample import" | Out-Null
+            }
+            "ImportUrl" {
+                Invoke-Element (Wait-Until { Find-ByName $firstRun "First Run Import Playlist URL" } $TimeoutSeconds "first-run URL button")
+                $prompt = Wait-Until {
+                    $window = Get-ProcessWindowByName -ProcessId $process.Id -Name "Import Playlist URL"
+                    if ($null -ne $window) { return $window }
+                    Find-ByName `
+                        -Root ([System.Windows.Automation.AutomationElement]::RootElement) `
+                        -Name "Import Playlist URL" `
+                        -Scope ([System.Windows.Automation.TreeScope]::Children)
+                } $TimeoutSeconds "playlist URL dialog from first-run"
+                Set-ElementValue (Wait-Until { Find-ByName $prompt "Playlist URL" } $TimeoutSeconds "playlist URL field") $PlaylistUrl
+                Invoke-Element (Wait-Until { Find-ByName $prompt "Import" } $TimeoutSeconds "dialog Import button")
+                $main = Wait-Until { Get-AppWindow -ProcessId $process.Id } $TimeoutSeconds "main app window after first-run URL"
+                Wait-Until { Find-ByNameContains $main "Imported " } $TimeoutSeconds "first-run URL import" | Out-Null
+            }
+            "OpenFile" {
+                Invoke-Element (Wait-Until { Find-ByName $firstRun "First Run Open Playlist File" } $TimeoutSeconds "first-run open file button")
+                $openDialog = Wait-Until {
+                    $window = Get-ProcessWindowByName -ProcessId $process.Id -Name "Import IPTV playlist"
+                    if ($null -ne $window) { return $window }
+                    Find-ByName `
+                        -Root ([System.Windows.Automation.AutomationElement]::RootElement) `
+                        -Name "Import IPTV playlist" `
+                        -Scope ([System.Windows.Automation.TreeScope]::Children)
+                } $TimeoutSeconds "first-run open file dialog"
+                $openDialog.SetFocus()
+                [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+            }
+            "Continue" {
+                Invoke-Element (Wait-Until { Find-ByName $firstRun "First Run Continue" } $TimeoutSeconds "first-run continue button")
+                $main = Wait-Until { Get-AppWindow -ProcessId $process.Id } $TimeoutSeconds "main app window after first-run continue"
+                Wait-Until { Find-ByName $main "Import URL" } $TimeoutSeconds "main import URL button after continue" | Out-Null
+            }
+        }
+
+        Write-Host "First-run smoke completed successfully."
+        return
+    }
 
     if ($UseDialogImport) {
         Write-Host "Importing playlist URL through dialog..."
@@ -501,6 +632,7 @@ finally {
 
     if (-not $UseRealUserProfile) {
         $env:LOCALAPPDATA = $originalLocalAppData
+        $env:IPTV_VIEWER_APPDATA_DIR = $originalAppDataOverride
         if ($null -ne $isolatedProfileRoot -and (Test-Path -LiteralPath $isolatedProfileRoot)) {
             $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
             $resolvedProfile = [System.IO.Path]::GetFullPath($isolatedProfileRoot)

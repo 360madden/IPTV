@@ -14,6 +14,10 @@ public interface IPlaylistDialogService
 
     string? PickSmartGroupPresetExportFile();
 
+    string? PickSourceProfileImportFile();
+
+    string? PickSourceProfileExportFile();
+
     string? PickCustomGroupCsvImportFile();
 
     string? PickCustomGroupCsvExportFile();

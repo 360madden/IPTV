@@ -224,7 +224,7 @@ public partial class MainWindow : Window
         {
             await viewModel.ImportPlaylistUrlAsync(startupPlaylistUrl).ConfigureAwait(true);
         }
-        else if (!viewModel.HasChannels)
+        else if (viewModel.ShouldShowFirstRunSetup)
         {
             ShowFirstRunSetup();
         }
@@ -237,7 +237,9 @@ public partial class MainWindow : Window
             Owner = this
         };
 
-        if (firstRunWindow.ShowDialog() != true)
+        bool? result = firstRunWindow.ShowDialog();
+        viewModel.MarkFirstRunSetupCompleted();
+        if (result != true)
         {
             return;
         }

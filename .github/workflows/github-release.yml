@@ -76,6 +76,10 @@ jobs:
           }
           & .\tools\package-release.ps1 @packageArgs
 
+      - name: Validate release ZIP
+        shell: pwsh
+        run: .\tools\validate-release-zip.ps1
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:

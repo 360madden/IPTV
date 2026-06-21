@@ -10,7 +10,8 @@ public sealed class M3uPlaylistParser : IPlaylistParser
     public async Task<PlaylistImportResult> ParseAsync(
         Stream content,
         PlaylistSource source,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgress<PlaylistImportProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(source);
@@ -41,6 +42,11 @@ public sealed class M3uPlaylistParser : IPlaylistParser
                 continue;
             }
 
+            if (lineNumber % 500 == 0)
+            {
+                progress?.Report(new PlaylistImportProgress("Parsing playlist", content.CanSeek ? content.Position : null, content.CanSeek ? content.Length : null, channels.Count, issues.Count, lineNumber));
+            }
+
             if (lineNumber == 1 && line.StartsWith("#EXTM3U", StringComparison.OrdinalIgnoreCase))
             {
                 sawHeader = true;
@@ -65,6 +71,10 @@ public sealed class M3uPlaylistParser : IPlaylistParser
 
             pendingMetadata = null;
             AddChannel(source, line, metadata, channels, issues, seen, lineNumber, channels.Count);
+            if (channels.Count % 250 == 0)
+            {
+                progress?.Report(new PlaylistImportProgress("Parsing playlist", content.CanSeek ? content.Position : null, content.CanSeek ? content.Length : null, channels.Count, issues.Count, lineNumber));
+            }
         }
 
         if (!sawHeader)
@@ -93,6 +103,7 @@ public sealed class M3uPlaylistParser : IPlaylistParser
                 "No playable channel entries were found."));
         }
 
+        progress?.Report(new PlaylistImportProgress("Parsed playlist", content.CanSeek ? content.Position : null, content.CanSeek ? content.Length : null, channels.Count, issues.Count, lineNumber));
         return new PlaylistImportResult(channels, issues);
     }
 

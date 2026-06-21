@@ -2,6 +2,8 @@
 param(
     [string]$Repository = "360madden/IPTV",
     [string]$Publisher = "CN=IPTV Viewer",
+    [string]$PfxPath,
+    [string]$PfxPassword,
     [int]$YearsValid = 3,
     [switch]$Force
 )
@@ -63,30 +65,46 @@ if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
 
 gh auth status | Out-Null
 
-$password = New-RandomPassword
-$securePassword = ConvertTo-SecureString -String $password -AsPlainText -Force
+$password = if ([string]::IsNullOrEmpty($PfxPath)) { New-RandomPassword } else { $PfxPassword }
 $tempDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "iptv-msix-signing-$([Guid]::NewGuid().ToString('N'))"
 $pfxPath = Join-Path $tempDirectory "iptv-msix-signing.pfx"
 $certificate = $null
 
 try {
-    New-Item -ItemType Directory -Force -Path $tempDirectory | Out-Null
-    $certificate = New-SelfSignedCertificate `
-        -Type CodeSigningCert `
-        -Subject $Publisher `
-        -CertStoreLocation "Cert:\CurrentUser\My" `
-        -KeyAlgorithm RSA `
-        -KeyLength 2048 `
-        -HashAlgorithm SHA256 `
-        -NotAfter (Get-Date).AddYears([Math]::Max(1, $YearsValid))
+    if ([string]::IsNullOrEmpty($PfxPath)) {
+        $securePassword = ConvertTo-SecureString -String $password -AsPlainText -Force
+        New-Item -ItemType Directory -Force -Path $tempDirectory | Out-Null
+        $certificate = New-SelfSignedCertificate `
+            -Type CodeSigningCert `
+            -Subject $Publisher `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -KeyAlgorithm RSA `
+            -KeyLength 2048 `
+            -HashAlgorithm SHA256 `
+            -NotAfter (Get-Date).AddYears([Math]::Max(1, $YearsValid))
 
-    Export-PfxCertificate -Cert $certificate -FilePath $pfxPath -Password $securePassword | Out-Null
-    $certificateBytes = [System.IO.File]::ReadAllBytes($pfxPath)
+        Export-PfxCertificate -Cert $certificate -FilePath $pfxPath -Password $securePassword | Out-Null
+        $certificateBytes = [System.IO.File]::ReadAllBytes($pfxPath)
+    }
+    else {
+        $resolvedPfxPath = [System.IO.Path]::GetFullPath($PfxPath)
+        if (-not (Test-Path -LiteralPath $resolvedPfxPath -PathType Leaf)) {
+            throw "PFX certificate was not found: $resolvedPfxPath"
+        }
+
+        if ([string]::IsNullOrEmpty($PfxPassword)) {
+            throw "-PfxPassword is required when -PfxPath is provided."
+        }
+
+        $certificateBytes = [System.IO.File]::ReadAllBytes($resolvedPfxPath)
+    }
+
     $certificateBase64 = [Convert]::ToBase64String($certificateBytes)
     [Convert]::FromBase64String($certificateBase64) | Out-Null
 
     if (-not $Force) {
-        Write-Host "Configuring repository secrets for $Repository using a self-signed code-signing certificate subject '$Publisher'."
+        $sourceDescription = if ([string]::IsNullOrEmpty($PfxPath)) { "a self-signed code-signing certificate subject '$Publisher'" } else { "the provided PFX certificate" }
+        Write-Host "Configuring repository secrets for $Repository using $sourceDescription."
         Write-Host "Use -Force in automation to skip this informational prompt."
     }
 
@@ -96,7 +114,12 @@ try {
     }
 
     Write-Host "Configured IPTV_MSIX_CERT_BASE64 and IPTV_MSIX_CERT_PASSWORD for $Repository."
-    Write-Host "The certificate is self-signed. Windows testers may still need to trust it, or replace it with a trusted code-signing certificate later."
+    if ([string]::IsNullOrEmpty($PfxPath)) {
+        Write-Host "The certificate is self-signed. Windows testers may still need to trust it, or replace it with a trusted code-signing certificate later."
+    }
+    else {
+        Write-Host "Configured the provided PFX certificate. Keep the source certificate and password outside this repository."
+    }
 }
 finally {
     if ($null -ne $certificate) {
