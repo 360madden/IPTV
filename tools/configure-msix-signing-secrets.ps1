@@ -21,39 +21,39 @@ function New-RandomPassword {
     return [Convert]::ToBase64String($bytes)
 }
 
-function Set-GitHubSecretFromText {
+function Set-GitHubSecretsFromEnvFile {
     param(
-        [string]$Name,
-        [string]$Value,
+        [hashtable]$Secrets,
         [string]$Repo
     )
 
-    if ([string]::IsNullOrWhiteSpace($Value)) {
-        throw "Secret '$Name' value is empty."
+    if ($Secrets.Count -eq 0) {
+        throw "At least one secret is required."
     }
 
-    $processStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $processStartInfo.FileName = (Get-Command gh).Source
-    $processStartInfo.Arguments = "secret set $Name --repo $Repo"
-    $processStartInfo.RedirectStandardInput = $true
-    $processStartInfo.RedirectStandardOutput = $true
-    $processStartInfo.RedirectStandardError = $true
-    $processStartInfo.UseShellExecute = $false
+    $secretPath = Join-Path ([System.IO.Path]::GetTempPath()) "iptv-msix-secrets-$([Guid]::NewGuid().ToString('N')).env"
+    try {
+        $lines = New-Object System.Collections.Generic.List[string]
+        foreach ($name in $Secrets.Keys) {
+            $value = [string]$Secrets[$name]
+            if ([string]::IsNullOrWhiteSpace($value)) {
+                throw "Secret '$name' value is empty."
+            }
 
-    $process = [System.Diagnostics.Process]::Start($processStartInfo)
-    if ($null -eq $process) {
-        throw "Failed to start GitHub CLI while setting secret '$Name'."
+            $lines.Add("$name=$value")
+        }
+
+        [System.IO.File]::WriteAllLines($secretPath, $lines, [System.Text.UTF8Encoding]::new($false))
+        gh secret set --repo $Repo -f $secretPath | Out-Null
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "GitHub CLI failed while setting repository secrets."
+        }
     }
-
-    $process.StandardInput.Write($Value)
-    $process.StandardInput.Close()
-    $standardOutput = $process.StandardOutput.ReadToEnd()
-    $standardError = $process.StandardError.ReadToEnd()
-    $process.WaitForExit()
-
-    if ($process.ExitCode -ne 0) {
-        $detail = if ([string]::IsNullOrWhiteSpace($standardError)) { $standardOutput } else { $standardError }
-        throw "Failed to set GitHub secret '$Name': $detail"
+    finally {
+        if (Test-Path -LiteralPath $secretPath) {
+            Remove-Item -LiteralPath $secretPath -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -83,14 +83,17 @@ try {
     Export-PfxCertificate -Cert $certificate -FilePath $pfxPath -Password $securePassword | Out-Null
     $certificateBytes = [System.IO.File]::ReadAllBytes($pfxPath)
     $certificateBase64 = [Convert]::ToBase64String($certificateBytes)
+    [Convert]::FromBase64String($certificateBase64) | Out-Null
 
     if (-not $Force) {
         Write-Host "Configuring repository secrets for $Repository using a self-signed code-signing certificate subject '$Publisher'."
         Write-Host "Use -Force in automation to skip this informational prompt."
     }
 
-    Set-GitHubSecretFromText -Name "IPTV_MSIX_CERT_BASE64" -Value $certificateBase64 -Repo $Repository
-    Set-GitHubSecretFromText -Name "IPTV_MSIX_CERT_PASSWORD" -Value $password -Repo $Repository
+    Set-GitHubSecretsFromEnvFile -Repo $Repository -Secrets @{
+        IPTV_MSIX_CERT_BASE64 = $certificateBase64
+        IPTV_MSIX_CERT_PASSWORD = $password
+    }
 
     Write-Host "Configured IPTV_MSIX_CERT_BASE64 and IPTV_MSIX_CERT_PASSWORD for $Repository."
     Write-Host "The certificate is self-signed. Windows testers may still need to trust it, or replace it with a trusted code-signing certificate later."

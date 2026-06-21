@@ -47,7 +47,16 @@ jobs:
         if: ${{ env.IPTV_MSIX_CERT_BASE64 != '' }}
         shell: pwsh
         run: |
-          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\iptv-msix.pfx", [Convert]::FromBase64String($env:IPTV_MSIX_CERT_BASE64))
+          $certBase64 = ($env:IPTV_MSIX_CERT_BASE64 -replace '\s', '').Trim()
+          if ([string]::IsNullOrWhiteSpace($certBase64)) {
+            throw "IPTV_MSIX_CERT_BASE64 is configured but empty after trimming."
+          }
+          try {
+            [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\iptv-msix.pfx", [Convert]::FromBase64String($certBase64))
+          }
+          catch {
+            throw "IPTV_MSIX_CERT_BASE64 is not valid base64. Re-run tools/configure-msix-signing-secrets.ps1 or replace the secret with a valid PFX encoded by [Convert]::ToBase64String(...)."
+          }
 
       - name: Package release artifacts
         shell: pwsh
