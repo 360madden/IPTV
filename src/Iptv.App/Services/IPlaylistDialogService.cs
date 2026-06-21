@@ -18,6 +18,10 @@ public interface IPlaylistDialogService
 
     string? PickSourceProfileExportFile();
 
+    string? PickRecentPlaylistSourcesImportFile();
+
+    string? PickRecentPlaylistSourcesExportFile();
+
     string? PickCustomGroupCsvImportFile();
 
     string? PickCustomGroupCsvExportFile();
@@ -29,6 +33,8 @@ public interface IPlaylistDialogService
     string? PromptXmltvUrl();
 
     bool ConfirmDuplicateHide(string title, IReadOnlyList<string> previewLines);
+
+    bool ConfirmSourceProfileImport(string title, IReadOnlyList<string> previewLines);
 
     void ShowError(string title, string message);
 }

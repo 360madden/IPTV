@@ -31,6 +31,8 @@ public sealed record ChannelOrganizationPreferences
 
     public Dictionary<string, ProviderPlaybackProfile> SourcePlaybackProfiles { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 
+    public Dictionary<string, string[]> SourceDefaultHiddenGroups { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
     public bool RefreshScheduleEnabled { get; init; }
 
     public int RefreshIntervalMinutes { get; init; } = 60;

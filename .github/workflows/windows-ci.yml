@@ -31,3 +31,6 @@ jobs:
 
       - name: Test
         run: dotnet test .\Iptv.slnx --configuration Release --no-build
+
+      - name: Large playlist search benchmark
+        run: dotnet run --project .\tools\Iptv.SearchBench\Iptv.SearchBench.csproj --configuration Release --no-build -- --count 75000

@@ -15,6 +15,7 @@ using Iptv.Epg;
 using Iptv.Persistence;
 using Iptv.Persistence.CustomGroups;
 using Iptv.Persistence.Logos;
+using Iptv.Persistence.RecentPlaylists;
 using Iptv.Persistence.SmartGroups;
 using Iptv.Persistence.SourceProfiles;
 using Iptv.Playback;
@@ -25,10 +26,6 @@ namespace Iptv.App.ViewModels;
 
 public sealed class MainViewModel : ObservableObject
 {
-    private delegate Task<PlaylistImportResult> PlaylistImportOperation(
-        CancellationToken cancellationToken,
-        IProgress<PlaylistImportProgress>? progress);
-
     private const string AllGroupsOption = "All Groups";
     private const string AllCategoriesOption = "All Categories";
     private const string AllYearsOption = "All Years";
@@ -51,6 +48,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly IChannelOrganizationPreferencesStore organizationPreferencesStore;
     private readonly IChannelOrganizationBackupService organizationBackupService;
     private readonly ILogoCacheService logoCacheService;
+    private readonly IRecentPlaylistSourceFileService recentPlaylistSourceFileService;
     private readonly ISourceProfileFileService sourceProfileFileService;
     private readonly ISmartGroupPresetFileService smartGroupPresetFileService;
     private readonly IUiPreferencesStore uiPreferencesStore;
@@ -68,8 +66,10 @@ public sealed class MainViewModel : ObservableObject
     private readonly HashSet<Guid> selectedChannelIds = [];
     private readonly Dictionary<string, string> sourceProfileNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ProviderPlaybackProfile> sourcePlaybackProfiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string[]> sourceDefaultHiddenGroups = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> lockedGroups = new(StringComparer.OrdinalIgnoreCase);
     private readonly StreamHealthTracker streamHealthTracker = new();
+    private readonly PlaylistImportCoordinator playlistImportCoordinator = new();
     private readonly Stack<ChannelUndoAction> organizationUndoStack = new();
     private readonly List<EpgProgram> epgPrograms = [];
     private readonly Dictionary<string, List<EpgProgram>> epgProgramsByChannelKey = new(StringComparer.Ordinal);
@@ -79,6 +79,8 @@ public sealed class MainViewModel : ObservableObject
     private PlaylistImportResult? pendingRefreshResult;
     private CancellationTokenSource? refreshScheduleCts;
     private DateTimeOffset? lastPlaylistImportedAt;
+    private TimeSpan? lastPlaylistImportDuration;
+    private PlaylistImportSummary? lastPlaylistImportSummary;
 
     private Channel? selectedChannel;
     private string searchText = string.Empty;
@@ -96,7 +98,10 @@ public sealed class MainViewModel : ObservableObject
     private string? selectedManagedCustomGroup;
     private SourceProfileViewModel? selectedSourceProfile;
     private RecentPlaylistSourceViewModel? selectedRecentPlaylistSource;
+    private string recentPlaylistSourceName = string.Empty;
     private string renameSourceProfileName = string.Empty;
+    private string selectedSourceDefaultVisibilityGroup = AllGroupsOption;
+    private string sourceDefaultVisibilitySummaryText = "Default source visibility rules appear after importing a playlist.";
     private string renameCustomGroupName = string.Empty;
     private string selectedBatchGroupAssignment = SourceGroupAssignmentOption;
     private string smartGroupMatchText = string.Empty;
@@ -117,6 +122,7 @@ public sealed class MainViewModel : ObservableObject
     private string fallbackSummaryText = "Fallback streams appear when playlist alternates share the selected channel name.";
     private string pendingRefreshSummaryText = "Refresh approval: no pending refresh.";
     private string searchBenchmarkSummaryText = "Search benchmark has not run.";
+    private string libraryHealthSummaryText = "Library health appears after importing a playlist.";
     private string playbackProgressText = "Playback position unavailable.";
     private string conflictReviewText = "Refresh conflicts unavailable until a playlist is refreshed.";
     private string logoPrefetchStatusText = "Logo prefetch idle.";
@@ -172,6 +178,7 @@ public sealed class MainViewModel : ObservableObject
         IChannelOrganizationPreferencesStore organizationPreferencesStore,
         IChannelOrganizationBackupService organizationBackupService,
         ILogoCacheService logoCacheService,
+        IRecentPlaylistSourceFileService recentPlaylistSourceFileService,
         ISourceProfileFileService sourceProfileFileService,
         ISmartGroupPresetFileService smartGroupPresetFileService,
         IUiPreferencesStore uiPreferencesStore,
@@ -185,6 +192,7 @@ public sealed class MainViewModel : ObservableObject
         this.organizationPreferencesStore = organizationPreferencesStore;
         this.organizationBackupService = organizationBackupService;
         this.logoCacheService = logoCacheService;
+        this.recentPlaylistSourceFileService = recentPlaylistSourceFileService;
         this.sourceProfileFileService = sourceProfileFileService;
         this.smartGroupPresetFileService = smartGroupPresetFileService;
         this.uiPreferencesStore = uiPreferencesStore;
@@ -196,6 +204,11 @@ public sealed class MainViewModel : ObservableObject
         ImportUrlCommand = new AsyncRelayCommand(_ => ImportUrlAsync(), _ => !IsBusy);
         LoadSampleCommand = new AsyncRelayCommand(_ => LoadSampleAsync(), _ => !IsBusy);
         OpenRecentPlaylistSourceCommand = new AsyncRelayCommand(_ => OpenRecentPlaylistSourceAsync(), _ => !IsBusy && SelectedRecentPlaylistSource is not null);
+        RenameRecentPlaylistSourceCommand = new RelayCommand(_ => RenameRecentPlaylistSource(), _ => SelectedRecentPlaylistSource is not null);
+        TogglePinRecentPlaylistSourceCommand = new RelayCommand(_ => TogglePinRecentPlaylistSource(), _ => SelectedRecentPlaylistSource is not null);
+        RemoveRecentPlaylistSourceCommand = new RelayCommand(_ => RemoveRecentPlaylistSource(), _ => SelectedRecentPlaylistSource is not null);
+        ImportRecentPlaylistSourcesCommand = new AsyncRelayCommand(_ => ImportRecentPlaylistSourcesAsync(), _ => !IsBusy);
+        ExportRecentPlaylistSourcesCommand = new AsyncRelayCommand(_ => ExportRecentPlaylistSourcesAsync(), _ => !IsBusy && RecentPlaylistSources.Count > 0);
         ClearRecentPlaylistSourcesCommand = new RelayCommand(_ => ClearRecentPlaylistSources(), _ => RecentPlaylistSources.Count > 0);
         CancelImportCommand = new RelayCommand(_ => CancelImport(), _ => IsImporting);
         RefreshPlaylistCommand = new AsyncRelayCommand(_ => RefreshPlaylistAsync(), _ => !IsBusy && lastPlaylistImport is not null);
@@ -231,7 +244,9 @@ public sealed class MainViewModel : ObservableObject
         RenameSourceProfileCommand = new RelayCommand(_ => RenameSelectedSourceProfile(), _ => SelectedSourceProfile is not null);
         SaveSourcePlaybackProfileCommand = new RelayCommand(_ => SaveSelectedSourcePlaybackProfile(), _ => SelectedSourceProfile is not null);
         ImportSourceProfilesCommand = new AsyncRelayCommand(_ => ImportSourceProfilesAsync(), _ => !IsBusy);
-        ExportSourceProfilesCommand = new AsyncRelayCommand(_ => ExportSourceProfilesAsync(), _ => !IsBusy && (sourceProfileNames.Count > 0 || sourcePlaybackProfiles.Count > 0));
+        ExportSourceProfilesCommand = new AsyncRelayCommand(_ => ExportSourceProfilesAsync(), _ => !IsBusy && (sourceProfileNames.Count > 0 || sourcePlaybackProfiles.Count > 0 || sourceDefaultHiddenGroups.Count > 0));
+        HideSourceDefaultGroupCommand = new RelayCommand(_ => HideSelectedSourceDefaultGroup(), _ => CanChangeSelectedSourceDefaultVisibilityGroup);
+        ShowSourceDefaultGroupCommand = new RelayCommand(_ => ShowSelectedSourceDefaultGroup(), _ => CanChangeSelectedSourceDefaultVisibilityGroup);
         RefreshDuplicateGroupsCommand = new RelayCommand(_ => RefreshDuplicateGroups());
         HideSelectedDuplicateGroupCommand = new RelayCommand(_ => HideSelectedDuplicateGroup(), _ => SelectedDuplicateGroup is not null);
         RefreshAuditCommand = new RelayCommand(_ => RefreshHiddenLockedAudit());
@@ -280,6 +295,10 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<SourceProfileViewModel> SourceProfiles { get; } = [];
 
     public ObservableCollection<RecentPlaylistSourceViewModel> RecentPlaylistSources { get; } = [];
+
+    public ObservableCollection<string> SourceDefaultVisibilityGroups { get; } = [AllGroupsOption];
+
+    public ObservableCollection<LibraryHealthMetricViewModel> LibraryHealthMetrics { get; } = [];
 
     public ObservableCollection<SmartGroupRulePresetViewModel> SmartGroupPresets { get; } = [];
 
@@ -391,6 +410,16 @@ public sealed class MainViewModel : ObservableObject
 
     public ICommand OpenRecentPlaylistSourceCommand { get; }
 
+    public ICommand RenameRecentPlaylistSourceCommand { get; }
+
+    public ICommand TogglePinRecentPlaylistSourceCommand { get; }
+
+    public ICommand RemoveRecentPlaylistSourceCommand { get; }
+
+    public ICommand ImportRecentPlaylistSourcesCommand { get; }
+
+    public ICommand ExportRecentPlaylistSourcesCommand { get; }
+
     public ICommand ClearRecentPlaylistSourcesCommand { get; }
 
     public ICommand CancelImportCommand { get; }
@@ -462,6 +491,10 @@ public sealed class MainViewModel : ObservableObject
     public ICommand ImportSourceProfilesCommand { get; }
 
     public ICommand ExportSourceProfilesCommand { get; }
+
+    public ICommand HideSourceDefaultGroupCommand { get; }
+
+    public ICommand ShowSourceDefaultGroupCommand { get; }
 
     public ICommand RefreshDuplicateGroupsCommand { get; }
 
@@ -732,6 +765,7 @@ public sealed class MainViewModel : ObservableObject
             {
                 RenameSourceProfileName = value?.DisplayName ?? string.Empty;
                 LoadSelectedSourcePlaybackProfile(value?.SourceId);
+                RefreshSourceDefaultVisibilityOptions();
                 RaiseProfileCommandStates();
             }
         }
@@ -742,19 +776,52 @@ public sealed class MainViewModel : ObservableObject
         get => selectedRecentPlaylistSource;
         set
         {
-            if (SetProperty(ref selectedRecentPlaylistSource, value) &&
-                OpenRecentPlaylistSourceCommand is AsyncRelayCommand openRecent)
+            if (SetProperty(ref selectedRecentPlaylistSource, value))
             {
-                openRecent.RaiseCanExecuteChanged();
+                RecentPlaylistSourceName = value?.DisplayName ?? string.Empty;
+                OnPropertyChanged(nameof(PinRecentPlaylistSourceLabel));
+                RaiseRecentPlaylistCommandStates();
             }
         }
     }
+
+    public string RecentPlaylistSourceName
+    {
+        get => recentPlaylistSourceName;
+        set => SetProperty(ref recentPlaylistSourceName, value);
+    }
+
+    public string PinRecentPlaylistSourceLabel => SelectedRecentPlaylistSource?.IsPinned == true ? "Unpin" : "Pin";
 
     public string RenameSourceProfileName
     {
         get => renameSourceProfileName;
         set => SetProperty(ref renameSourceProfileName, value);
     }
+
+    public string SelectedSourceDefaultVisibilityGroup
+    {
+        get => selectedSourceDefaultVisibilityGroup;
+        set
+        {
+            string nextValue = string.IsNullOrWhiteSpace(value) ? AllGroupsOption : value;
+            if (SetProperty(ref selectedSourceDefaultVisibilityGroup, nextValue))
+            {
+                RefreshSourceDefaultVisibilitySummary();
+                RaiseSourceDefaultVisibilityCommandStates();
+            }
+        }
+    }
+
+    public string SourceDefaultVisibilitySummaryText
+    {
+        get => sourceDefaultVisibilitySummaryText;
+        private set => SetProperty(ref sourceDefaultVisibilitySummaryText, value);
+    }
+
+    private bool CanChangeSelectedSourceDefaultVisibilityGroup =>
+        SelectedSourceProfile is not null &&
+        !string.Equals(SelectedSourceDefaultVisibilityGroup, AllGroupsOption, StringComparison.OrdinalIgnoreCase);
 
     public int SelectedSourceRetryCount
     {
@@ -1005,6 +1072,8 @@ public sealed class MainViewModel : ObservableObject
             if (SetProperty(ref isBusy, value))
             {
                 RaiseImportCommandStates();
+                RaiseProfileCommandStates();
+                RaiseRecentPlaylistCommandStates();
                 RaisePendingRefreshCommandStates();
             }
         }
@@ -1147,6 +1216,12 @@ public sealed class MainViewModel : ObservableObject
     {
         get => logoCacheStatusText;
         private set => SetProperty(ref logoCacheStatusText, value);
+    }
+
+    public string LibraryHealthSummaryText
+    {
+        get => libraryHealthSummaryText;
+        private set => SetProperty(ref libraryHealthSummaryText, value);
     }
 
     public int SelectedLogoCacheLimitMegabytes
@@ -1327,6 +1402,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedLogoCacheLimitMegabytes));
         ApplyRecentPlaylistSources(uiPreferences.RecentPlaylistSources);
         RefreshLogoCacheStatus();
+        RefreshLibraryHealth();
 
         ChannelOrganizationPreferences preferences = await organizationPreferencesStore
             .LoadAsync(shutdownCts.Token)
@@ -1359,6 +1435,8 @@ public sealed class MainViewModel : ObservableObject
                 sourcePlaybackProfiles[sourceId] = NormalizePlaybackProfile(profile);
             }
         }
+
+        ApplySourceDefaultHiddenGroups(preferences.SourceDefaultHiddenGroups);
 
         selectedRefreshIntervalMinutes = NormalizeRefreshInterval(preferences.RefreshIntervalMinutes);
         OnPropertyChanged(nameof(SelectedRefreshIntervalMinutes));
@@ -1716,12 +1794,13 @@ public sealed class MainViewModel : ObservableObject
             Channel[] previousChannels = allChannels.ToArray();
             HashSet<Guid> previousIds = previousChannels.Select(channel => channel.Id).ToHashSet();
             var progress = new Progress<PlaylistImportProgress>(ApplyPlaylistImportProgress);
-            PlaylistImportResult result = await import(importToken, progress).ConfigureAwait(true);
+            PlaylistImportExecution execution = await playlistImportCoordinator.RunAsync(import, importToken, progress).ConfigureAwait(true);
+            PlaylistImportResult result = execution.Result;
+            lastPlaylistImportDuration = execution.Duration;
 
-            if (result.Summary.ErrorCount > 0 && result.Channels.Count == 0)
+            if (execution.FatalError is not null)
             {
-                string error = result.Issues.FirstOrDefault(issue => issue.Severity == ImportIssueSeverity.Error)?.Message
-                    ?? "Playlist import failed.";
+                string error = execution.FatalError;
                 dialogService.ShowError("Playlist import failed", error);
                 StatusText = error;
                 AddDiagnostic($"Playlist import failed: {error}");
@@ -1743,6 +1822,7 @@ public sealed class MainViewModel : ObservableObject
             RefreshDuplicateGroups();
             RefreshHiddenLockedAudit();
             RefreshEpgTimeline();
+            RefreshLibraryHealth(result.Summary, execution.Duration);
 
             PlaylistDiffSummary diff = CalculateDiff(previousIds, allChannels.Select(channel => channel.Id));
             PopulateSourceProfiles();
@@ -1840,11 +1920,11 @@ public sealed class MainViewModel : ObservableObject
             StatusText = "Refreshing playlist for approval preview...";
             AddDiagnostic("Playlist refresh approval preview started.");
             var progress = new Progress<PlaylistImportProgress>(ApplyPlaylistImportProgress);
-            PlaylistImportResult result = await import(shutdownCts.Token, progress).ConfigureAwait(true);
-            if (result.Summary.ErrorCount > 0 && result.Channels.Count == 0)
+            PlaylistImportExecution execution = await playlistImportCoordinator.RunAsync(import, shutdownCts.Token, progress).ConfigureAwait(true);
+            PlaylistImportResult result = execution.Result;
+            if (execution.FatalError is not null)
             {
-                string error = result.Issues.FirstOrDefault(issue => issue.Severity == ImportIssueSeverity.Error)?.Message
-                    ?? "Playlist refresh failed.";
+                string error = execution.FatalError;
                 dialogService.ShowError("Playlist refresh failed", error);
                 StatusText = error;
                 AddDiagnostic($"Playlist refresh failed: {error}");
@@ -1923,6 +2003,7 @@ public sealed class MainViewModel : ObservableObject
         RebuildEpgIndex();
         RefreshSelectedChannelEpgGuide();
         RefreshEpgTimeline();
+        RefreshLibraryHealth();
         int matched = CountEpgMatches(result.Channels);
         EpgSummaryText = $"{result.SummaryText} Matched channels {matched:N0}.";
         StatusText = EpgSummaryText;
@@ -2932,7 +3013,9 @@ public sealed class MainViewModel : ObservableObject
     {
         if (!channelStates.TryGetValue(channel.Id, out ChannelUserState? state))
         {
-            return channel;
+            return IsHiddenBySourceDefault(channel)
+                ? channel with { IsHidden = true }
+                : channel;
         }
 
         return channel with
@@ -3060,6 +3143,9 @@ public sealed class MainViewModel : ObservableObject
             SourcePlaybackProfiles = sourcePlaybackProfiles
                 .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
                 .ToDictionary(pair => pair.Key, pair => NormalizePlaybackProfile(pair.Value), StringComparer.OrdinalIgnoreCase),
+            SourceDefaultHiddenGroups = sourceDefaultHiddenGroups
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && pair.Value.Length > 0)
+                .ToDictionary(pair => pair.Key, pair => NormalizeGroups(pair.Value), StringComparer.OrdinalIgnoreCase),
             RefreshScheduleEnabled = RefreshScheduleEnabled,
             RefreshIntervalMinutes = SelectedRefreshIntervalMinutes,
             ParentalPinSalt = parentalPinSalt,
@@ -3092,6 +3178,8 @@ public sealed class MainViewModel : ObservableObject
         {
             knownCustomGroups.Add(group);
         }
+
+        ApplySourceDefaultHiddenGroups(backup.Preferences.SourceDefaultHiddenGroups);
 
         for (int index = 0; index < allChannels.Count; index++)
         {
@@ -3156,6 +3244,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(AutoLoadXmltvOnPlaylistImport));
 
         RefreshGroupsAndCategories();
+        RefreshLibraryHealth();
         if (SelectedChannel is not null)
         {
             SelectedChannel = allChannels.FirstOrDefault(channel => channel.Id == SelectedChannel.Id);
@@ -3206,13 +3295,8 @@ public sealed class MainViewModel : ObservableObject
     private void ApplyRecentPlaylistSources(IEnumerable<RecentPlaylistSourcePreference> sources)
     {
         RecentPlaylistSources.Clear();
-        foreach (RecentPlaylistSourceViewModel source in sources
-                     .Select(RecentPlaylistSourceViewModel.FromPreference)
-                     .Where(source => IsUsableRecentPlaylistSource(source))
-                     .GroupBy(source => $"{source.Kind}|{source.Value}", StringComparer.OrdinalIgnoreCase)
-                     .Select(group => group.OrderByDescending(source => source.LastUsedAt).First())
-                     .OrderByDescending(source => source.LastUsedAt)
-                     .Take(MaximumRecentPlaylistSources))
+        foreach (RecentPlaylistSourceViewModel source in NormalizeRecentPlaylistSources(
+                     sources.Select(RecentPlaylistSourceViewModel.FromPreference)))
         {
             RecentPlaylistSources.Add(source);
         }
@@ -3228,25 +3312,55 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        for (int index = RecentPlaylistSources.Count - 1; index >= 0; index--)
+        RecentPlaylistSourceViewModel? existing = RecentPlaylistSources.FirstOrDefault(candidate => IsSameRecentSource(candidate, source));
+        RecentPlaylistSourceViewModel merged = source with
         {
-            RecentPlaylistSourceViewModel existing = RecentPlaylistSources[index];
-            if (existing.Kind == source.Kind &&
-                existing.Value.Equals(source.Value, StringComparison.OrdinalIgnoreCase))
-            {
-                RecentPlaylistSources.RemoveAt(index);
-            }
-        }
+            DisplayName = existing?.DisplayName ?? source.DisplayName,
+            IsPinned = existing?.IsPinned ?? source.IsPinned,
+            LastUsedAt = DateTimeOffset.UtcNow
+        };
 
-        RecentPlaylistSources.Insert(0, source with { LastUsedAt = DateTimeOffset.UtcNow });
-        while (RecentPlaylistSources.Count > MaximumRecentPlaylistSources)
-        {
-            RecentPlaylistSources.RemoveAt(RecentPlaylistSources.Count - 1);
-        }
-
-        SelectedRecentPlaylistSource = RecentPlaylistSources.FirstOrDefault();
-        RaiseRecentPlaylistCommandStates();
+        ReplaceRecentPlaylistSources(RecentPlaylistSources.Where(candidate => !IsSameRecentSource(candidate, source)).Append(merged));
+        SelectedRecentPlaylistSource = RecentPlaylistSources.FirstOrDefault(candidate => IsSameRecentSource(candidate, merged));
         _ = SaveUiPreferencesSafelyAsync();
+    }
+
+    private void ReplaceRecentPlaylistSources(IEnumerable<RecentPlaylistSourceViewModel> sources)
+    {
+        RecentPlaylistSourceViewModel[] normalized = NormalizeRecentPlaylistSources(sources).ToArray();
+        RecentPlaylistSources.Clear();
+        foreach (RecentPlaylistSourceViewModel source in normalized)
+        {
+            RecentPlaylistSources.Add(source);
+        }
+
+        if (SelectedRecentPlaylistSource is not null &&
+            RecentPlaylistSources.All(source => !IsSameRecentSource(source, SelectedRecentPlaylistSource)))
+        {
+            SelectedRecentPlaylistSource = RecentPlaylistSources.FirstOrDefault();
+        }
+
+        RaiseRecentPlaylistCommandStates();
+    }
+
+    private static IEnumerable<RecentPlaylistSourceViewModel> NormalizeRecentPlaylistSources(IEnumerable<RecentPlaylistSourceViewModel> sources)
+    {
+        return sources
+            .Where(IsUsableRecentPlaylistSource)
+            .GroupBy(source => $"{source.Kind}|{source.Value}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(source => source.IsPinned)
+                .ThenByDescending(source => source.LastUsedAt)
+                .First())
+            .OrderByDescending(source => source.IsPinned)
+            .ThenByDescending(source => source.LastUsedAt)
+            .Take(MaximumRecentPlaylistSources);
+    }
+
+    private static bool IsSameRecentSource(RecentPlaylistSourceViewModel left, RecentPlaylistSourceViewModel right)
+    {
+        return left.Kind == right.Kind &&
+            left.Value.Equals(right.Value, StringComparison.OrdinalIgnoreCase);
     }
 
     private static RecentPlaylistSourceViewModel CreateRecentPlaylistSource(
@@ -3302,6 +3416,116 @@ public sealed class MainViewModel : ObservableObject
         RaiseRecentPlaylistCommandStates();
         _ = SaveUiPreferencesSafelyAsync();
         StatusText = "Cleared recent playlist sources.";
+    }
+
+    private void RenameRecentPlaylistSource()
+    {
+        if (SelectedRecentPlaylistSource is null)
+        {
+            StatusText = "Select a recent playlist source before renaming.";
+            return;
+        }
+
+        string? normalizedName = NormalizeCustomGroup(RecentPlaylistSourceName);
+        if (normalizedName is null)
+        {
+            StatusText = "Enter a recent playlist name.";
+            return;
+        }
+
+        RecentPlaylistSourceViewModel updated = SelectedRecentPlaylistSource with { DisplayName = normalizedName };
+        ReplaceRecentPlaylistSources(RecentPlaylistSources.Select(source => IsSameRecentSource(source, updated) ? updated : source));
+        SelectedRecentPlaylistSource = RecentPlaylistSources.FirstOrDefault(source => IsSameRecentSource(source, updated));
+        _ = SaveUiPreferencesSafelyAsync();
+        StatusText = $"Renamed recent playlist source to '{normalizedName}'.";
+    }
+
+    private void TogglePinRecentPlaylistSource()
+    {
+        if (SelectedRecentPlaylistSource is null)
+        {
+            StatusText = "Select a recent playlist source before pinning.";
+            return;
+        }
+
+        RecentPlaylistSourceViewModel updated = SelectedRecentPlaylistSource with { IsPinned = !SelectedRecentPlaylistSource.IsPinned };
+        ReplaceRecentPlaylistSources(RecentPlaylistSources.Select(source => IsSameRecentSource(source, updated) ? updated : source));
+        SelectedRecentPlaylistSource = RecentPlaylistSources.FirstOrDefault(source => IsSameRecentSource(source, updated));
+        _ = SaveUiPreferencesSafelyAsync();
+        StatusText = updated.IsPinned
+            ? $"Pinned recent playlist source '{updated.DisplayName}'."
+            : $"Unpinned recent playlist source '{updated.DisplayName}'.";
+    }
+
+    private void RemoveRecentPlaylistSource()
+    {
+        if (SelectedRecentPlaylistSource is null)
+        {
+            StatusText = "Select a recent playlist source before removing.";
+            return;
+        }
+
+        string removedName = SelectedRecentPlaylistSource.DisplayName;
+        ReplaceRecentPlaylistSources(RecentPlaylistSources.Where(source => !IsSameRecentSource(source, SelectedRecentPlaylistSource)));
+        SelectedRecentPlaylistSource = RecentPlaylistSources.FirstOrDefault();
+        _ = SaveUiPreferencesSafelyAsync();
+        StatusText = $"Removed recent playlist source '{removedName}'.";
+    }
+
+    private async Task ImportRecentPlaylistSourcesAsync()
+    {
+        try
+        {
+            string? path = dialogService.PickRecentPlaylistSourcesImportFile();
+            if (path is null)
+            {
+                return;
+            }
+
+            RecentPlaylistSourcesExport imported = await recentPlaylistSourceFileService.ImportAsync(path, shutdownCts.Token).ConfigureAwait(true);
+            int previousCount = RecentPlaylistSources.Count;
+            ReplaceRecentPlaylistSources(RecentPlaylistSources.Concat(imported.Sources.Select(RecentPlaylistSourceViewModel.FromPreference)));
+            SelectedRecentPlaylistSource = RecentPlaylistSources.FirstOrDefault();
+            await SaveUiPreferencesSafelyAsync().ConfigureAwait(true);
+            StatusText = $"Imported recent playlist sources; list now contains {RecentPlaylistSources.Count:N0} item(s) ({previousCount:N0} before merge).";
+            AddDiagnostic(StatusText);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Recent playlist source import cancelled.";
+        }
+        catch (Exception ex)
+        {
+            ShowSafeError("Recent playlist source import failed", ex);
+        }
+    }
+
+    private async Task ExportRecentPlaylistSourcesAsync()
+    {
+        try
+        {
+            string? path = dialogService.PickRecentPlaylistSourcesExportFile();
+            if (path is null)
+            {
+                return;
+            }
+
+            var export = new RecentPlaylistSourcesExport
+            {
+                Sources = RecentPlaylistSources.Select(source => source.ToPreference()).ToArray()
+            };
+            await recentPlaylistSourceFileService.ExportAsync(path, export, shutdownCts.Token).ConfigureAwait(true);
+            StatusText = $"Exported {export.Sources.Length:N0} recent playlist source(s).";
+            AddDiagnostic(StatusText);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Recent playlist source export cancelled.";
+        }
+        catch (Exception ex)
+        {
+            ShowSafeError("Recent playlist source export failed", ex);
+        }
     }
 
     private int ReplaceCustomGroup(string sourceGroup, string? replacementGroup)
@@ -3488,8 +3712,9 @@ public sealed class MainViewModel : ObservableObject
     private string FormatProfileSummary()
     {
         int sourceCount = allChannels.Select(channel => channel.SourceId).Distinct().Count();
+        int defaultRuleCount = sourceDefaultHiddenGroups.Values.Sum(groups => groups.Length);
         string sourceText = sourceCount == 1 ? "source" : "sources";
-        return $"Profile: automatic per-playlist/source organization across {sourceCount:N0} {sourceText}; saved favorites, hidden channels, custom groups, and order are matched by stable channel IDs.";
+        return $"Profile: automatic per-playlist/source organization across {sourceCount:N0} {sourceText}; saved favorites, hidden channels, custom groups, default visibility rules ({defaultRuleCount:N0}), and order are matched by stable channel IDs.";
     }
 
     private string FormatOrganizationReconciliation(PlaylistDiffSummary diff)
@@ -3528,6 +3753,217 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private void ApplySourceDefaultHiddenGroups(IDictionary<string, string[]>? rules)
+    {
+        sourceDefaultHiddenGroups.Clear();
+        if (rules is null)
+        {
+            RefreshSourceDefaultVisibilityOptions();
+            return;
+        }
+
+        foreach ((string sourceId, string[] groups) in rules)
+        {
+            if (string.IsNullOrWhiteSpace(sourceId))
+            {
+                continue;
+            }
+
+            string[] normalizedGroups = NormalizeGroups(groups);
+            if (normalizedGroups.Length > 0)
+            {
+                sourceDefaultHiddenGroups[sourceId.Trim()] = normalizedGroups;
+            }
+        }
+
+        RefreshSourceDefaultVisibilityOptions();
+    }
+
+    private bool IsHiddenBySourceDefault(Channel channel)
+    {
+        return sourceDefaultHiddenGroups.TryGetValue(channel.SourceId.ToString(), out string[]? hiddenGroups) &&
+            hiddenGroups.Contains(channel.GroupTitle, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void RefreshSourceDefaultVisibilityOptions()
+    {
+        string previous = SelectedSourceDefaultVisibilityGroup;
+        SourceDefaultVisibilityGroups.Clear();
+        SourceDefaultVisibilityGroups.Add(AllGroupsOption);
+
+        if (SelectedSourceProfile is not null)
+        {
+            foreach (string group in allChannels
+                         .Where(channel => channel.SourceId.ToString().Equals(SelectedSourceProfile.SourceId, StringComparison.OrdinalIgnoreCase))
+                         .Select(channel => channel.GroupTitle)
+                         .Where(group => !string.IsNullOrWhiteSpace(group))
+                         .Distinct(StringComparer.OrdinalIgnoreCase)
+                         .Order(StringComparer.OrdinalIgnoreCase))
+            {
+                SourceDefaultVisibilityGroups.Add(group);
+            }
+        }
+
+        SelectedSourceDefaultVisibilityGroup = SourceDefaultVisibilityGroups.Contains(previous, StringComparer.OrdinalIgnoreCase)
+            ? previous
+            : AllGroupsOption;
+        RefreshSourceDefaultVisibilitySummary();
+        RaiseSourceDefaultVisibilityCommandStates();
+    }
+
+    private void RefreshSourceDefaultVisibilitySummary()
+    {
+        if (SelectedSourceProfile is null)
+        {
+            SourceDefaultVisibilitySummaryText = "Default source visibility rules appear after importing a playlist.";
+            return;
+        }
+
+        sourceDefaultHiddenGroups.TryGetValue(SelectedSourceProfile.SourceId, out string[]? hiddenGroups);
+        string rulesText = hiddenGroups is { Length: > 0 }
+            ? $"{hiddenGroups.Length:N0} default hidden group(s): {string.Join(", ", hiddenGroups.Take(4))}{(hiddenGroups.Length > 4 ? "..." : string.Empty)}"
+            : "No default hidden groups configured.";
+        string selectedText = string.Equals(SelectedSourceDefaultVisibilityGroup, AllGroupsOption, StringComparison.OrdinalIgnoreCase)
+            ? "Select a source group to hide or show it by default for future imports."
+            : $"Selected group '{SelectedSourceDefaultVisibilityGroup}' can be toggled as a default visibility rule.";
+        SourceDefaultVisibilitySummaryText = $"{SelectedSourceProfile.DisplayName}: {rulesText} {selectedText}";
+    }
+
+    private void HideSelectedSourceDefaultGroup()
+    {
+        ChangeSelectedSourceDefaultGroup(hidden: true);
+    }
+
+    private void ShowSelectedSourceDefaultGroup()
+    {
+        ChangeSelectedSourceDefaultGroup(hidden: false);
+    }
+
+    private void ChangeSelectedSourceDefaultGroup(bool hidden)
+    {
+        if (SelectedSourceProfile is null || string.Equals(SelectedSourceDefaultVisibilityGroup, AllGroupsOption, StringComparison.OrdinalIgnoreCase))
+        {
+            StatusText = "Select a source profile and group before changing default visibility.";
+            return;
+        }
+
+        string? normalizedGroup = NormalizeCustomGroup(SelectedSourceDefaultVisibilityGroup);
+        if (normalizedGroup is null)
+        {
+            StatusText = "Select a valid source group before changing default visibility.";
+            return;
+        }
+
+        string sourceId = SelectedSourceProfile.SourceId;
+        var groups = sourceDefaultHiddenGroups.TryGetValue(sourceId, out string[]? existing)
+            ? existing.ToList()
+            : new List<string>();
+        bool changed;
+        if (hidden)
+        {
+            changed = !groups.Contains(normalizedGroup, StringComparer.OrdinalIgnoreCase);
+            if (changed)
+            {
+                groups.Add(normalizedGroup);
+            }
+        }
+        else
+        {
+            changed = groups.RemoveAll(group => group.Equals(normalizedGroup, StringComparison.OrdinalIgnoreCase)) > 0;
+        }
+
+        string[] normalizedGroups = NormalizeGroups(groups);
+        if (normalizedGroups.Length == 0)
+        {
+            sourceDefaultHiddenGroups.Remove(sourceId);
+        }
+        else
+        {
+            sourceDefaultHiddenGroups[sourceId] = normalizedGroups;
+        }
+
+        int affected = ApplySourceDefaultVisibilityToLoadedChannels(sourceId, normalizedGroup, hidden);
+        _ = SaveOrganizationPreferencesSafelyAsync();
+        RefreshSourceDefaultVisibilitySummary();
+        ProfileSummaryText = FormatProfileSummary();
+        RefreshLibraryHealth();
+        RaiseProfileCommandStates();
+        StatusText = changed
+            ? $"{(hidden ? "Hid" : "Showed")} source group '{normalizedGroup}' by default; updated {affected:N0} currently loaded channel(s) without explicit saved state."
+            : $"Source group '{normalizedGroup}' already had that default visibility.";
+    }
+
+    private int ApplySourceDefaultVisibilityToLoadedChannels(string sourceId, string groupName, bool hidden)
+    {
+        int changed = 0;
+        Guid? selectedId = SelectedChannel?.Id;
+        for (int index = 0; index < allChannels.Count; index++)
+        {
+            Channel current = allChannels[index];
+            if (!current.SourceId.ToString().Equals(sourceId, StringComparison.OrdinalIgnoreCase) ||
+                !current.GroupTitle.Equals(groupName, StringComparison.OrdinalIgnoreCase) ||
+                channelStates.ContainsKey(current.Id) ||
+                current.IsHidden == hidden)
+            {
+                continue;
+            }
+
+            Channel updated = current with { IsHidden = hidden };
+            allChannels[index] = updated;
+            changed++;
+            if (selectedId == updated.Id)
+            {
+                SelectedChannel = updated;
+            }
+        }
+
+        if (changed > 0)
+        {
+            RefreshGroupsAndCategories();
+            RefreshHiddenLockedAudit();
+            ScheduleSearch();
+        }
+
+        return changed;
+    }
+
+    private int ReapplySourceDefaultVisibilityToLoadedChannels()
+    {
+        int changed = 0;
+        Guid? selectedId = SelectedChannel?.Id;
+        for (int index = 0; index < allChannels.Count; index++)
+        {
+            Channel current = allChannels[index];
+            if (channelStates.ContainsKey(current.Id))
+            {
+                continue;
+            }
+
+            bool shouldHide = IsHiddenBySourceDefault(current);
+            if (current.IsHidden == shouldHide)
+            {
+                continue;
+            }
+
+            Channel updated = current with { IsHidden = shouldHide };
+            allChannels[index] = updated;
+            changed++;
+            if (selectedId == updated.Id)
+            {
+                SelectedChannel = updated;
+            }
+        }
+
+        if (changed > 0)
+        {
+            RefreshGroupsAndCategories();
+            RefreshHiddenLockedAudit();
+            ScheduleSearch();
+        }
+
+        return changed;
+    }
+
     private void PopulateSourceProfiles()
     {
         string? previousSourceId = SelectedSourceProfile?.SourceId;
@@ -3541,6 +3977,7 @@ public sealed class MainViewModel : ObservableObject
         SelectedSourceProfile = previousSourceId is null
             ? SourceProfiles.FirstOrDefault()
             : SourceProfiles.FirstOrDefault(profile => profile.SourceId.Equals(previousSourceId, StringComparison.OrdinalIgnoreCase)) ?? SourceProfiles.FirstOrDefault();
+        RefreshSourceDefaultVisibilityOptions();
     }
 
     private string GetSourceProfileName(Guid sourceId, int sourceChannelCount)
@@ -3608,6 +4045,38 @@ public sealed class MainViewModel : ObservableObject
         StatusText = $"Saved playback profile for '{SelectedSourceProfile.DisplayName}': {SelectedSourceRetryCount:N0} retries, {SelectedSourceBufferingPreset} buffer.";
     }
 
+    private IReadOnlyList<string> BuildSourceProfileImportConflicts(SourceProfileExport imported)
+    {
+        var conflicts = new List<string>();
+        foreach (string sourceId in imported.SourceProfileNames.Keys.Where(sourceId => sourceProfileNames.ContainsKey(sourceId)).Take(25))
+        {
+            conflicts.Add($"Profile name for source {sourceId}: '{sourceProfileNames[sourceId]}' -> '{imported.SourceProfileNames[sourceId]}'.");
+        }
+
+        foreach (string sourceId in imported.SourcePlaybackProfiles.Keys.Where(sourceId => sourcePlaybackProfiles.ContainsKey(sourceId)).Take(25))
+        {
+            ProviderPlaybackProfile current = NormalizePlaybackProfile(sourcePlaybackProfiles[sourceId]);
+            ProviderPlaybackProfile incoming = NormalizePlaybackProfile(imported.SourcePlaybackProfiles[sourceId]);
+            conflicts.Add($"Playback profile for source {sourceId}: {current.RetryCount:N0}/{current.BufferingPreset} -> {incoming.RetryCount:N0}/{incoming.BufferingPreset}.");
+        }
+
+        foreach (string sourceId in imported.SourceDefaultHiddenGroups.Keys.Where(sourceId => sourceDefaultHiddenGroups.ContainsKey(sourceId)).Take(25))
+        {
+            string current = string.Join(", ", sourceDefaultHiddenGroups[sourceId]);
+            string incoming = string.Join(", ", NormalizeGroups(imported.SourceDefaultHiddenGroups[sourceId]));
+            conflicts.Add($"Default hidden groups for source {sourceId}: [{current}] -> [{incoming}].");
+        }
+
+        if (conflicts.Count == 0)
+        {
+            return conflicts;
+        }
+
+        int importedTotal = imported.SourceProfileNames.Count + imported.SourcePlaybackProfiles.Count + imported.SourceDefaultHiddenGroups.Count;
+        conflicts.Insert(0, $"Import contains {importedTotal:N0} source profile setting group(s); {conflicts.Count:N0} shown may overwrite existing settings.");
+        return conflicts;
+    }
+
     private async Task ImportSourceProfilesAsync()
     {
         try
@@ -3619,12 +4088,19 @@ public sealed class MainViewModel : ObservableObject
             }
 
             SourceProfileExport imported = await sourceProfileFileService.ImportAsync(path, shutdownCts.Token).ConfigureAwait(true);
+            IReadOnlyList<string> conflicts = BuildSourceProfileImportConflicts(imported);
+            if (conflicts.Count > 0 && !dialogService.ConfirmSourceProfileImport("Review Source Profile Conflicts", conflicts))
+            {
+                StatusText = "Source profile import cancelled before applying conflicts.";
+                return;
+            }
+
             int importedNameCount = 0;
             foreach ((string sourceId, string profileName) in imported.SourceProfileNames)
             {
                 if (!string.IsNullOrWhiteSpace(sourceId) && !string.IsNullOrWhiteSpace(profileName))
                 {
-                    sourceProfileNames[sourceId] = profileName;
+                    sourceProfileNames[sourceId.Trim()] = profileName.Trim();
                     importedNameCount++;
                 }
             }
@@ -3634,15 +4110,36 @@ public sealed class MainViewModel : ObservableObject
             {
                 if (!string.IsNullOrWhiteSpace(sourceId))
                 {
-                    sourcePlaybackProfiles[sourceId] = NormalizePlaybackProfile(profile);
+                    sourcePlaybackProfiles[sourceId.Trim()] = NormalizePlaybackProfile(profile);
                     importedPlaybackCount++;
                 }
             }
 
+            int importedDefaultGroupCount = 0;
+            foreach ((string sourceId, string[] hiddenGroups) in imported.SourceDefaultHiddenGroups)
+            {
+                if (string.IsNullOrWhiteSpace(sourceId))
+                {
+                    continue;
+                }
+
+                string[] normalizedGroups = NormalizeGroups(hiddenGroups);
+                if (normalizedGroups.Length == 0)
+                {
+                    continue;
+                }
+
+                sourceDefaultHiddenGroups[sourceId.Trim()] = normalizedGroups;
+                importedDefaultGroupCount += normalizedGroups.Length;
+            }
+
+            int defaultVisibilityAffected = ReapplySourceDefaultVisibilityToLoadedChannels();
             PopulateSourceProfiles();
             LoadSelectedSourcePlaybackProfile(SelectedSourceProfile?.SourceId);
             await SaveOrganizationPreferencesSafelyAsync().ConfigureAwait(true);
-            StatusText = $"Imported {importedNameCount:N0} source profile names and {importedPlaybackCount:N0} playback profiles.";
+            ProfileSummaryText = FormatProfileSummary();
+            RefreshLibraryHealth();
+            StatusText = $"Imported {importedNameCount:N0} source profile names, {importedPlaybackCount:N0} playback profiles, and {importedDefaultGroupCount:N0} default hidden group rules; updated {defaultVisibilityAffected:N0} loaded channel(s).";
             AddDiagnostic(StatusText);
         }
         catch (OperationCanceledException)
@@ -3676,10 +4173,14 @@ public sealed class MainViewModel : ObservableObject
                     .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase),
                 SourcePlaybackProfiles = sourcePlaybackProfiles
                     .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
-                    .ToDictionary(pair => pair.Key, pair => NormalizePlaybackProfile(pair.Value), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(pair => pair.Key, pair => NormalizePlaybackProfile(pair.Value), StringComparer.OrdinalIgnoreCase),
+                SourceDefaultHiddenGroups = sourceDefaultHiddenGroups
+                    .Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && pair.Value.Length > 0)
+                    .ToDictionary(pair => pair.Key, pair => NormalizeGroups(pair.Value), StringComparer.OrdinalIgnoreCase)
             };
             await sourceProfileFileService.ExportAsync(path, export, shutdownCts.Token).ConfigureAwait(true);
-            StatusText = $"Exported {export.SourceProfileNames.Count:N0} source profile names and {export.SourcePlaybackProfiles.Count:N0} playback profiles.";
+            int defaultRuleCount = export.SourceDefaultHiddenGroups.Values.Sum(groups => groups.Length);
+            StatusText = $"Exported {export.SourceProfileNames.Count:N0} source profile names, {export.SourcePlaybackProfiles.Count:N0} playback profiles, and {defaultRuleCount:N0} default hidden group rules.";
             AddDiagnostic(StatusText);
         }
         catch (OperationCanceledException)
@@ -3698,6 +4199,35 @@ public sealed class MainViewModel : ObservableObject
         return sourcePlaybackProfiles.TryGetValue(key, out ProviderPlaybackProfile? profile)
             ? NormalizePlaybackProfile(profile)
             : new ProviderPlaybackProfile { RetryCount = 0, BufferingPreset = SelectedBufferingPreset };
+    }
+
+    private void RefreshLibraryHealth(PlaylistImportSummary? importSummary = null, TimeSpan? importDuration = null)
+    {
+        if (importSummary is not null)
+        {
+            lastPlaylistImportSummary = importSummary;
+        }
+
+        if (importDuration is not null)
+        {
+            lastPlaylistImportDuration = importDuration;
+        }
+
+        LibraryHealthMetrics.Clear();
+        foreach (LibraryHealthMetricViewModel metric in LibraryHealthAnalyzer.BuildMetrics(
+                     allChannels,
+                     channelStates.Keys.ToArray(),
+                     sourceDefaultHiddenGroups,
+                     epgPrograms.Count,
+                     lastPlaylistImportDuration,
+                     lastPlaylistImportSummary))
+        {
+            LibraryHealthMetrics.Add(metric);
+        }
+
+        LibraryHealthSummaryText = allChannels.Count == 0
+            ? "Library health: import a playlist to inspect channel, organization, VOD, logo, EPG, and import metrics."
+            : $"Library health: {allChannels.Count:N0} channels, {allChannels.Count(channel => !channel.IsHidden):N0} visible, {sourceDefaultHiddenGroups.Values.Sum(groups => groups.Length):N0} default visibility rule(s).";
     }
 
     private void RefreshVodLibrary()
@@ -3831,8 +4361,8 @@ public sealed class MainViewModel : ObservableObject
         string title = $"Hide {toHide.Length:N0} duplicate(s) for '{duplicateChannels[0].DisplayName}'?";
         string[] previewLines = duplicateChannels
             .Select((channel, index) => index == 0
-                ? $"KEEP: {channel.DisplayName} · {channel.EffectiveGroupTitle} · {channel.StreamUrl.Host}"
-                : $"HIDE: {channel.DisplayName} · {channel.EffectiveGroupTitle} · {channel.StreamUrl.Host}")
+                ? $"KEEP: {channel.DisplayName} Â· {channel.EffectiveGroupTitle} Â· {channel.StreamUrl.Host}"
+                : $"HIDE: {channel.DisplayName} Â· {channel.EffectiveGroupTitle} Â· {channel.StreamUrl.Host}")
             .ToArray();
         if (!dialogService.ConfirmDuplicateHide(title, previewLines))
         {
@@ -4058,6 +4588,7 @@ public sealed class MainViewModel : ObservableObject
             RefreshDuplicateGroups();
             RefreshHiddenLockedAudit();
             RefreshEpgTimeline();
+            RefreshLibraryHealth(result.Summary, lastPlaylistImportDuration);
 
             PlaylistDiffSummary diff = CalculateDiff(previousChannels.Select(channel => channel.Id).ToHashSet(), allChannels.Select(channel => channel.Id));
             PopulateSourceProfiles();
@@ -4849,6 +5380,17 @@ public sealed class MainViewModel : ObservableObject
         return normalized.Length == 0 ? null : normalized;
     }
 
+    private static string[] NormalizeGroups(IEnumerable<string>? groups)
+    {
+        return (groups ?? [])
+            .Select(NormalizeCustomGroup)
+            .Where(group => group is not null)
+            .Select(group => group!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     private static int? NormalizeCustomSortIndex(int? value)
     {
         return value < 0 ? null : value;
@@ -5012,7 +5554,7 @@ public sealed class MainViewModel : ObservableObject
     {
         if (program is null)
         {
-            return "—";
+            return "â€”";
         }
 
         string prefix = program.Start is not null && program.Stop is not null && program.Start <= now && program.Stop >= now
@@ -5114,7 +5656,7 @@ public sealed class MainViewModel : ObservableObject
 
         return
             $"Title: {channel.DisplayName}\n" +
-            $"Type: {FormatContentKind(channel.ContentKind)} · {year}\n" +
+            $"Type: {FormatContentKind(channel.ContentKind)} Â· {year}\n" +
             $"Group: {channel.EffectiveGroupTitle}\n" +
             $"Resume: {progress}\n" +
             artwork;
@@ -5226,7 +5768,7 @@ public sealed class MainViewModel : ObservableObject
     {
         PlaybackStatusText = state.Channel is null
             ? state.Message
-            : $"{state.Status}: {state.Channel.DisplayName} — {state.Message}";
+            : $"{state.Status}: {state.Channel.DisplayName} â€” {state.Message}";
         UpdateNowPlayingMarker(state);
         UpdateStreamHealth(state);
         AddDiagnostic(PlaybackStatusText);
@@ -5410,6 +5952,8 @@ public sealed class MainViewModel : ObservableObject
         {
             exportProfiles.RaiseCanExecuteChanged();
         }
+
+        RaiseSourceDefaultVisibilityCommandStates();
     }
 
     private void RaiseRecentPlaylistCommandStates()
@@ -5419,9 +5963,49 @@ public sealed class MainViewModel : ObservableObject
             openRecent.RaiseCanExecuteChanged();
         }
 
+        if (RenameRecentPlaylistSourceCommand is RelayCommand renameRecent)
+        {
+            renameRecent.RaiseCanExecuteChanged();
+        }
+
+        if (TogglePinRecentPlaylistSourceCommand is RelayCommand pinRecent)
+        {
+            pinRecent.RaiseCanExecuteChanged();
+        }
+
+        if (RemoveRecentPlaylistSourceCommand is RelayCommand removeRecent)
+        {
+            removeRecent.RaiseCanExecuteChanged();
+        }
+
+        if (ImportRecentPlaylistSourcesCommand is AsyncRelayCommand importRecent)
+        {
+            importRecent.RaiseCanExecuteChanged();
+        }
+
+        if (ExportRecentPlaylistSourcesCommand is AsyncRelayCommand exportRecent)
+        {
+            exportRecent.RaiseCanExecuteChanged();
+        }
+
         if (ClearRecentPlaylistSourcesCommand is RelayCommand clearRecent)
         {
             clearRecent.RaiseCanExecuteChanged();
+        }
+
+        OnPropertyChanged(nameof(PinRecentPlaylistSourceLabel));
+    }
+
+    private void RaiseSourceDefaultVisibilityCommandStates()
+    {
+        if (HideSourceDefaultGroupCommand is RelayCommand hideDefault)
+        {
+            hideDefault.RaiseCanExecuteChanged();
+        }
+
+        if (ShowSourceDefaultGroupCommand is RelayCommand showDefault)
+        {
+            showDefault.RaiseCanExecuteChanged();
         }
     }
 
@@ -5517,6 +6101,16 @@ public sealed class MainViewModel : ObservableObject
         if (OpenRecentPlaylistSourceCommand is AsyncRelayCommand openRecent)
         {
             openRecent.RaiseCanExecuteChanged();
+        }
+
+        if (ImportRecentPlaylistSourcesCommand is AsyncRelayCommand importRecent)
+        {
+            importRecent.RaiseCanExecuteChanged();
+        }
+
+        if (ExportRecentPlaylistSourcesCommand is AsyncRelayCommand exportRecent)
+        {
+            exportRecent.RaiseCanExecuteChanged();
         }
 
         if (RefreshPlaylistCommand is AsyncRelayCommand refresh)

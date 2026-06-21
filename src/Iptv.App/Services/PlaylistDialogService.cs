@@ -118,6 +118,35 @@ public sealed class PlaylistDialogService : IPlaylistDialogService
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
+    public string? PickRecentPlaylistSourcesImportFile()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import recent playlist sources",
+            Filter = "IPTV recent playlist sources (*.json)|*.json|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
+    public string? PickRecentPlaylistSourcesExportFile()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export recent playlist sources",
+            Filter = "IPTV recent playlist sources (*.json)|*.json|All files (*.*)|*.*",
+            DefaultExt = ".json",
+            AddExtension = true,
+            CheckPathExists = true,
+            OverwritePrompt = true,
+            FileName = $"iptv-recent-playlists-{DateTime.Now:yyyyMMdd-HHmmss}.json"
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
     public string? PickCustomGroupCsvImportFile()
     {
         var dialog = new OpenFileDialog
@@ -187,6 +216,20 @@ public sealed class PlaylistDialogService : IPlaylistDialogService
     public bool ConfirmDuplicateHide(string title, IReadOnlyList<string> previewLines)
     {
         var dialog = new DuplicatePreviewWindow(title, previewLines)
+        {
+            Owner = Application.Current.MainWindow
+        };
+
+        return dialog.ShowDialog() == true;
+    }
+
+    public bool ConfirmSourceProfileImport(string title, IReadOnlyList<string> previewLines)
+    {
+        var dialog = new PreviewConfirmWindow(
+            title,
+            "The imported source profile file updates existing profile settings. Review the conflicts before applying.",
+            "Import Profiles",
+            previewLines)
         {
             Owner = Application.Current.MainWindow
         };
