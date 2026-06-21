@@ -2,19 +2,23 @@
 
 Date: 2026-06-20
 Repo: `C:\RIFT MODDING\iptv`
-Branch: `main`
-Validated code baseline before final handoff/CI update: `47c75d6576b023aad8a12c92fd18fc845fecaf52` (`Merge pull request #2 from 360madden/codex/fix-msix-workflow-args`)
 Remote: `https://github.com/360madden/IPTV.git`
+Branch to resume from: `main`
+Published baseline before this handoff refresh: `6539a9498b5303570bd5e59cdde7d1e2571398f1` (`Merge pull request #3 from 360madden/codex/final-handoff-ci-required-check`)
 
-## Current State
+## Current Product State
 
-The .NET 10 WPF IPTV viewer is functional for user-supplied M3U/M3U8 playlists and is now set up on GitHub. PR #1 merged the app/repo setup, refreshed contributor docs, added CI, release artifact hardening, playlist-file launcher support, duplicate/VOD sample playlists, and playlist fixture tests. PR #2 fixed the MSIX workflow and packaging script after hosted CI exposed PowerShell parameter-binding and Windows SDK tool-discovery issues. The final handoff update also removes path filters from the required Windows CI workflow so protected PRs always receive the `Build and Test` check.
+The repo contains a functional .NET 10 WPF IPTV viewer for user-supplied M3U/M3U8 playlists. Playback uses LibVLC, playlist import supports URL and local file workflows, and the app includes channel grouping, hidden/custom group support, duplicate handling, search, EPG, VOD resume infrastructure, and a polished desktop UI. Keep the repository content-neutral: never commit private playlists, provider credentials, generated user-library data, or proprietary stream URLs.
 
-The repository is content-neutral: do not commit private playlists, provider credentials, or generated user library data.
+## Recent Repository Work
 
-## Validated Gates
+- PR #1 merged the app repository setup, refreshed contributor docs, added Windows CI, release artifact hardening, playlist-file launcher support, duplicate/VOD sample playlists, and playlist fixture tests.
+- PR #2 fixed Windows MSIX packaging by replacing positional PowerShell array splatting with named hashtable splatting and adding Windows SDK tool discovery for `makeappx.exe`/`signtool.exe`.
+- PR #3 refreshed this handoff path and removed Windows CI path filters so the required `Build and Test` check is always created on protected PRs.
 
-Local validation on 2026-06-20 passed:
+## Validation Snapshot
+
+Local validation from the completed setup slice passed:
 
 - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -DryRun -CreateMsix`
 - workflow-style hashtable dry-run invocation with `DryRun = $true`
@@ -26,25 +30,28 @@ Local validation on 2026-06-20 passed:
 
 Remote validation passed:
 
-- Windows MSIX on PR #2 branch: run `27880620058`
 - Windows MSIX on `main`: run `27880692669`
-- Windows CI on `main`: run `27880753885`
+- Windows CI on `main`: run `27880897797`
+- Current branch protection requires strict `Build and Test`.
 
-## GitHub Setup
+## GitHub / Branch State
 
-- Repo metadata set for `360madden/IPTV` with IPTV/.NET/WPF/M3U topics.
-- `main` branch protection is enabled.
-- Required check: `Build and Test` with strict up-to-date status checks.
-- Windows CI runs on every PR to `main` and every push to `main` so the required check is always produced.
-- Pull requests are required; force pushes and deletions are disabled.
-- Merged feature branches were deleted and local tracking was pruned.
+- Default branch: `main`.
+- `main` branch protection is enabled: PRs required, strict `Build and Test` required, force pushes disabled, deletions disabled.
+- Windows CI runs for every PR to `main` and every push to `main`.
+- Windows MSIX runs on pushes touching app/package paths and can be manually dispatched.
+- At handoff creation time there were no open PRs and local `main` matched `origin/main`.
 
 ## Known Cautions
 
-- GUI duplicate-dialog smoke was improved but can still be timing-sensitive; CLI fixture coverage passed reliably.
-- MSIX artifacts are unsigned unless `IPTV_MSIX_CERT_BASE64` and `IPTV_MSIX_CERT_PASSWORD` secrets are configured.
-- GitHub Actions currently warns that some pinned actions target Node 20 while the runner forces Node 24; not failing yet, but update actions when upstream versions are available.
+- GUI duplicate-dialog smoke is improved but timing-sensitive; CLI fixture coverage is reliable.
+- MSIX artifacts are unsigned until `IPTV_MSIX_CERT_BASE64` and `IPTV_MSIX_CERT_PASSWORD` secrets are configured.
+- GitHub Actions currently emits a Node 20 deprecation warning for pinned actions while hosted runners force Node 24; workflows pass, but action versions should be updated when upstream releases are available.
 
-## Best Next Resume Step
+## Best Resume Flow
 
-Start with `git status --short --branch`, then use `launch-iptv.cmd "https://www.apsattv.com/xumo.m3u"` or a local `.m3u` file to test playlist import and playback. For development, branch from protected `main` and expect PR validation before merge.
+1. Run `git status --short --branch` and confirm you are on clean `main` tracking `origin/main`.
+2. Pull latest: `git pull --ff-only`.
+3. Launch with a public test playlist: `launch-iptv.cmd "https://www.apsattv.com/xumo.m3u"`, or pass a local `.m3u` file.
+4. For new work, create a `codex/...` branch, keep changes scoped, run targeted local validation, push, open a PR, wait for `Build and Test`, then merge through protected `main`.
+5. Highest-impact next product area: robust large-playlist/VOD workflows, including faster import progress/cancel UX, custom group/hidden channel persistence QA, and less flaky GUI automation.
