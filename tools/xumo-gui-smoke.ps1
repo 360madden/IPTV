@@ -6,6 +6,7 @@ param(
     [string]$ChannelName = "LiveNOW",
     [int]$TimeoutSeconds = 60,
     [int]$PlaybackTimeoutSeconds = 35,
+    [int]$DuplicateDialogTimeoutSeconds = 120,
     [switch]$SkipBuild,
     [switch]$RequirePlayback,
     [switch]$RequireClockOverlay,
@@ -379,7 +380,11 @@ try {
 
         Write-Host "Exercising duplicate-hide workflow when duplicates are available..."
         Invoke-Element (Wait-Until { Find-ByName $main "Refresh Duplicates" } $TimeoutSeconds "Refresh Duplicates button")
-        $hideDuplicates = Wait-Until { Find-ByName $main "Hide Duplicates" } $TimeoutSeconds "Hide Duplicates button"
+        $hideDuplicates = Wait-Until {
+            $button = Find-ByName $main "Hide Duplicates"
+            if ($null -eq $button) { return $false }
+            return $button
+        } $TimeoutSeconds "Hide Duplicates button"
         if ($hideDuplicates.Current.IsEnabled) {
             Invoke-Element $hideDuplicates
             $duplicateDialog = Wait-Until {
@@ -400,7 +405,7 @@ try {
                     -Root $root `
                     -Text "Duplicate Preview" `
                     -Scope ([System.Windows.Automation.TreeScope]::Descendants)
-            } $TimeoutSeconds "duplicate preview dialog"
+            } $DuplicateDialogTimeoutSeconds "duplicate preview dialog"
             Invoke-Element (Wait-Until { Find-ByName $duplicateDialog "Confirm Hide Duplicates" } $TimeoutSeconds "confirm hide duplicates button")
             Wait-Until {
                 $main = Get-AppWindow -ProcessId $process.Id

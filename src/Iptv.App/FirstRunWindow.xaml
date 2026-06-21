@@ -1,0 +1,53 @@
+<Window x:Class="Iptv.App.FirstRunWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Get started"
+        Width="520"
+        Height="360"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{StaticResource AppBackgroundBrush}">
+    <Border Padding="24"
+            Background="{StaticResource PanelBrush}">
+        <StackPanel>
+            <TextBlock Text="Welcome to IPTV Viewer"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Margin="0,0,0,8" />
+            <TextBlock Text="This app is content-neutral. It does not include channels, streams, credentials, or playlist sources."
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,16" />
+            <TextBlock Text="Choose how you want to start:"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,12" />
+
+            <Button Content="Load bundled sample playlist"
+                    Click="LoadSample_Click"
+                    HorizontalAlignment="Stretch"
+                    Margin="0,0,0,10"
+                    AutomationProperties.Name="First Run Load Sample" />
+            <Button Content="Open my playlist file"
+                    Click="OpenFile_Click"
+                    HorizontalAlignment="Stretch"
+                    Margin="0,0,0,10"
+                    AutomationProperties.Name="First Run Open Playlist File" />
+            <Button Content="Import my playlist URL"
+                    Click="ImportUrl_Click"
+                    HorizontalAlignment="Stretch"
+                    Margin="0,0,0,16"
+                    AutomationProperties.Name="First Run Import Playlist URL" />
+
+            <TextBlock Text="Privacy reminder: avoid sharing screenshots, logs, or playlists that contain provider tokens or account details."
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       TextWrapping="Wrap"
+                       FontSize="12"
+                       Margin="0,0,0,18" />
+
+            <Button Content="Continue without importing"
+                    Click="Continue_Click"
+                    HorizontalAlignment="Right"
+                    AutomationProperties.Name="First Run Continue" />
+        </StackPanel>
+    </Border>
+</Window>

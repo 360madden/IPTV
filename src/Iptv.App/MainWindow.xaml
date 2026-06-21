@@ -41,6 +41,12 @@
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
+                    <CheckBox Content="Basic mode"
+                              IsChecked="{Binding IsBasicMode}"
+                              VerticalAlignment="Center"
+                              Foreground="{StaticResource TextPrimaryBrush}"
+                              Margin="0,0,12,0"
+                              AutomationProperties.Name="Basic Mode" />
                     <Button Content="Import File"
                             Command="{Binding ImportFileCommand}" />
                     <Button Content="Load Sample"
@@ -214,6 +220,7 @@
                               Background="{StaticResource PanelAltBrush}"
                               Margin="0,0,0,14"
                               IsExpanded="True"
+                              Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                               AutomationProperties.Name="Channel Organization">
                         <Border Background="{StaticResource PanelAltBrush}"
                                 CornerRadius="10"
@@ -498,6 +505,7 @@
                               Background="{StaticResource PanelAltBrush}"
                               Margin="0,0,0,14"
                               IsExpanded="False"
+                              Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                               AutomationProperties.Name="Source Profiles">
                         <Border Background="{StaticResource PanelAltBrush}"
                                 CornerRadius="10"
@@ -727,6 +735,7 @@
                                       Background="{StaticResource PanelAltBrush}"
                                       Margin="0,8,0,0"
                                       IsExpanded="False"
+                                      Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                       AutomationProperties.Name="Refresh Approval">
                                 <StackPanel>
                                     <WrapPanel Margin="0,6,0,8">
@@ -781,6 +790,7 @@
                                       Background="{StaticResource PanelAltBrush}"
                                       Margin="0,8,0,0"
                                       IsExpanded="False"
+                                      Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                       AutomationProperties.Name="EPG Timeline">
                                 <StackPanel>
                                     <ComboBox ItemsSource="{Binding EpgTimelineWindowOptions}"
@@ -830,6 +840,7 @@
                                       Background="{StaticResource PanelAltBrush}"
                                       Margin="0,8,0,0"
                                       IsExpanded="False"
+                                      Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                       AutomationProperties.Name="Search Benchmark">
                                 <StackPanel>
                                     <Button Content="Run Search Benchmark"
@@ -1096,6 +1107,7 @@
                                   Background="{StaticResource PanelAltBrush}"
                                   Margin="0,8,0,0"
                                   IsExpanded="False"
+                                  Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                   AutomationProperties.Name="VOD Library">
                             <StackPanel>
                                 <WrapPanel Margin="0,6,0,8">
@@ -1353,6 +1365,7 @@
                                   Background="{StaticResource PanelAltBrush}"
                                   Margin="0,8,0,0"
                                   IsExpanded="False"
+                                  Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                   AutomationProperties.Name="Fallback Streams">
                             <Border Background="{StaticResource PanelAltBrush}"
                                     CornerRadius="8"
@@ -1388,6 +1401,7 @@
                                   Background="{StaticResource PanelAltBrush}"
                                   Margin="0,8,0,0"
                                   IsExpanded="False"
+                                  Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                   AutomationProperties.Name="VOD Detail Page">
                             <Border Background="{StaticResource PanelAltBrush}"
                                     CornerRadius="8"
@@ -1553,17 +1567,31 @@
                             Background="{StaticResource PanelAltBrush}"
                             CornerRadius="10"
                             Padding="12"
-                            Margin="0,14,0,0">
+                            Margin="0,14,0,0"
+                            Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
                             <TextBlock Text="Diagnostics"
                                        FontWeight="SemiBold"
-                                       Margin="0,0,0,8" />
+                                       Margin="0,0,8,8"
+                                       VerticalAlignment="Center" />
+                            <Button Grid.Row="0"
+                                    Grid.Column="1"
+                                    Content="Export Redacted Diagnostics"
+                                    Command="{Binding ExportDiagnosticsCommand}"
+                                    HorizontalAlignment="Right"
+                                    Margin="0,0,0,8"
+                                    AutomationProperties.Name="Export Redacted Diagnostics" />
                             <Expander Grid.Row="1"
+                                      Grid.ColumnSpan="2"
                                       Header="{Binding StreamHealthSummaryText}"
                                       Foreground="{StaticResource TextPrimaryBrush}"
                                       Background="{StaticResource PanelAltBrush}"
@@ -1592,6 +1620,7 @@
                                 </StackPanel>
                             </Expander>
                             <ListBox Grid.Row="2"
+                                     Grid.ColumnSpan="2"
                                      ItemsSource="{Binding Diagnostics}"
                                      Background="Transparent"
                                      BorderThickness="0"
@@ -1609,10 +1638,35 @@
                 Background="{StaticResource PanelBrush}"
                 BorderBrush="#283243"
                 BorderThickness="0,1,0,0">
-            <TextBlock Text="{Binding StatusText}"
-                       VerticalAlignment="Center"
-                       Margin="18,0"
-                       Foreground="{StaticResource TextSecondaryBrush}" />
+            <Grid Margin="18,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding StatusText}"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding IsImporting, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ProgressBar Width="150"
+                                     Height="8"
+                                     Margin="0,4,10,0"
+                                     IsIndeterminate="True"
+                                     AutomationProperties.Name="Playlist Import Progress" />
+                        <TextBlock Text="{Binding ImportProgressText}"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   AutomationProperties.Name="Playlist Import Progress Text" />
+                    </StackPanel>
+                </StackPanel>
+                <Button Grid.Column="1"
+                        Content="Cancel Import"
+                        Command="{Binding CancelImportCommand}"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding IsImporting, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        AutomationProperties.Name="Cancel Playlist Import" />
+            </Grid>
         </Border>
     </Grid>
 </Window>

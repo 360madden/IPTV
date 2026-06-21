@@ -118,6 +118,22 @@ public sealed class PlaylistDialogService : IPlaylistDialogService
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
+    public string? PickDiagnosticsExportFile()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export redacted diagnostics",
+            Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*",
+            DefaultExt = ".txt",
+            AddExtension = true,
+            CheckPathExists = true,
+            OverwritePrompt = true,
+            FileName = $"iptv-diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt"
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
     public string? PromptPlaylistUrl()
     {
         var dialog = new UrlPromptWindow

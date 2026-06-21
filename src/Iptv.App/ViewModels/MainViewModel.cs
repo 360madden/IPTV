@@ -31,7 +31,6 @@ public sealed class MainViewModel : ObservableObject
     private const int StandardVisibleChannelResults = 50_000;
     private const int LargeLibraryVisibleChannelResults = 10_000;
     private const int MaximumLogoPrefetchCount = 250;
-    private const int MaximumStreamHealthRows = 100;
     private const int MaximumEpgTimelineRows = 250;
     private const int MaximumDuplicateGroups = 100;
     private const int MaximumVodLibraryItems = 1_000;
@@ -62,7 +61,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly Dictionary<string, string> sourceProfileNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ProviderPlaybackProfile> sourcePlaybackProfiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> lockedGroups = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<Guid, StreamHealthSnapshot> streamHealthSnapshots = [];
+    private readonly StreamHealthTracker streamHealthTracker = new();
     private readonly Stack<ChannelUndoAction> organizationUndoStack = new();
     private readonly List<EpgProgram> epgPrograms = [];
     private readonly Dictionary<string, List<EpgProgram>> epgProgramsByChannelKey = new(StringComparer.Ordinal);
@@ -131,6 +130,10 @@ public sealed class MainViewModel : ObservableObject
     private int selectedChannelCount;
     private bool isUpdatingSelectedChannelOrganization;
     private bool isBusy;
+    private bool isImporting;
+    private string importProgressText = "Import idle.";
+    private CancellationTokenSource? importCts;
+    private bool isBasicMode;
     private string statusText = "Import a user-provided M3U/M3U8 playlist to begin.";
     private string playbackStatusText = "Playback idle.";
     private string importSummaryText = "No playlist imported yet.";
@@ -177,6 +180,7 @@ public sealed class MainViewModel : ObservableObject
         ImportFileCommand = new AsyncRelayCommand(_ => ImportFileAsync(), _ => !IsBusy);
         ImportUrlCommand = new AsyncRelayCommand(_ => ImportUrlAsync(), _ => !IsBusy);
         LoadSampleCommand = new AsyncRelayCommand(_ => LoadSampleAsync(), _ => !IsBusy);
+        CancelImportCommand = new RelayCommand(_ => CancelImport(), _ => IsImporting);
         RefreshPlaylistCommand = new AsyncRelayCommand(_ => RefreshPlaylistAsync(), _ => !IsBusy && lastPlaylistImport is not null);
         ImportEpgCommand = new AsyncRelayCommand(_ => ImportEpgAsync(), _ => !IsBusy);
         ImportEpgUrlCommand = new AsyncRelayCommand(_ => ImportEpgUrlAsync(), _ => !IsBusy);
@@ -229,6 +233,7 @@ public sealed class MainViewModel : ObservableObject
         PrefetchVisibleLogosCommand = new AsyncRelayCommand(_ => PrefetchVisibleLogosAsync(), _ => VisibleChannels.Count > 0);
         UndoOrganizationActionCommand = new RelayCommand(_ => UndoLastOrganizationAction(), _ => organizationUndoStack.Count > 0);
         ClearStreamHealthCommand = new RelayCommand(_ => ClearStreamHealth(), _ => StreamHealthRows.Count > 0);
+        ExportDiagnosticsCommand = new AsyncRelayCommand(_ => ExportDiagnosticsAsync(), _ => Diagnostics.Count > 0);
         ImportOrganizationCommand = new AsyncRelayCommand(_ => ImportOrganizationAsync(), _ => !IsBusy);
         ExportOrganizationCommand = new AsyncRelayCommand(_ => ExportOrganizationAsync(), _ => !IsBusy);
         ClearFiltersCommand = new RelayCommand(_ => ClearFilters());
@@ -359,6 +364,8 @@ public sealed class MainViewModel : ObservableObject
 
     public ICommand LoadSampleCommand { get; }
 
+    public ICommand CancelImportCommand { get; }
+
     public ICommand RefreshPlaylistCommand { get; }
 
     public ICommand ImportEpgCommand { get; }
@@ -462,6 +469,8 @@ public sealed class MainViewModel : ObservableObject
     public ICommand UndoOrganizationActionCommand { get; }
 
     public ICommand ClearStreamHealthCommand { get; }
+
+    public ICommand ExportDiagnosticsCommand { get; }
 
     public ICommand ImportOrganizationCommand { get; }
 
@@ -950,6 +959,46 @@ public sealed class MainViewModel : ObservableObject
             }
         }
     }
+
+    public bool IsImporting
+    {
+        get => isImporting;
+        private set
+        {
+            if (SetProperty(ref isImporting, value))
+            {
+                if (CancelImportCommand is RelayCommand cancel)
+                {
+                    cancel.RaiseCanExecuteChanged();
+                }
+            }
+        }
+    }
+
+    public string ImportProgressText
+    {
+        get => importProgressText;
+        private set => SetProperty(ref importProgressText, value);
+    }
+
+    public bool IsBasicMode
+    {
+        get => isBasicMode;
+        set
+        {
+            if (SetProperty(ref isBasicMode, value))
+            {
+                OnPropertyChanged(nameof(IsAdvancedModeVisible));
+                StatusText = value
+                    ? "Basic mode enabled: advanced organization, EPG, VOD, diagnostics, and release panels are hidden."
+                    : "Advanced mode enabled: full IPTV organization and diagnostics panels are visible.";
+            }
+        }
+    }
+
+    public bool IsAdvancedModeVisible => !IsBasicMode;
+
+    public bool HasChannels => allChannels.Count > 0;
 
     public string StatusText
     {
@@ -1442,6 +1491,8 @@ public sealed class MainViewModel : ObservableObject
     public async ValueTask DisposeAsync()
     {
         shutdownCts.Cancel();
+        importCts?.Cancel();
+        importCts?.Dispose();
         searchCts?.Cancel();
         searchCts?.Dispose();
         refreshScheduleCts?.Cancel();
@@ -1530,14 +1581,22 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task ImportAsync(Func<CancellationToken, Task<PlaylistImportResult>> import, bool rememberForRefresh)
     {
+        CancellationTokenSource? activeImportCts = null;
         try
         {
             IsBusy = true;
+            IsImporting = true;
+            importCts?.Dispose();
+            importCts = CancellationTokenSource.CreateLinkedTokenSource(shutdownCts.Token);
+            activeImportCts = importCts;
+            CancellationToken importToken = activeImportCts.Token;
+
+            ImportProgressText = "Starting playlist import...";
             StatusText = "Importing playlist...";
             AddDiagnostic("Playlist import started.");
             Channel[] previousChannels = allChannels.ToArray();
             HashSet<Guid> previousIds = previousChannels.Select(channel => channel.Id).ToHashSet();
-            PlaylistImportResult result = await import(shutdownCts.Token).ConfigureAwait(true);
+            PlaylistImportResult result = await import(importToken).ConfigureAwait(true);
 
             if (result.Summary.ErrorCount > 0 && result.Channels.Count == 0)
             {
@@ -1549,12 +1608,16 @@ public sealed class MainViewModel : ObservableObject
                 return;
             }
 
+            ImportProgressText = $"Applying saved organization to {result.Channels.Count:N0} imported entries...";
             allChannels.Clear();
             allChannels.AddRange(result.Channels.Select(ApplyUserState));
+            OnPropertyChanged(nameof(HasChannels));
             SelectedChannel = null;
             RefreshGroupsAndCategories();
             PopulateImportIssues(result.Issues);
-            await ApplySearchAsync(shutdownCts.Token).ConfigureAwait(true);
+            ImportProgressText = "Indexing visible channel list...";
+            await ApplySearchAsync(importToken).ConfigureAwait(true);
+            ImportProgressText = "Refreshing organization, VOD, duplicate, audit, and EPG summaries...";
             RefreshVodLibrary();
             RefreshDuplicateGroups();
             RefreshHiddenLockedAudit();
@@ -1583,10 +1646,12 @@ public sealed class MainViewModel : ObservableObject
             lastPlaylistImportedAt = DateTimeOffset.UtcNow;
             UpdateRefreshScheduleStatus();
             QueueAutoXmltvImportIfEnabled();
+            ImportProgressText = $"Import complete: {result.Summary.ImportedCount:N0} channels.";
         }
         catch (OperationCanceledException)
         {
             StatusText = "Import cancelled.";
+            ImportProgressText = "Import cancelled.";
             AddDiagnostic("Playlist import cancelled.");
         }
         catch (Exception ex)
@@ -1598,8 +1663,27 @@ public sealed class MainViewModel : ObservableObject
         }
         finally
         {
+            if (ReferenceEquals(importCts, activeImportCts))
+            {
+                importCts = null;
+            }
+
+            activeImportCts?.Dispose();
+            IsImporting = false;
             IsBusy = false;
         }
+    }
+
+    private void CancelImport()
+    {
+        if (!IsImporting || importCts is null)
+        {
+            return;
+        }
+
+        ImportProgressText = "Cancelling playlist import...";
+        StatusText = "Cancelling playlist import...";
+        importCts.Cancel();
     }
 
     private async Task RefreshPlaylistAsync()
@@ -1859,6 +1943,45 @@ public sealed class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             ShowSafeError("Organization export failed", ex);
+        }
+    }
+
+    private async Task ExportDiagnosticsAsync()
+    {
+        try
+        {
+            if (Diagnostics.Count == 0)
+            {
+                StatusText = "No diagnostics are available to export.";
+                return;
+            }
+
+            string? path = dialogService.PickDiagnosticsExportFile();
+            if (path is null)
+            {
+                return;
+            }
+
+            string[] lines =
+            [
+                "IPTV Viewer redacted diagnostics",
+                $"Exported: {DateTimeOffset.Now:O}",
+                "Raw stream URLs, credentials, and token-like query values are redacted before export.",
+                string.Empty,
+                .. Diagnostics.Select(SensitiveTextRedactor.RedactText)
+            ];
+
+            await File.WriteAllLinesAsync(path, lines, shutdownCts.Token).ConfigureAwait(true);
+            StatusText = $"Exported redacted diagnostics to {Path.GetFileName(path)}.";
+            AddDiagnostic($"Exported redacted diagnostics to {Path.GetFileName(path)}.");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Diagnostics export cancelled.";
+        }
+        catch (Exception ex)
+        {
+            ShowSafeError("Diagnostics export failed", ex);
         }
     }
 
@@ -3578,6 +3701,7 @@ public sealed class MainViewModel : ObservableObject
             PlaylistImportResult result = pendingRefreshResult;
             allChannels.Clear();
             allChannels.AddRange(pendingRefreshChannels);
+            OnPropertyChanged(nameof(HasChannels));
             SelectedChannel = null;
             RefreshGroupsAndCategories();
             PopulateImportIssues(result.Issues);
@@ -3875,12 +3999,10 @@ public sealed class MainViewModel : ObservableObject
             reasons.Add(channel.StreamUrl.Uri.Scheme);
         }
 
-        if (streamHealthSnapshots.TryGetValue(channel.Id, out StreamHealthSnapshot? health))
+        if (streamHealthTracker.TryGetFallbackScoreImpact(channel.Id, out int healthScoreAdjustment, out string healthReason))
         {
-            score += Math.Min(30, health.SuccessCount * 10);
-            score -= Math.Min(35, health.FailureCount * 12);
-            score -= Math.Min(15, health.SlowEventCount * 5);
-            reasons.Add($"{health.LastStatus}");
+            score += healthScoreAdjustment;
+            reasons.Add(healthReason);
         }
         else
         {
@@ -4261,54 +4383,21 @@ public sealed class MainViewModel : ObservableObject
 
     private void UpdateStreamHealth(PlaybackStateSnapshot state)
     {
-        if (state.Channel is null)
+        if (streamHealthTracker.Record(state))
         {
-            return;
+            RefreshStreamHealthRows();
         }
-
-        streamHealthSnapshots.TryGetValue(state.Channel.Id, out StreamHealthSnapshot? current);
-        current ??= new StreamHealthSnapshot(
-            state.Channel.Id,
-            state.Channel.DisplayName,
-            state.Channel.StreamUrl.Host,
-            state.Status,
-            0,
-            0,
-            0,
-            state.UpdatedAt,
-            state.Message);
-
-        int success = current.SuccessCount + (state.Status == PlaybackStatus.Playing ? 1 : 0);
-        int failure = current.FailureCount + (state.Status is PlaybackStatus.Failed or PlaybackStatus.Unsupported or PlaybackStatus.TimedOut ? 1 : 0);
-        int slow = current.SlowEventCount + (state.Status is PlaybackStatus.Buffering or PlaybackStatus.Retrying ? 1 : 0);
-        streamHealthSnapshots[state.Channel.Id] = current with
-        {
-            LastStatus = state.Status,
-            SuccessCount = success,
-            FailureCount = failure,
-            SlowEventCount = slow,
-            LastUpdatedAt = state.UpdatedAt,
-            LastMessage = SensitiveTextRedactor.RedactText(state.Message)
-        };
-
-        RefreshStreamHealthRows();
     }
 
     private void RefreshStreamHealthRows()
     {
         StreamHealthRows.Clear();
-        foreach (StreamHealthSnapshot snapshot in streamHealthSnapshots.Values
-                     .OrderByDescending(snapshot => snapshot.FailureCount)
-                     .ThenByDescending(snapshot => snapshot.SlowEventCount)
-                     .ThenByDescending(snapshot => snapshot.LastUpdatedAt)
-                     .Take(MaximumStreamHealthRows))
+        foreach (StreamHealthViewModel row in streamHealthTracker.CreateRows())
         {
-            StreamHealthRows.Add(snapshot.ToViewModel());
+            StreamHealthRows.Add(row);
         }
 
-        int failures = streamHealthSnapshots.Values.Sum(snapshot => snapshot.FailureCount);
-        int slow = streamHealthSnapshots.Values.Sum(snapshot => snapshot.SlowEventCount);
-        StreamHealthSummaryText = $"Stream health: {streamHealthSnapshots.Count:N0} checked; {failures:N0} failures; {slow:N0} buffering/retry events.";
+        StreamHealthSummaryText = streamHealthTracker.SummaryText;
         if (ClearStreamHealthCommand is RelayCommand clear)
         {
             clear.RaiseCanExecuteChanged();
@@ -4317,7 +4406,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void ClearStreamHealth()
     {
-        streamHealthSnapshots.Clear();
+        streamHealthTracker.Clear();
         StreamHealthRows.Clear();
         StreamHealthSummaryText = "Stream health cleared.";
         if (ClearStreamHealthCommand is RelayCommand clear)
@@ -4996,6 +5085,11 @@ public sealed class MainViewModel : ObservableObject
             refresh.RaiseCanExecuteChanged();
         }
 
+        if (CancelImportCommand is RelayCommand cancelImport)
+        {
+            cancelImport.RaiseCanExecuteChanged();
+        }
+
         if (ImportEpgCommand is AsyncRelayCommand epg)
         {
             epg.RaiseCanExecuteChanged();
@@ -5029,6 +5123,11 @@ public sealed class MainViewModel : ObservableObject
         if (ExportOrganizationCommand is AsyncRelayCommand exportOrganization)
         {
             exportOrganization.RaiseCanExecuteChanged();
+        }
+
+        if (ExportDiagnosticsCommand is AsyncRelayCommand exportDiagnostics)
+        {
+            exportDiagnostics.RaiseCanExecuteChanged();
         }
 
         if (ImportSmartGroupPresetsCommand is AsyncRelayCommand importPresets)
@@ -5126,6 +5225,11 @@ public sealed class MainViewModel : ObservableObject
         {
             Diagnostics.RemoveAt(Diagnostics.Count - 1);
         }
+
+        if (ExportDiagnosticsCommand is AsyncRelayCommand exportDiagnostics)
+        {
+            exportDiagnostics.RaiseCanExecuteChanged();
+        }
     }
 
     private sealed record ChannelUndoAction(string Description, ChannelUndoSnapshot[] Snapshots);
@@ -5162,32 +5266,6 @@ public sealed class MainViewModel : ObservableObject
                 LastWatchedAt = LastWatchedAt,
                 ResumeProgressPercent = ResumeProgressPercent
             };
-        }
-    }
-
-    private sealed record StreamHealthSnapshot(
-        Guid ChannelId,
-        string ChannelName,
-        string Host,
-        PlaybackStatus LastStatus,
-        int SuccessCount,
-        int FailureCount,
-        int SlowEventCount,
-        DateTimeOffset LastUpdatedAt,
-        string LastMessage)
-    {
-        public StreamHealthViewModel ToViewModel()
-        {
-            return new StreamHealthViewModel(
-                ChannelId,
-                ChannelName,
-                Host,
-                LastStatus,
-                SuccessCount,
-                FailureCount,
-                SlowEventCount,
-                LastUpdatedAt,
-                LastMessage);
         }
     }
 

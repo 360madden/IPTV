@@ -18,6 +18,8 @@ public interface IPlaylistDialogService
 
     string? PickCustomGroupCsvExportFile();
 
+    string? PickDiagnosticsExportFile();
+
     string? PromptPlaylistUrl();
 
     string? PromptXmltvUrl();
