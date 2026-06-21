@@ -98,6 +98,7 @@ public sealed class JsonChannelOrganizationPreferencesStore : IChannelOrganizati
             .ToArray();
         Dictionary<string, string> profileNames = NormalizeProfileNames(preferences.SourceProfileNames);
         Dictionary<string, ProviderPlaybackProfile> playbackProfiles = NormalizePlaybackProfiles(preferences.SourcePlaybackProfiles);
+        Dictionary<string, string[]> sourceHiddenGroups = NormalizeSourceHiddenGroups(preferences.SourceDefaultHiddenGroups);
         string[] lockedGroups = NormalizeGroups(preferences.LockedGroups);
 
         return preferences with
@@ -111,6 +112,7 @@ public sealed class JsonChannelOrganizationPreferencesStore : IChannelOrganizati
                 : ChannelViewDensity.Comfortable,
             SourceProfileNames = profileNames,
             SourcePlaybackProfiles = playbackProfiles,
+            SourceDefaultHiddenGroups = sourceHiddenGroups,
             RefreshIntervalMinutes = NormalizeRefreshInterval(preferences.RefreshIntervalMinutes),
             LockedGroups = lockedGroups,
             ParentalPinSalt = NormalizeSecret(preferences.ParentalPinSalt),
@@ -179,6 +181,31 @@ public sealed class JsonChannelOrganizationPreferencesStore : IChannelOrganizati
                 RetryCount = Math.Clamp(profile.RetryCount, 0, 3),
                 BufferingPreset = bufferingPreset
             };
+        }
+
+        return normalized;
+    }
+
+    private static Dictionary<string, string[]> NormalizeSourceHiddenGroups(IDictionary<string, string[]>? sourceHiddenGroups)
+    {
+        var normalized = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        if (sourceHiddenGroups is null)
+        {
+            return normalized;
+        }
+
+        foreach ((string sourceId, string[] groups) in sourceHiddenGroups)
+        {
+            if (string.IsNullOrWhiteSpace(sourceId))
+            {
+                continue;
+            }
+
+            string[] hiddenGroups = NormalizeGroups(groups);
+            if (hiddenGroups.Length > 0)
+            {
+                normalized[sourceId.Trim()] = hiddenGroups;
+            }
         }
 
         return normalized;

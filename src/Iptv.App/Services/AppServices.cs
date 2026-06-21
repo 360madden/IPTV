@@ -3,6 +3,7 @@ using Iptv.App.ViewModels;
 using Iptv.Epg;
 using Iptv.Persistence;
 using Iptv.Persistence.Logos;
+using Iptv.Persistence.RecentPlaylists;
 using Iptv.Persistence.SmartGroups;
 using Iptv.Persistence.SourceProfiles;
 using Iptv.Playback;
@@ -27,6 +28,7 @@ public static class AppServices
         var organizationPreferencesStore = new JsonChannelOrganizationPreferencesStore(appDataDirectory);
         var organizationBackupService = new JsonChannelOrganizationBackupService();
         var logoCacheService = new LogoCacheService(appDataDirectory is null ? null : Path.Combine(appDataDirectory, "logos"));
+        var recentPlaylistSourceFileService = new JsonRecentPlaylistSourceFileService();
         var sourceProfileFileService = new JsonSourceProfileFileService();
         var smartGroupPresetFileService = new JsonSmartGroupPresetFileService();
         var uiPreferencesStore = new JsonUiPreferencesStore(appDataDirectory);
@@ -41,6 +43,7 @@ public static class AppServices
             organizationPreferencesStore,
             organizationBackupService,
             logoCacheService,
+            recentPlaylistSourceFileService,
             sourceProfileFileService,
             smartGroupPresetFileService,
             uiPreferencesStore,

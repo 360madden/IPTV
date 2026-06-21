@@ -91,7 +91,16 @@ public sealed class JsonSourceProfileFileService : ISourceProfileFileService
                 .ToDictionary(pair => pair.Key.Trim(), pair => pair.Value.Trim(), StringComparer.OrdinalIgnoreCase),
             SourcePlaybackProfiles = (export.SourcePlaybackProfiles ?? new Dictionary<string, ProviderPlaybackProfile>(StringComparer.OrdinalIgnoreCase))
                 .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
-                .ToDictionary(pair => pair.Key.Trim(), pair => Normalize(pair.Value), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(pair => pair.Key.Trim(), pair => Normalize(pair.Value), StringComparer.OrdinalIgnoreCase),
+            SourceDefaultHiddenGroups = (export.SourceDefaultHiddenGroups ?? new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase))
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
+                .Select(pair => new
+                {
+                    SourceId = pair.Key.Trim(),
+                    Groups = NormalizeGroups(pair.Value)
+                })
+                .Where(pair => pair.Groups.Length > 0)
+                .ToDictionary(pair => pair.SourceId, pair => pair.Groups, StringComparer.OrdinalIgnoreCase)
         };
     }
 
@@ -104,5 +113,27 @@ public sealed class JsonSourceProfileFileService : ISourceProfileFileService
                 ? profile.BufferingPreset
                 : BufferingPreset.Balanced
         };
+    }
+
+    private static string[] NormalizeGroups(IEnumerable<string>? groups)
+    {
+        return (groups ?? [])
+            .Select(NormalizeGroup)
+            .Where(group => group is not null)
+            .Select(group => group!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string? NormalizeGroup(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string normalized = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length == 0 ? null : normalized;
     }
 }

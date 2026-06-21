@@ -51,7 +51,7 @@ For signed MSIX release candidates, configure `IPTV_MSIX_CERT_BASE64` and `IPTV_
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -CreateMsix -SignCertificatePath <path-to-pfx>
 ```
 
-Use `tools\configure-msix-signing-secrets.ps1 -PfxPath <trusted-cert.pfx> -PfxPassword <password>` when replacing the temporary self-signed CI certificate with a trusted certificate. Use `tools\start-github-release.ps1 -TagName v0.1.0 -Prerelease -WhatIf` to preview release workflow dispatch before creating a tag/release.
+Use `tools\configure-msix-signing-secrets.ps1 -PfxPath <trusted-cert.pfx> -PfxPassword <password>` when replacing the temporary self-signed CI certificate with a trusted certificate. Confirm the cert chain is trusted on a clean Windows profile before distributing a signed MSIX; self-signed packages are tester-only. Use `tools\start-github-release.ps1 -TagName v0.1.0 -Prerelease -WhatIf` to preview release workflow dispatch before creating a tag/release.
 
 ## 5. Release Notes Check
 

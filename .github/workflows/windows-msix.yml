@@ -84,6 +84,11 @@ jobs:
         shell: pwsh
         run: .\tools\validate-release-zip.ps1
 
+      - name: Launch release ZIP smoke
+        shell: pwsh
+        continue-on-error: true
+        run: .\tools\validate-release-zip.ps1 -LaunchSeconds 3 -PlaylistFile .\assets\sample-playlists\synthetic-news-sports.m3u
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:

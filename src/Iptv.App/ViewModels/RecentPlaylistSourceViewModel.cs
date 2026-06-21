@@ -8,9 +8,10 @@ public sealed record RecentPlaylistSourceViewModel(
     RecentPlaylistSourceKind Kind,
     string DisplayName,
     string Value,
-    DateTimeOffset LastUsedAt)
+    DateTimeOffset LastUsedAt,
+    bool IsPinned = false)
 {
-    public string DisplayText => $"{DisplayName} · {KindLabel} · {LastUsedAt.LocalDateTime:g}";
+    public string DisplayText => $"{(IsPinned ? "★ " : string.Empty)}{DisplayName} · {KindLabel} · {LastUsedAt.LocalDateTime:g}";
 
     public string KindLabel => Kind == RecentPlaylistSourceKind.RemoteUrl ? "URL" : "File";
 
@@ -21,6 +22,7 @@ public sealed record RecentPlaylistSourceViewModel(
             Kind = Kind,
             DisplayName = DisplayName,
             Value = Value,
+            IsPinned = IsPinned,
             LastUsedAt = LastUsedAt
         };
     }
@@ -35,7 +37,8 @@ public sealed record RecentPlaylistSourceViewModel(
             preference.Kind,
             displayName,
             value,
-            preference.LastUsedAt == default ? DateTimeOffset.UtcNow : preference.LastUsedAt);
+            preference.LastUsedAt == default ? DateTimeOffset.UtcNow : preference.LastUsedAt,
+            preference.IsPinned);
     }
 
     public static string CreateDisplayName(RecentPlaylistSourceKind kind, string value)

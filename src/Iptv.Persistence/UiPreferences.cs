@@ -36,6 +36,8 @@ public sealed record RecentPlaylistSourcePreference
 
     public string Value { get; init; } = string.Empty;
 
+    public bool IsPinned { get; init; }
+
     public DateTimeOffset LastUsedAt { get; init; } = DateTimeOffset.UtcNow;
 }
 

@@ -110,11 +110,34 @@
                               Background="{StaticResource PanelAltBrush}"
                               Foreground="Black"
                               AutomationProperties.Name="Recent Playlist Sources" />
+                    <TextBox Text="{Binding RecentPlaylistSourceName, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,0,0,8"
+                             AutomationProperties.Name="Recent Playlist Source Name" />
                     <WrapPanel Margin="0,0,0,14">
                         <Button Content="Open Recent"
                                 Command="{Binding OpenRecentPlaylistSourceCommand}"
                                 Margin="0,0,8,8"
                                 AutomationProperties.Name="Open Recent Playlist" />
+                        <Button Content="Rename"
+                                Command="{Binding RenameRecentPlaylistSourceCommand}"
+                                Margin="0,0,8,8"
+                                AutomationProperties.Name="Rename Recent Playlist" />
+                        <Button Content="{Binding PinRecentPlaylistSourceLabel}"
+                                Command="{Binding TogglePinRecentPlaylistSourceCommand}"
+                                Margin="0,0,8,8"
+                                AutomationProperties.Name="Pin Recent Playlist" />
+                        <Button Content="Remove"
+                                Command="{Binding RemoveRecentPlaylistSourceCommand}"
+                                Margin="0,0,8,8"
+                                AutomationProperties.Name="Remove Recent Playlist" />
+                        <Button Content="Import List"
+                                Command="{Binding ImportRecentPlaylistSourcesCommand}"
+                                Margin="0,0,8,8"
+                                AutomationProperties.Name="Import Recent Playlist Sources" />
+                        <Button Content="Export List"
+                                Command="{Binding ExportRecentPlaylistSourcesCommand}"
+                                Margin="0,0,8,8"
+                                AutomationProperties.Name="Export Recent Playlist Sources" />
                         <Button Content="Clear"
                                 Command="{Binding ClearRecentPlaylistSourcesCommand}"
                                 Margin="0,0,8,8"
@@ -590,6 +613,29 @@
                                             Margin="0,0,8,8"
                                             AutomationProperties.Name="Export Source Profiles" />
                                 </WrapPanel>
+                                <TextBlock Text="Default group visibility"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,6" />
+                                <TextBlock Text="{Binding SourceDefaultVisibilitySummaryText}"
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,0,0,8" />
+                                <ComboBox ItemsSource="{Binding SourceDefaultVisibilityGroups}"
+                                          SelectedItem="{Binding SelectedSourceDefaultVisibilityGroup}"
+                                          Padding="6"
+                                          Margin="0,0,0,8"
+                                          Foreground="Black"
+                                          AutomationProperties.Name="Source Default Visibility Group" />
+                                <WrapPanel Margin="0,0,0,12">
+                                    <Button Content="Hide By Default"
+                                            Command="{Binding HideSourceDefaultGroupCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Hide Source Group By Default" />
+                                    <Button Content="Show By Default"
+                                            Command="{Binding ShowSourceDefaultGroupCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Show Source Group By Default" />
+                                </WrapPanel>
                                 <TextBlock Text="Refresh schedule"
                                            FontWeight="SemiBold"
                                            Margin="0,0,0,6" />
@@ -780,6 +826,29 @@
                                        Margin="0,8,0,0"
                                        TextWrapping="Wrap"
                                        Foreground="{StaticResource TextSecondaryBrush}" />
+                            <Expander Header="{Binding LibraryHealthSummaryText}"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Background="{StaticResource PanelAltBrush}"
+                                      Margin="0,8,0,0"
+                                      IsExpanded="False"
+                                      Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                      AutomationProperties.Name="Library Health Dashboard">
+                                <ListBox ItemsSource="{Binding LibraryHealthMetrics}"
+                                         MaxHeight="160"
+                                         Background="Transparent"
+                                         BorderBrush="#334056"
+                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         ScrollViewer.CanContentScroll="True"
+                                         VirtualizingPanel.IsVirtualizing="True">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayText}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,0,0,6" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Expander>
                             <TextBlock Text="{Binding ConflictReviewText}"
                                        Margin="0,8,0,0"
                                        TextWrapping="Wrap"

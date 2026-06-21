@@ -1,0 +1,51 @@
+<Window x:Class="Iptv.App.PreviewConfirmWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Review Changes"
+        Width="620"
+        Height="440"
+        MinWidth="500"
+        MinHeight="320"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource AppBackgroundBrush}"
+        AutomationProperties.Name="Preview Confirm Dialog">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="{Binding TitleText}"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       TextWrapping="Wrap" />
+            <TextBlock Text="{Binding MessageText}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       TextWrapping="Wrap"
+                       Margin="0,8,0,14" />
+        </StackPanel>
+
+        <ListBox Grid.Row="1"
+                 ItemsSource="{Binding PreviewLines}"
+                 Background="{StaticResource PanelAltBrush}"
+                 BorderBrush="#334056"
+                 Foreground="{StaticResource TextPrimaryBrush}"
+                 ScrollViewer.CanContentScroll="True"
+                 VirtualizingPanel.IsVirtualizing="True"
+                 AutomationProperties.Name="Preview Confirm List" />
+
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,16,0,0">
+            <Button Content="Cancel"
+                    Click="Cancel_Click" />
+            <Button Content="{Binding ConfirmText}"
+                    Background="{StaticResource AccentBrush}"
+                    Click="Confirm_Click"
+                    AutomationProperties.Name="Confirm Preview Changes" />
+        </StackPanel>
+    </Grid>
+</Window>

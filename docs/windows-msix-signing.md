@@ -36,6 +36,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\configure-msix-signi
 
 Omit `-PfxPath` only for temporary self-signed tester builds.
 
+For trusted distribution, use a CA-issued or enterprise-trusted PFX stored outside the repo and restrict access to the GitHub environment that publishes releases. Before relying on a signed MSIX, install/test it on a clean Windows profile where the certificate chain is already trusted; self-signed certificates are suitable only for private tester builds.
+
 ## Local dry run
 
 ```powershell

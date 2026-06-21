@@ -30,6 +30,7 @@ public sealed class JsonUiPreferencesStoreTests
                         Kind = RecentPlaylistSourceKind.RemoteUrl,
                         DisplayName = "Example",
                         Value = "https://example.test/list.m3u",
+                        IsPinned = true,
                         LastUsedAt = DateTimeOffset.Parse("2026-06-21T00:00:00Z")
                     }
                 ]
@@ -54,6 +55,7 @@ public sealed class JsonUiPreferencesStoreTests
             Assert.Equal(RecentPlaylistSourceKind.RemoteUrl, recent.Kind);
             Assert.Equal("Example", recent.DisplayName);
             Assert.Equal("https://example.test/list.m3u", recent.Value);
+            Assert.True(recent.IsPinned);
         }
         finally
         {

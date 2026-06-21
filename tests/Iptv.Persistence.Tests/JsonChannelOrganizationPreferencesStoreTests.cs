@@ -28,6 +28,10 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
                     {
                         [" source-a "] = new() { RetryCount = 9, BufferingPreset = BufferingPreset.PoorNetwork }
                     },
+                    SourceDefaultHiddenGroups = new Dictionary<string, string[]>
+                    {
+                        [" source-a "] = [" Kids ", "Kids", "Premium"]
+                    },
                     RefreshScheduleEnabled = true,
                     RefreshIntervalMinutes = 3,
                     ParentalPinSalt = " salt ",
@@ -47,6 +51,7 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
             Assert.Equal("Provider A", loaded.SourceProfileNames["source-a"]);
             Assert.Equal(3, loaded.SourcePlaybackProfiles["source-a"].RetryCount);
             Assert.Equal(BufferingPreset.PoorNetwork, loaded.SourcePlaybackProfiles["source-a"].BufferingPreset);
+            Assert.Equal(["Kids", "Premium"], loaded.SourceDefaultHiddenGroups["source-a"]);
             Assert.True(loaded.RefreshScheduleEnabled);
             Assert.Equal(5, loaded.RefreshIntervalMinutes);
             Assert.Equal("salt", loaded.ParentalPinSalt);
