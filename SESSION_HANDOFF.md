@@ -25,6 +25,7 @@ The practical 1-10 follow-up was completed in small, reviewable pieces:
 - Improved duplicate-dialog GUI smoke timing with a configurable timeout.
 - Added `tools/configure-msix-signing-secrets.ps1` and configured `IPTV_MSIX_CERT_BASE64` / `IPTV_MSIX_CERT_PASSWORD` in `360madden/IPTV` using a temporary self-signed certificate.
 - Added `.github/workflows/github-release.yml` for manual ZIP/MSIX GitHub Release publishing.
+- Hardened MSIX signing-secret setup and workflow decode after a CI catch showed the certificate secret needed a safer env-file write path and clearer base64 validation.
 
 ## Validation Snapshot
 
@@ -38,6 +39,7 @@ Local validation passed on 2026-06-21:
 - `dotnet run --project .\tools\Iptv.Smoke\Iptv.Smoke.csproj --no-build -- --url https://www.apsattv.com/xumo.m3u --probe-count 3 --timeout-seconds 20` — imported 389 channels; 3/3 probes reached `Playing`
 - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\configure-msix-signing-secrets.ps1 -Repository 360madden/IPTV -Force`
 - `gh secret list --repo 360madden/IPTV` — confirmed both MSIX signing secrets exist
+- `dotnet format .\Iptv.slnx --verify-no-changes` and package dry-run were repeated after the MSIX signing workflow hardening.
 - `git diff --check`
 
 ## GitHub / Branch State
