@@ -16,9 +16,11 @@ public sealed class LibVlcPlaybackEngine : PlaybackEngineBase
     private Channel? currentChannel;
     private BufferingPreset bufferingPreset = BufferingPreset.Balanced;
     private int playAttemptVersion;
+    private int lastAlivePlaybackPromotionAttempt;
     private long lastKnownTimeMilliseconds = -1;
     private long lastKnownLengthMilliseconds = -1;
     private float lastKnownPosition = -1;
+    private volatile bool hasObservedPlaybackProgress;
     private bool disposed;
 
     public LibVlcPlaybackEngine(VideoView videoView)
@@ -48,7 +50,13 @@ public sealed class LibVlcPlaybackEngine : PlaybackEngineBase
         mediaPlayer.TimeChanged += (_, args) =>
         {
             lastKnownTimeMilliseconds = args.Time;
+            if (args.Time >= 0)
+            {
+                hasObservedPlaybackProgress = true;
+            }
+
             PublishProgressOnUi();
+            PromoteAlivePlaybackOnUi();
         };
         mediaPlayer.LengthChanged += (_, args) =>
         {
@@ -58,7 +66,13 @@ public sealed class LibVlcPlaybackEngine : PlaybackEngineBase
         mediaPlayer.PositionChanged += (_, args) =>
         {
             lastKnownPosition = args.Position;
+            if (args.Position >= 0)
+            {
+                hasObservedPlaybackProgress = true;
+            }
+
             PublishProgressOnUi();
+            PromoteAlivePlaybackOnUi();
         };
 
         videoView.MediaPlayer = mediaPlayer;
@@ -74,7 +88,9 @@ public sealed class LibVlcPlaybackEngine : PlaybackEngineBase
         lastKnownTimeMilliseconds = -1;
         lastKnownLengthMilliseconds = -1;
         lastKnownPosition = -1;
+        hasObservedPlaybackProgress = false;
         int attempt = Interlocked.Increment(ref playAttemptVersion);
+        Volatile.Write(ref lastAlivePlaybackPromotionAttempt, 0);
         Publish(PlaybackStatus.Loading, channel, "Opening stream...");
 
         currentMedia?.Dispose();
@@ -140,6 +156,21 @@ public sealed class LibVlcPlaybackEngine : PlaybackEngineBase
         return Task.CompletedTask;
     }
 
+    public override Task SetHardwareDecodingAsync(bool enabled, CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        mediaPlayer.EnableHardwareDecoding = enabled;
+        Publish(
+            PlaybackStatus.Idle,
+            currentChannel,
+            enabled
+                ? "Hardware decoding enabled. Retry the channel if video was black."
+                : "Hardware decoding disabled. Retry the channel if audio played with a black picture.",
+            CreateDiagnosticText());
+        return Task.CompletedTask;
+    }
+
     public override Task SeekToProgressAsync(int progressPercent, CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -183,7 +214,13 @@ public sealed class LibVlcPlaybackEngine : PlaybackEngineBase
         }
 
         PlaybackStatus status = CurrentState.Status;
-        if (status is PlaybackStatus.Loading or PlaybackStatus.Buffering)
+        if (IsPlaybackAlive())
+        {
+            PromoteAlivePlaybackOnUi();
+            return;
+        }
+
+        if (PlaybackStartupWatchdogPolicy.ShouldTimeout(status, isPlaybackAlive: false))
         {
             PublishOnUi(
                 PlaybackStatus.TimedOut,
@@ -202,15 +239,60 @@ public sealed class LibVlcPlaybackEngine : PlaybackEngineBase
         };
     }
 
-    private void PublishOnUi(PlaybackStatus status, Channel? channel, string message)
+    private bool IsPlaybackAlive()
     {
-        if (dispatcher.CheckAccess())
+        return mediaPlayer.IsPlaying || hasObservedPlaybackProgress;
+    }
+
+    private void PromoteAlivePlaybackOnUi()
+    {
+        if (currentChannel is null ||
+            !PlaybackStartupWatchdogPolicy.ShouldPromoteAlivePlayback(CurrentState.Status, IsPlaybackAlive()))
         {
-            Publish(status, channel, message);
             return;
         }
 
-        dispatcher.BeginInvoke(() => Publish(status, channel, message));
+        int attempt = Volatile.Read(ref playAttemptVersion);
+        if (Volatile.Read(ref lastAlivePlaybackPromotionAttempt) == attempt)
+        {
+            return;
+        }
+
+        Volatile.Write(ref lastAlivePlaybackPromotionAttempt, attempt);
+        string message = CurrentState.Status == PlaybackStatus.TimedOut
+            ? "Playback is active after a slow start. If audio plays but video stays black, try disabling hardware decoding and retry."
+            : "Playing.";
+        PublishOnUi(PlaybackStatus.Playing, currentChannel, message);
+    }
+
+    private void PublishOnUi(PlaybackStatus status, Channel? channel, string message)
+    {
+        string diagnosticText = CreateDiagnosticText();
+        if (dispatcher.CheckAccess())
+        {
+            Publish(status, channel, message, diagnosticText);
+            return;
+        }
+
+        dispatcher.BeginInvoke(() => Publish(status, channel, message, diagnosticText));
+    }
+
+    private string CreateDiagnosticText()
+    {
+        return $"VLC state {mediaPlayer.State}; playing {mediaPlayer.IsPlaying}; progress seen {hasObservedPlaybackProgress}; " +
+            $"time {FormatMilliseconds(lastKnownTimeMilliseconds)}; length {FormatMilliseconds(lastKnownLengthMilliseconds)}; " +
+            $"position {FormatPosition(lastKnownPosition)}; hardware decoding {(mediaPlayer.EnableHardwareDecoding ? "enabled" : "disabled")}; " +
+            $"buffering preset {bufferingPreset}.";
+    }
+
+    private static string FormatMilliseconds(long value)
+    {
+        return value < 0 ? "unknown" : $"{value:N0} ms";
+    }
+
+    private static string FormatPosition(float value)
+    {
+        return value is < 0 or > 1 ? "unknown" : $"{value:P0}";
     }
 
     private void PublishProgressOnUi()

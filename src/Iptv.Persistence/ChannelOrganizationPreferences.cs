@@ -15,6 +15,8 @@ public sealed record ProviderPlaybackProfile
     public int RetryCount { get; init; }
 
     public BufferingPreset BufferingPreset { get; init; } = BufferingPreset.Balanced;
+
+    public bool HardwareDecodingDisabled { get; init; }
 }
 
 public sealed record ChannelOrganizationPreferences

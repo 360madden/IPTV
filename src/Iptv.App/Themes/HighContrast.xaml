@@ -18,6 +18,8 @@
     <Color x:Key="TextPrimaryColor">#FFFFFF</Color>
     <Color x:Key="TextSecondaryColor">#E6E6E6</Color>
     <Color x:Key="TextDisabledColor">#B8B8B8</Color>
+    <Color x:Key="DisabledControlSurfaceColor">#101010</Color>
+    <Color x:Key="DisabledControlBorderColor">#B8B8B8</Color>
     <Color x:Key="PlayerPlaceholderColor">#000000</Color>
     <Color x:Key="PlayerPlaceholderBorderColor">#FFFF00</Color>
 
@@ -39,8 +41,8 @@
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}" />
     <SolidColorBrush x:Key="TextDisabledBrush" Color="{StaticResource TextDisabledColor}" />
+    <SolidColorBrush x:Key="DisabledControlSurfaceBrush" Color="{StaticResource DisabledControlSurfaceColor}" />
+    <SolidColorBrush x:Key="DisabledControlBorderBrush" Color="{StaticResource DisabledControlBorderColor}" />
     <SolidColorBrush x:Key="PlayerPlaceholderBrush" Color="{StaticResource PlayerPlaceholderColor}" />
     <SolidColorBrush x:Key="PlayerPlaceholderBorderBrush" Color="{StaticResource PlayerPlaceholderBorderColor}" />
 </ResourceDictionary>
-
-

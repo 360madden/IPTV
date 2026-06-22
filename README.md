@@ -64,23 +64,25 @@ The GUI smoke uses an isolated local app-data profile by default. Add `-UseRealU
 
 - Local and remote M3U/M3U8 import.
 - Playlist refresh with added/removed/unchanged diff summary, removable/new-channel review, and explicit apply/discard approval before replacing the loaded library.
-- XMLTV file or URL import with size/time limits, `.gz`/`.zip` guide support, optional auto-load after playlist import, channel/program counts, basic channel matching, selected-channel EPG guide preview, EPG title/description search, and virtualized timeline windows for now, +2 hours, tonight, and tomorrow.
+- XMLTV file or URL import from the Library panel's **EPG guide** card, with size/time limits, `.gz`/`.zip` guide support, optional auto-load after playlist import, channel/program counts, basic channel matching, selected-channel EPG guide preview, EPG title/description search, and virtualized timeline windows for now, +2 hours, tonight, and tomorrow.
 - Search, group/category/content/VOD-year/visibility filters, sort modes, built-in saved smart views, favorites, hidden channels, and custom group assignment.
 - Local channel organization persistence for favorites, hidden channels, custom groups, custom order, recently watched sorting, and VOD/series resume progress captured from playback position when available.
 - VOD/series library mode with a paged poster grid, poster status, resume-first sorting, and quick selection into the player detail pane.
 - Custom group manager with counts, add, rename, delete, import/export CSV, hidden/locked audit restore actions, undo, batch actions, select-all/clear-selection, duplicate-channel preview/hide dialog, advanced smart group rules/presets, and drag/drop or up/down custom ordering.
 - Import/export for channel organization backups and smart group presets without raw stream URLs.
-- Automatic per-playlist/source organization matching, editable source profile names, provider playback retry/buffer profiles, manual refresh reminders, refresh reconciliation summaries, safe channel details, selected-channel logo caching, visible-logo prefetch, view density, and large-library mode for compact 10k-result browsing.
+- Automatic per-playlist/source organization matching, editable source profile names, provider playback retry/buffer/hardware-decoding profiles, manual refresh reminders, refresh reconciliation summaries, safe channel details, selected-channel logo caching, visible-logo prefetch, view density, and large-library mode for compact 10k-result browsing.
 - Scored fallback stream list for same-name alternate entries plus a 50k-channel search benchmark UI/tool for large playlist checks.
 - PIN-gated group locks for hiding restricted groups until unlocked locally.
 - VOD/series detail panel with playlist-provided poster/backdrop preview and quick resume markers.
-- Stream health dashboard based on playback success/failure/buffering events.
+- Stream health dashboard based on playback success/failure/buffering events, with retry/buffer recommendations for repeatedly slow or timed-out channels.
 - Release packaging helper for publish/zip output plus optional MSIX staging, packaging, and signing via Windows SDK tools.
 - GitHub Actions workflow for Windows Release build/test/MSIX packaging, with optional PFX signing through repository secrets.
 - MSIX signing setup is documented in `docs/windows-msix-signing.md`.
 - GUI smoke can capture window/fullscreen screenshots into ignored `artifacts/gui-smoke/` for layout regression review.
 - UI dropdown smoke captures readable theme/dropdown screenshots into ignored `artifacts/ui-smoke/dropdowns/`; `scripts/compare_ui_smoke_screenshots.py` validates PNG integrity and optional baseline dimensions.
-- LibVLC playback with fullscreen toggle, volume, buffering presets, and startup timeout guidance.
+- IPTV-friendly default layout with primary import/playback controls visible first, recent playlists/extra filters/library tools tucked into drawers, and advanced organization/diagnostics hidden behind **Simple UI**.
+- Polished selected-channel TV guide with larger upcoming-program cards plus the advanced EPG timeline for broader schedule review.
+- LibVLC playback with fullscreen toggle, retry, volume, collapsed picture/audio fixes, buffering presets, hardware-decoding toggle for black-video/audio-only troubleshooting, one-click source playback profile save, redacted playback diagnostics, and startup timeout guidance.
 - Selectable Dark, Light, and High contrast themes with Desktop, Living room, High contrast, and Custom appearance presets, TV-distance scale, reset button, source/profile-specific appearance presets, and a live appearance preview card.
 - Compact/dense channel-list modes and large-library mode for providers with many thousands of channels or VOD entries.
 - Optional clock overlay with position, size, background, opacity, 24-hour, and seconds settings.
@@ -110,3 +112,7 @@ Do not commit private playlists, tokenized stream URLs, credentials, screenshots
 ## Playback Note
 
 The UI is wired through a playback boundary so the backend can evolve. The current app shell is prepared for LibVLC-backed playback while the lower-level contracts remain backend-neutral.
+
+If a stream plays audio but the picture stays black, open **Picture/audio fixes and source profile**, press **Retry**, then check **Disable hardware decoding** and press **Retry** again. The playback diagnostics text reports VLC state, progress, buffering preset, and hardware-decoding mode without showing raw stream URLs.
+
+When that workaround fixes a provider, press **Save Source** near the playback controls to save the current buffer and hardware-decoding mode for that channel's source. You can also open **Source Profiles**, check **Disable hardware decoding for this source**, and save the playback profile manually.

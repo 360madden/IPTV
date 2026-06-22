@@ -219,6 +219,15 @@ function Set-CheckboxOn {
     }
 }
 
+function Set-CheckboxOff {
+    param([System.Windows.Automation.AutomationElement]$Element)
+
+    $pattern = $Element.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
+    if ($pattern.Current.ToggleState -ne [System.Windows.Automation.ToggleState]::Off) {
+        $pattern.Toggle()
+    }
+}
+
 function Expand-Element {
     param([System.Windows.Automation.AutomationElement]$Element)
 
@@ -566,6 +575,10 @@ try {
     Select-Element $channel
 
     Write-Host "Verifying organization feature surfaces..."
+    Set-CheckboxOff (Wait-Until { Find-ByName $main "Basic Mode" } $TimeoutSeconds "basic mode toggle")
+    Expand-Element (Wait-Until { Find-ByName $main "Recent Playlist Drawer" } $TimeoutSeconds "recent playlist drawer")
+    Expand-Element (Wait-Until { Find-ByName $main "More Channel Filters" } $TimeoutSeconds "more channel filters drawer")
+    Expand-Element (Wait-Until { Find-ByName $main "Channel Organization" } $TimeoutSeconds "channel organization drawer")
     Wait-Until { Find-ByName $main "Recent Playlist Sources" } $TimeoutSeconds "recent playlist source selector" | Out-Null
     Wait-Until { Find-ByName $main "Import Recent Playlist Sources" } $TimeoutSeconds "recent playlist source import button" | Out-Null
     Wait-Until { Find-ByName $main "Export Recent Playlist Sources" } $TimeoutSeconds "recent playlist source export button" | Out-Null
@@ -583,10 +596,17 @@ try {
     Wait-Until { Find-ByName $main "Fallback Streams" } $TimeoutSeconds "fallback streams panel" | Out-Null
     Wait-Until { Find-ByName $main "Refresh Approval" } $TimeoutSeconds "refresh approval panel" | Out-Null
     Wait-Until { Find-ByName $main "Search Benchmark" } $TimeoutSeconds "search benchmark panel" | Out-Null
+    Wait-Until { Find-ByName $main "Retry Playback" } $TimeoutSeconds "retry playback button" | Out-Null
+    Expand-Element (Wait-Until { Find-ByName $main "Playback Recovery Panel" } $TimeoutSeconds "playback recovery panel")
+    Wait-Until { Find-ByName $main "Disable Hardware Decoding" } $TimeoutSeconds "disable hardware decoding checkbox" | Out-Null
+    Wait-Until { Find-ByName $main "Save Current Playback Settings to Source" } $TimeoutSeconds "save current playback settings button" | Out-Null
+    Wait-Until { Find-ByName $main "Applied Playback Profile" } $TimeoutSeconds "applied playback profile text" | Out-Null
+    Wait-Until { Find-ByName $main "Playback Diagnostics" } $TimeoutSeconds "playback diagnostics text" | Out-Null
 
     Expand-Element (Wait-Until { Find-ByName $main "Source Profiles" } $TimeoutSeconds "source profiles panel")
     Wait-Until { Find-ByName $main "Import Source Profiles" } $TimeoutSeconds "source profile import button" | Out-Null
     Wait-Until { Find-ByName $main "Export Source Profiles" } $TimeoutSeconds "source profile export button" | Out-Null
+    Wait-Until { Find-ByName $main "Source Disable Hardware Decoding" } $TimeoutSeconds "source hardware decoding profile toggle" | Out-Null
     Wait-Until { Find-ByName $main "Source Default Visibility Group" } $TimeoutSeconds "source default visibility group selector" | Out-Null
     Wait-Until { Find-ByName $main "XMLTV Guide URL" } $TimeoutSeconds "XMLTV guide URL field" | Out-Null
     Wait-Until { Find-ByName $main "Library Health Dashboard" } $TimeoutSeconds "library health dashboard" | Out-Null
@@ -742,6 +762,10 @@ try {
     try {
         Wait-Until { Find-ByNameContains $main "Playing:" } $PlaybackTimeoutSeconds "Playing playback status" | Out-Null
         Write-Host "Playback reached Playing."
+        $placeholder = Find-ByName $main "No Channel Video Placeholder"
+        if ($null -ne $placeholder -and -not $placeholder.Current.IsOffscreen) {
+            throw "Playback reached Playing while the no-channel placeholder was still visible."
+        }
     }
     catch {
         if ($RequirePlayback) {

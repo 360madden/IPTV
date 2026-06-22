@@ -31,11 +31,39 @@
         <Setter Property="FontFamily" Value="Segoe UI" />
         <Setter Property="FontSize" Value="{DynamicResource AppFontSizeBase}" />
         <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
         <Setter Property="Background" Value="{DynamicResource ControlSurfaceBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="ButtonChrome"
+                            MinHeight="{TemplateBinding MinHeight}"
+                            Padding="{TemplateBinding Padding}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="5"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          RecognizesAccessKey="True"
+                                          TextElement.Foreground="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="ButtonChrome" Property="Background" Value="{DynamicResource DisabledControlSurfaceBrush}" />
+                            <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="{DynamicResource DisabledControlBorderBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{DynamicResource ControlSurfaceHoverBrush}" />
@@ -49,7 +77,8 @@
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
                 <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}" />
-                <Setter Property="Opacity" Value="0.72" />
+                <Setter Property="Background" Value="{DynamicResource DisabledControlSurfaceBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource DisabledControlBorderBrush}" />
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -341,5 +370,3 @@
         <Setter Property="FontSize" Value="{DynamicResource AppFontSizeBase}" />
     </Style>
 </ResourceDictionary>
-
-

@@ -30,47 +30,44 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="IPTV Viewer"
+                <StackPanel VerticalAlignment="Center"
+                            Margin="0,0,20,0">
+                    <TextBlock Text="IPTV Home"
                                FontSize="{DynamicResource AppFontSizeTitle}"
                                FontWeight="Bold" />
-                    <TextBlock Text="Content-neutral playlist viewer — import your own M3U/M3U8 sources"
+                    <TextBlock Text="Import a playlist, pick a channel, and watch with guide data up front"
                                Foreground="{DynamicResource TextSecondaryBrush}"
-                               FontSize="{DynamicResource AppFontSizeSmall}" />
+                               FontSize="{DynamicResource AppFontSizeSmall}"
+                               TextTrimming="CharacterEllipsis" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <CheckBox Content="Basic mode"
-                              IsChecked="{Binding IsBasicMode}"
-                              VerticalAlignment="Center"
-                              Foreground="{DynamicResource TextPrimaryBrush}"
-                              Margin="0,0,12,0"
-                              AutomationProperties.Name="Basic Mode" />
-                    <Button Content="Import File"
-                            Command="{Binding ImportFileCommand}" />
-                    <Button Content="Load Sample"
-                            Command="{Binding LoadSampleCommand}" />
-                    <Button Content="Refresh"
-                            Command="{Binding RefreshPlaylistCommand}" />
-                    <Button Content="Import XMLTV"
-                            Command="{Binding ImportEpgCommand}" />
-                    <Button Content="Shortcuts"
-                            Command="{Binding ToggleShortcutHelpCommand}"
-                            ToolTip="Show keyboard shortcut help (F1 or ?)"
-                            AutomationProperties.Name="Show Keyboard Shortcuts" />
-                    <Button Content="XMLTV URL"
-                            Command="{Binding ImportEpgUrlCommand}"
-                            AutomationProperties.Name="Import XMLTV URL" />
-                    <Button Content="Import Org"
-                            Command="{Binding ImportOrganizationCommand}" />
-                    <Button Content="Export Org"
-                            Command="{Binding ExportOrganizationCommand}" />
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="IPTV Primary Header Actions">
                     <Button Content="Import URL"
                             Background="{DynamicResource AccentBrush}"
                             Foreground="{DynamicResource AccentTextBrush}"
-                            Command="{Binding ImportUrlCommand}" />
+                            Command="{Binding ImportUrlCommand}"
+                            ToolTip="Import an M3U/M3U8 playlist URL" />
+                    <Button Content="Import File"
+                            Command="{Binding ImportFileCommand}"
+                            ToolTip="Import a local M3U/M3U8 playlist" />
+                    <Button Content="EPG"
+                            Command="{Binding ImportEpgCommand}"
+                            ToolTip="Import an XMLTV EPG guide file (.xml, .xmltv, .gz, .zip)"
+                            AutomationProperties.Name="Import EPG XMLTV File" />
+                    <Button Content="Refresh"
+                            Command="{Binding RefreshPlaylistCommand}"
+                            ToolTip="Refresh the loaded playlist" />
+                    <CheckBox Content="Simple"
+                              IsChecked="{Binding IsBasicMode}"
+                              VerticalAlignment="Center"
+                              Foreground="{DynamicResource TextPrimaryBrush}"
+                              Margin="12,0,0,0"
+                              ToolTip="Hide advanced organization and diagnostic tools"
+                              AutomationProperties.Name="Basic Mode" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -105,49 +102,124 @@
                              Margin="0,0,0,14"
                              AutomationProperties.Name="Channel Search" />
 
-                    <TextBlock Text="Recent playlists"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               Margin="0,0,0,6" />
-                    <ComboBox ItemsSource="{Binding RecentPlaylistSources}"
-                              SelectedItem="{Binding SelectedRecentPlaylistSource}"
-                              DisplayMemberPath="DisplayText"
-                              Margin="0,0,0,8"
-                              Padding="8"
+                    <Expander Header="Recent playlists"
+                              Foreground="{DynamicResource TextPrimaryBrush}"
                               Background="{DynamicResource PanelAltBrush}"
-                              AutomationProperties.Name="Recent Playlist Sources" />
-                    <TextBox Text="{Binding RecentPlaylistSourceName, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,0,8"
-                             AutomationProperties.Name="Recent Playlist Source Name" />
-                    <WrapPanel Margin="0,0,0,14">
-                        <Button Content="Open Recent"
-                                Command="{Binding OpenRecentPlaylistSourceCommand}"
-                                Margin="0,0,8,8"
-                                AutomationProperties.Name="Open Recent Playlist" />
-                        <Button Content="Rename"
-                                Command="{Binding RenameRecentPlaylistSourceCommand}"
-                                Margin="0,0,8,8"
-                                AutomationProperties.Name="Rename Recent Playlist" />
-                        <Button Content="{Binding PinRecentPlaylistSourceLabel}"
-                                Command="{Binding TogglePinRecentPlaylistSourceCommand}"
-                                Margin="0,0,8,8"
-                                AutomationProperties.Name="Pin Recent Playlist" />
-                        <Button Content="Remove"
-                                Command="{Binding RemoveRecentPlaylistSourceCommand}"
-                                Margin="0,0,8,8"
-                                AutomationProperties.Name="Remove Recent Playlist" />
-                        <Button Content="Import List"
-                                Command="{Binding ImportRecentPlaylistSourcesCommand}"
-                                Margin="0,0,8,8"
-                                AutomationProperties.Name="Import Recent Playlist Sources" />
-                        <Button Content="Export List"
-                                Command="{Binding ExportRecentPlaylistSourcesCommand}"
-                                Margin="0,0,8,8"
-                                AutomationProperties.Name="Export Recent Playlist Sources" />
-                        <Button Content="Clear"
-                                Command="{Binding ClearRecentPlaylistSourcesCommand}"
-                                Margin="0,0,8,8"
-                                AutomationProperties.Name="Clear Recent Playlists" />
-                    </WrapPanel>
+                              Margin="0,0,0,14"
+                              IsExpanded="False"
+                              AutomationProperties.Name="Recent Playlist Drawer">
+                        <Border Background="{DynamicResource PanelAltBrush}"
+                                CornerRadius="10"
+                                Padding="12"
+                                Margin="0,8,0,0">
+                            <StackPanel>
+                                <ComboBox ItemsSource="{Binding RecentPlaylistSources}"
+                                          SelectedItem="{Binding SelectedRecentPlaylistSource}"
+                                          DisplayMemberPath="DisplayText"
+                                          Margin="0,0,0,8"
+                                          Padding="8"
+                                          Background="{DynamicResource PanelAltBrush}"
+                                          AutomationProperties.Name="Recent Playlist Sources" />
+                                <TextBox Text="{Binding RecentPlaylistSourceName, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,8"
+                                         AutomationProperties.Name="Recent Playlist Source Name" />
+                                <WrapPanel>
+                                    <Button Content="Open"
+                                            Command="{Binding OpenRecentPlaylistSourceCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Open Recent Playlist" />
+                                    <Button Content="Rename"
+                                            Command="{Binding RenameRecentPlaylistSourceCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Rename Recent Playlist" />
+                                    <Button Content="{Binding PinRecentPlaylistSourceLabel}"
+                                            Command="{Binding TogglePinRecentPlaylistSourceCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Pin Recent Playlist" />
+                                    <Button Content="Remove"
+                                            Command="{Binding RemoveRecentPlaylistSourceCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Remove Recent Playlist" />
+                                    <Button Content="Import List"
+                                            Command="{Binding ImportRecentPlaylistSourcesCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Import Recent Playlist Sources" />
+                                    <Button Content="Export List"
+                                            Command="{Binding ExportRecentPlaylistSourcesCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Export Recent Playlist Sources" />
+                                    <Button Content="Clear"
+                                            Command="{Binding ClearRecentPlaylistSourcesCommand}"
+                                            Margin="0,0,8,8"
+                                            AutomationProperties.Name="Clear Recent Playlists" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
+                    <Border Background="{DynamicResource PanelAltBrush}"
+                            CornerRadius="10"
+                            Padding="12"
+                            Margin="0,0,0,14"
+                            AutomationProperties.Name="EPG Import Panel">
+                        <StackPanel>
+                            <TextBlock Text="EPG guide"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       Margin="0,0,0,6" />
+                            <TextBlock Text="{Binding EpgSummaryText}"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="{DynamicResource AppFontSizeSmall}"
+                                       Margin="0,0,0,8" />
+                            <WrapPanel>
+                                <Button Content="Import EPG File"
+                                        Command="{Binding ImportEpgCommand}"
+                                        Margin="0,0,8,8"
+                                        ToolTip="Import an XMLTV EPG guide file (.xml, .xmltv, .gz, .zip)"
+                                        AutomationProperties.Name="Import EPG File" />
+                                <Button Content="Import EPG URL"
+                                        Command="{Binding ImportEpgUrlCommand}"
+                                        Margin="0,0,8,8"
+                                        ToolTip="Import an XMLTV EPG guide from a web URL"
+                                        AutomationProperties.Name="Import EPG URL" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Expander Header="More library tools"
+                              Foreground="{DynamicResource TextPrimaryBrush}"
+                              Background="{DynamicResource PanelAltBrush}"
+                              Margin="0,0,0,14"
+                              IsExpanded="False"
+                              AutomationProperties.Name="More Library Tools">
+                        <Border Background="{DynamicResource PanelAltBrush}"
+                                CornerRadius="10"
+                                Padding="12"
+                                Margin="0,8,0,0">
+                            <WrapPanel>
+                                <Button Content="Load Sample"
+                                        Command="{Binding LoadSampleCommand}"
+                                        Margin="0,0,8,8" />
+                                <Button Content="EPG URL"
+                                        Command="{Binding ImportEpgUrlCommand}"
+                                        Margin="0,0,8,8"
+                                        ToolTip="Import an XMLTV EPG guide from a web URL"
+                                        AutomationProperties.Name="Import EPG XMLTV URL" />
+                                <Button Content="Shortcuts"
+                                        Command="{Binding ToggleShortcutHelpCommand}"
+                                        Margin="0,0,8,8"
+                                        ToolTip="Show keyboard shortcut help (F1 or ?)"
+                                        AutomationProperties.Name="Show Keyboard Shortcuts" />
+                                <Button Content="Import Org"
+                                        Command="{Binding ImportOrganizationCommand}"
+                                        Margin="0,0,8,8" />
+                                <Button Content="Export Org"
+                                        Command="{Binding ExportOrganizationCommand}"
+                                        Margin="0,0,8,8" />
+                            </WrapPanel>
+                        </Border>
+                    </Expander>
 
                     <TextBlock Text="Group"
                                Foreground="{DynamicResource TextSecondaryBrush}"
@@ -167,6 +239,17 @@
                               Padding="8"
                               Background="{DynamicResource PanelAltBrush}" />
 
+                    <Expander Header="More filters"
+                              Foreground="{DynamicResource TextPrimaryBrush}"
+                              Background="{DynamicResource PanelAltBrush}"
+                              Margin="0,0,0,14"
+                              IsExpanded="False"
+                              AutomationProperties.Name="More Channel Filters">
+                        <Border Background="{DynamicResource PanelAltBrush}"
+                                CornerRadius="10"
+                                Padding="12"
+                                Margin="0,8,0,0">
+                            <StackPanel>
                     <TextBlock Text="Content"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,6" />
@@ -188,11 +271,6 @@
                               Padding="8"
                               Background="{DynamicResource PanelAltBrush}"
                               AutomationProperties.Name="VOD Year Filter" />
-
-                    <CheckBox Content="Favorites only"
-                              IsChecked="{Binding FavoritesOnly}"
-                              Foreground="{DynamicResource TextPrimaryBrush}"
-                              Margin="0,4,0,12" />
 
                     <TextBlock Text="Visibility"
                                Foreground="{DynamicResource TextSecondaryBrush}"
@@ -249,9 +327,12 @@
                               SelectedValuePath="Value"
                               SelectedValue="{Binding SelectedChannelViewDensity}"
                               Padding="8"
-                              Margin="0,0,0,14"
+                              Margin="0,0,0,0"
                               Background="{DynamicResource PanelAltBrush}"
                               AutomationProperties.Name="Channel View Density" />
+                            </StackPanel>
+                        </Border>
+                    </Expander>
 
                     <Button Content="Clear Filters"
                             Command="{Binding ClearFiltersCommand}"
@@ -261,7 +342,7 @@
                               Foreground="{DynamicResource TextPrimaryBrush}"
                               Background="{DynamicResource PanelAltBrush}"
                               Margin="0,0,0,14"
-                              IsExpanded="True"
+                              IsExpanded="False"
                               Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                               AutomationProperties.Name="Channel Organization">
                         <Border Background="{DynamicResource PanelAltBrush}"
@@ -593,6 +674,12 @@
                                           Padding="6"
                                           Margin="0,0,0,8"
                                           AutomationProperties.Name="Source Buffer Preset" />
+                                <CheckBox Content="Disable hardware decoding for this source"
+                                          IsChecked="{Binding SelectedSourceHardwareDecodingDisabled}"
+                                          Foreground="{DynamicResource TextPrimaryBrush}"
+                                          Margin="0,0,0,8"
+                                          ToolTip="Use for providers where audio plays but video stays black."
+                                          AutomationProperties.Name="Source Disable Hardware Decoding" />
                                 <Button Content="Save Playback Profile"
                                         Command="{Binding SaveSourcePlaybackProfileCommand}"
                                         Margin="0,0,0,12" />
@@ -680,10 +767,10 @@
                                           Foreground="{DynamicResource TextPrimaryBrush}"
                                           Margin="0,0,0,8"
                                           AutomationProperties.Name="Auto Load XMLTV" />
-                                <Button Content="Import XMLTV URL"
+                                <Button Content="Import EPG URL"
                                         Command="{Binding ImportEpgUrlCommand}"
                                         HorizontalAlignment="Left"
-                                        AutomationProperties.Name="Import XMLTV URL From Settings" />
+                                        AutomationProperties.Name="Import EPG URL From Settings" />
                             </StackPanel>
                         </Border>
                     </Expander>
@@ -890,7 +977,8 @@
                     <Border Background="{DynamicResource PanelAltBrush}"
                             CornerRadius="10"
                             Padding="12"
-                            Margin="0,0,0,14">
+                            Margin="0,0,0,14"
+                            Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
                             <TextBlock Text="Import Summary"
                                        FontWeight="SemiBold"
@@ -1007,7 +1095,7 @@
                                               DisplayMemberPath="Label"
                                               SelectedValuePath="Value"
                                               SelectedValue="{Binding SelectedEpgTimelineWindow}"
-                                              Width="150"
+                                              Width="180"
                                               HorizontalAlignment="Left"
                                               Padding="6"
                                               Margin="0,6,0,8"
@@ -1019,7 +1107,8 @@
                                     <DataGrid ItemsSource="{Binding EpgTimelineRows}"
                                               AutoGenerateColumns="False"
                                               IsReadOnly="True"
-                                              MaxHeight="180"
+                                              MaxHeight="280"
+                                              MinHeight="220"
                                               Background="{DynamicResource PanelAltBrush}"
                                               Foreground="{DynamicResource TextPrimaryBrush}"
                                               BorderBrush="{DynamicResource ControlBorderBrush}"
@@ -1092,9 +1181,11 @@
 
                     <TextBlock Text="Recent Import Issues"
                                FontWeight="SemiBold"
-                               Margin="0,18,0,8" />
+                               Margin="0,18,0,8"
+                               Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <ListBox ItemsSource="{Binding RecentImportIssues}"
                              MaxHeight="180"
+                             Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                              Background="Transparent"
                              BorderThickness="0"
                              Foreground="{DynamicResource TextSecondaryBrush}"
@@ -1127,7 +1218,8 @@
                     </Grid.RowDefinitions>
 
                     <DockPanel Margin="6,4,0,12">
-                        <WrapPanel DockPanel.Dock="Right">
+                        <WrapPanel DockPanel.Dock="Right"
+                                   Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Button Content="Select All Visible"
                                     Click="SelectAllVisible_Click"
                                     Padding="10,5"
@@ -1399,7 +1491,7 @@
                         <RowDefinition x:Name="PlayerControlsRow"
                                        Height="Auto" />
                         <RowDefinition x:Name="PlayerDiagnosticsRow"
-                                       Height="170" />
+                                       Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <Border x:Name="PlayerVideoHost"
@@ -1409,7 +1501,8 @@
                             MinHeight="160">
                         <Grid>
                         <vlc:VideoView x:Name="PlayerView"
-                                       Visibility="{Binding IsVideoSurfaceVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                       Visibility="{Binding IsVideoSurfaceVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                       AutomationProperties.Name="Playback Video Surface">
                             <Grid x:Name="PlayerOverlayGrid"
                                   Background="#01000000"
                                   MouseLeftButtonDown="PlayerOverlay_MouseLeftButtonDown"
@@ -1495,6 +1588,8 @@
                                                     Margin="18,0,0,0">
                                             <Button Content="Play"
                                                     Command="{Binding PlaySelectedCommand}" />
+                                            <Button Content="Retry"
+                                                    Command="{Binding RetryPlaybackCommand}" />
                                             <Button Content="Pause"
                                                     Command="{Binding PauseCommand}" />
                                             <Button Content="Stop"
@@ -1551,6 +1646,22 @@
                                    Margin="0,4,0,0"
                                    TextWrapping="Wrap"
                                    AutomationProperties.Name="Playback Progress" />
+                        <TextBlock Text="{Binding PlaybackTroubleshootingText}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"
+                                   AutomationProperties.Name="Playback Troubleshooting" />
+                        <TextBlock Text="{Binding AppliedPlaybackProfileText}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"
+                                   AutomationProperties.Name="Applied Playback Profile" />
+                        <TextBlock Text="{Binding PlaybackDiagnosticsText}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontSize="{DynamicResource AppFontSizeSmall}"
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"
+                                   AutomationProperties.Name="Playback Diagnostics" />
                         <TextBlock Text="{Binding SelectedChannelDetails}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    Margin="0,6,0,0"
@@ -1682,121 +1793,195 @@
                                 </DockPanel>
                             </Border>
                         </Expander>
-                        <Expander Header="EPG guide"
+                        <Expander Header="TV guide"
                                   Foreground="{DynamicResource TextPrimaryBrush}"
                                   Background="{DynamicResource PanelAltBrush}"
-                                  Margin="0,8,0,0"
-                                  IsExpanded="False">
-                            <ListBox ItemsSource="{Binding SelectedChannelEpgPrograms}"
-                                     MaxHeight="120"
-                                     Margin="0,6,0,0"
-                                     Background="{DynamicResource PanelAltBrush}"
-                                     BorderBrush="{DynamicResource ControlBorderBrush}"
-                                     Foreground="{DynamicResource TextSecondaryBrush}"
-                                     ScrollViewer.CanContentScroll="True"
-                                     VirtualizingPanel.IsVirtualizing="True"
-                                     AutomationProperties.Name="Selected Channel EPG">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding DisplayText}"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,0,0,6" />
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                                  Margin="0,10,0,0"
+                                  IsExpanded="True"
+                                  AutomationProperties.Name="Polished EPG Guide">
+                            <Border Background="{DynamicResource PanelAltBrush}"
+                                    BorderBrush="{DynamicResource ControlBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="12"
+                                    Margin="0,8,0,0"
+                                    MinHeight="190">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <DockPanel Margin="0,0,0,10">
+                                        <TextBlock Text="Upcoming programs"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="{DynamicResource AppFontSizeLarge}" />
+                                        <TextBlock Text="EPG"
+                                                   DockPanel.Dock="Right"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   FontWeight="SemiBold"
+                                                   Margin="12,0,0,0" />
+                                    </DockPanel>
+                                    <ListBox Grid.Row="1"
+                                             ItemsSource="{Binding SelectedChannelEpgPrograms}"
+                                             MinHeight="150"
+                                             MaxHeight="300"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             Foreground="{DynamicResource TextPrimaryBrush}"
+                                             ScrollViewer.CanContentScroll="True"
+                                             VirtualizingPanel.IsVirtualizing="True"
+                                             AutomationProperties.Name="Selected Channel EPG">
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Padding" Value="0" />
+                                                <Setter Property="Margin" Value="0,0,0,8" />
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="Background" Value="Transparent" />
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{DynamicResource DropdownSurfaceBrush}"
+                                                        BorderBrush="{DynamicResource ControlBorderBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="10"
+                                                        Padding="12,10">
+                                                    <TextBlock Text="{Binding DisplayText}"
+                                                               TextWrapping="Wrap"
+                                                               FontSize="{DynamicResource AppFontSizeBase}"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Grid>
+                            </Border>
                         </Expander>
                     </StackPanel>
 
                     <Grid x:Name="PlayerControlsPanel"
-                          Grid.Row="2">
+                          Grid.Row="2"
+                          AutomationProperties.Name="Player Primary Controls">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
 
-                        <StackPanel Orientation="Horizontal">
-                            <Button Content="Play"
-                                    Command="{Binding PlaySelectedCommand}" />
-                            <Button Content="Pause"
-                                    Command="{Binding PauseCommand}" />
-                            <Button Content="Stop"
-                                    Command="{Binding StopCommand}" />
-                            <Button Content="Favorite"
-                                    Command="{Binding ToggleFavoriteCommand}" />
-                            <Button Content="{Binding HideSelectedChannelLabel}"
-                                    Command="{Binding ToggleHiddenCommand}" />
-                            <Button Content="Up"
-                                    Command="{Binding MoveChannelUpCommand}" />
-                            <Button Content="Down"
-                                    Command="{Binding MoveChannelDownCommand}" />
-                            <Button Content="Undo Org"
-                                    Command="{Binding UndoOrganizationActionCommand}" />
-                            <CheckBox Content="Clock"
-                                      IsChecked="{Binding Clock.IsVisible}"
-                                      VerticalAlignment="Center"
-                                      Foreground="{DynamicResource TextPrimaryBrush}"
-                                      Margin="6,0,10,0"
-                                      AutomationProperties.Name="Player Clock" />
-                            <CheckBox Content="24h"
-                                      IsChecked="{Binding Clock.Use24HourClock}"
-                                      VerticalAlignment="Center"
-                                      Foreground="{DynamicResource TextPrimaryBrush}"
-                                      Margin="0,0,10,0" />
-                            <CheckBox Content="Sec"
-                                      IsChecked="{Binding Clock.ShowSeconds}"
-                                      VerticalAlignment="Center"
-                                      Foreground="{DynamicResource TextPrimaryBrush}"
-                                      Margin="0,0,10,0" />
-                            <Button Content="Fullscreen"
-                                    Click="Fullscreen_Click" />
-                        </StackPanel>
+                        <DockPanel LastChildFill="True">
+                            <StackPanel DockPanel.Dock="Left"
+                                        Orientation="Horizontal">
+                                <Button Content="Play"
+                                        Command="{Binding PlaySelectedCommand}" />
+                                <Button Content="Retry"
+                                        Command="{Binding RetryPlaybackCommand}"
+                                        AutomationProperties.Name="Retry Playback" />
+                                <Button Content="Pause"
+                                        Command="{Binding PauseCommand}" />
+                                <Button Content="Stop"
+                                        Command="{Binding StopCommand}" />
+                                <Button Content="Fullscreen"
+                                        Click="Fullscreen_Click" />
+                                <Button Content="Favorite"
+                                        Command="{Binding ToggleFavoriteCommand}" />
+                            </StackPanel>
 
-                        <StackPanel Grid.Row="0"
-                                    Grid.Column="2"
-                                    Orientation="Horizontal"
-                                    VerticalAlignment="Center">
-                            <TextBlock Text="Buffer"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       Margin="0,0,10,0" />
-                            <ComboBox Width="130"
-                                      ItemsSource="{Binding BufferingPresets}"
-                                      SelectedItem="{Binding SelectedBufferingPreset}"
-                                      Margin="0,0,18,0"
-                                      Padding="6" />
-                            <TextBlock Text="Volume"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       Margin="0,0,10,0" />
-                            <Slider Width="160"
-                                    Minimum="0"
-                                    Maximum="100"
-                                    Value="{Binding Volume, UpdateSourceTrigger=PropertyChanged}" />
-                        </StackPanel>
+                            <StackPanel DockPanel.Dock="Right"
+                                        Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="Volume"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,0,10,0" />
+                                <Slider Width="170"
+                                        Minimum="0"
+                                        Maximum="100"
+                                        Value="{Binding Volume, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </DockPanel>
 
-                        <StackPanel Grid.Row="1"
-                                    Grid.ColumnSpan="3"
-                                    Orientation="Horizontal"
-                                    VerticalAlignment="Center"
-                                    Margin="0,10,0,0">
-                            <TextBlock Text="Selected group"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       Margin="0,0,10,0" />
-                            <ComboBox Width="180"
-                                      ItemsSource="{Binding CustomGroupAssignments}"
-                                      SelectedItem="{Binding SelectedCustomGroupAssignment}"
-                                      Padding="6"
-                                      Margin="0,0,8,0"
-                                      AutomationProperties.Name="Selected Channel Custom Group" />
-                            <Button Content="Clear Group"
-                                    Command="{Binding ClearCustomGroupCommand}" />
-                        </StackPanel>
+                        <Expander Grid.Row="1"
+                                  Header="Picture/audio fixes and source profile"
+                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                  Background="{DynamicResource PanelAltBrush}"
+                                  Margin="0,10,0,0"
+                                  IsExpanded="False"
+                                  AutomationProperties.Name="Playback Recovery Panel">
+                            <Border Background="{DynamicResource PanelAltBrush}"
+                                    CornerRadius="10"
+                                    Padding="12"
+                                    Margin="0,8,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="If audio plays but the picture stays black: disable hardware decoding, retry, then save the source if it works."
+                                               TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Margin="0,0,0,10" />
+                                    <WrapPanel>
+                                        <TextBlock Text="Buffer"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Margin="0,0,10,8" />
+                                        <ComboBox Width="140"
+                                                  ItemsSource="{Binding BufferingPresets}"
+                                                  SelectedItem="{Binding SelectedBufferingPreset}"
+                                                  Margin="0,0,18,8"
+                                                  Padding="6" />
+                                        <CheckBox Content="Disable hardware decoding"
+                                                  IsChecked="{Binding IsHardwareDecodingDisabled}"
+                                                  VerticalAlignment="Center"
+                                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                                  Margin="0,0,18,8"
+                                                  ToolTip="Use this when audio plays but the video stays black, then retry the channel."
+                                                  AutomationProperties.Name="Disable Hardware Decoding" />
+                                        <Button Content="Save Source"
+                                                Command="{Binding SaveCurrentPlaybackProfileCommand}"
+                                                Margin="0,0,18,8"
+                                                ToolTip="Save the current buffer and hardware-decoding mode for this channel's source."
+                                                AutomationProperties.Name="Save Current Playback Settings to Source" />
+                                        <CheckBox Content="Clock"
+                                                  IsChecked="{Binding Clock.IsVisible}"
+                                                  VerticalAlignment="Center"
+                                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                                  Margin="0,0,12,8"
+                                                  AutomationProperties.Name="Player Clock" />
+                                    </WrapPanel>
+                                    <WrapPanel Visibility="{Binding IsAdvancedModeVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="Selected group"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Margin="0,0,10,8" />
+                                        <ComboBox Width="180"
+                                                  ItemsSource="{Binding CustomGroupAssignments}"
+                                                  SelectedItem="{Binding SelectedCustomGroupAssignment}"
+                                                  Padding="6"
+                                                  Margin="0,0,8,8"
+                                                  AutomationProperties.Name="Selected Channel Custom Group" />
+                                        <Button Content="Clear Group"
+                                                Command="{Binding ClearCustomGroupCommand}"
+                                                Margin="0,0,8,8" />
+                                        <Button Content="Up"
+                                                Command="{Binding MoveChannelUpCommand}"
+                                                Margin="0,0,8,8" />
+                                        <Button Content="Down"
+                                                Command="{Binding MoveChannelDownCommand}"
+                                                Margin="0,0,8,8" />
+                                        <Button Content="Undo Org"
+                                                Command="{Binding UndoOrganizationActionCommand}"
+                                                Margin="0,0,8,8" />
+                                        <CheckBox Content="24h"
+                                                  IsChecked="{Binding Clock.Use24HourClock}"
+                                                  VerticalAlignment="Center"
+                                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                                  Margin="0,0,10,8" />
+                                        <CheckBox Content="Sec"
+                                                  IsChecked="{Binding Clock.ShowSeconds}"
+                                                  VerticalAlignment="Center"
+                                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                                  Margin="0,0,10,8" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                        </Expander>
                     </Grid>
 
                     <Border x:Name="DiagnosticsPanel"
@@ -1835,6 +2020,11 @@
                                       IsExpanded="False"
                                       Margin="0,0,0,8">
                                 <StackPanel>
+                                    <TextBlock Text="{Binding PlaybackDiagnosticsText}"
+                                               TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Margin="0,0,0,8"
+                                               AutomationProperties.Name="Playback Diagnostics" />
                                     <Button Content="Clear Stream Health"
                                             Command="{Binding ClearStreamHealthCommand}"
                                             HorizontalAlignment="Left"

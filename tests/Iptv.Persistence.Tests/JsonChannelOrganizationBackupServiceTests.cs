@@ -33,7 +33,12 @@ public sealed class JsonChannelOrganizationBackupServiceTests
                         },
                         SourcePlaybackProfiles = new Dictionary<string, ProviderPlaybackProfile>
                         {
-                            ["source-a"] = new() { RetryCount = 2, BufferingPreset = BufferingPreset.LowLatency }
+                            ["source-a"] = new()
+                            {
+                                RetryCount = 2,
+                                BufferingPreset = BufferingPreset.LowLatency,
+                                HardwareDecodingDisabled = true
+                            }
                         },
                         SourceDefaultHiddenGroups = new Dictionary<string, string[]>
                         {
@@ -79,6 +84,7 @@ public sealed class JsonChannelOrganizationBackupServiceTests
             Assert.Equal("Provider A", imported.Preferences.SourceProfileNames["source-a"]);
             Assert.Equal(2, imported.Preferences.SourcePlaybackProfiles["source-a"].RetryCount);
             Assert.Equal(BufferingPreset.LowLatency, imported.Preferences.SourcePlaybackProfiles["source-a"].BufferingPreset);
+            Assert.True(imported.Preferences.SourcePlaybackProfiles["source-a"].HardwareDecodingDisabled);
             Assert.Equal(["Kids", "Premium"], imported.Preferences.SourceDefaultHiddenGroups["source-a"]);
             Assert.True(imported.Preferences.RefreshScheduleEnabled);
             Assert.Equal(120, imported.Preferences.RefreshIntervalMinutes);

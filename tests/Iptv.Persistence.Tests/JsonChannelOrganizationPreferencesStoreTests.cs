@@ -26,7 +26,12 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
                     },
                     SourcePlaybackProfiles = new Dictionary<string, ProviderPlaybackProfile>
                     {
-                        [" source-a "] = new() { RetryCount = 9, BufferingPreset = BufferingPreset.PoorNetwork }
+                        [" source-a "] = new()
+                        {
+                            RetryCount = 9,
+                            BufferingPreset = BufferingPreset.PoorNetwork,
+                            HardwareDecodingDisabled = true
+                        }
                     },
                     SourceAppearancePresets = new Dictionary<string, AppAppearancePreset>
                     {
@@ -56,6 +61,7 @@ public sealed class JsonChannelOrganizationPreferencesStoreTests
             Assert.Equal("Provider A", loaded.SourceProfileNames["source-a"]);
             Assert.Equal(3, loaded.SourcePlaybackProfiles["source-a"].RetryCount);
             Assert.Equal(BufferingPreset.PoorNetwork, loaded.SourcePlaybackProfiles["source-a"].BufferingPreset);
+            Assert.True(loaded.SourcePlaybackProfiles["source-a"].HardwareDecodingDisabled);
             Assert.Equal(AppAppearancePreset.LivingRoom, loaded.SourceAppearancePresets["source-a"]);
             Assert.False(loaded.SourceAppearancePresets.ContainsKey("source-b"));
             Assert.Equal(["Kids", "Premium"], loaded.SourceDefaultHiddenGroups["source-a"]);

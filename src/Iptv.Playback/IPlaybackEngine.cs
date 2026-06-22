@@ -21,5 +21,7 @@ public interface IPlaybackEngine : IAsyncDisposable
 
     Task SetBufferingPresetAsync(BufferingPreset preset, CancellationToken cancellationToken);
 
+    Task SetHardwareDecodingAsync(bool enabled, CancellationToken cancellationToken);
+
     Task SeekToProgressAsync(int progressPercent, CancellationToken cancellationToken);
 }

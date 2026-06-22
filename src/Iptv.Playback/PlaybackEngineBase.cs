@@ -28,6 +28,12 @@ public abstract class PlaybackEngineBase : IPlaybackEngine
         return Task.CompletedTask;
     }
 
+    public virtual Task SetHardwareDecodingAsync(bool enabled, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
     public virtual Task SeekToProgressAsync(int progressPercent, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -39,9 +45,9 @@ public abstract class PlaybackEngineBase : IPlaybackEngine
         return ValueTask.CompletedTask;
     }
 
-    protected void Publish(PlaybackStatus status, Channel? channel, string message)
+    protected void Publish(PlaybackStatus status, Channel? channel, string message, string? diagnosticText = null)
     {
-        CurrentState = new PlaybackStateSnapshot(status, channel, message, DateTimeOffset.UtcNow);
+        CurrentState = new PlaybackStateSnapshot(status, channel, message, DateTimeOffset.UtcNow, diagnosticText);
         StateChanged?.Invoke(this, CurrentState);
     }
 

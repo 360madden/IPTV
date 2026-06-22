@@ -142,6 +142,7 @@ public sealed class MainViewModel : ObservableObject
     private int selectedRefreshIntervalMinutes = 60;
     private int selectedSourceRetryCount;
     private BufferingPreset selectedSourceBufferingPreset = BufferingPreset.Balanced;
+    private bool selectedSourceHardwareDecodingDisabled;
     private string? parentalPinSalt;
     private string? parentalPinHash;
     private bool isParentalUnlocked;
@@ -154,7 +155,7 @@ public sealed class MainViewModel : ObservableObject
     private bool isImporting;
     private string importProgressText = "Import idle.";
     private CancellationTokenSource? importCts;
-    private bool isBasicMode;
+    private bool isBasicMode = true;
     private bool firstRunSetupCompleted;
     private int selectedLogoCacheLimitMegabytes = 100;
     private AppTheme selectedAppTheme = AppTheme.Dark;
@@ -166,6 +167,10 @@ public sealed class MainViewModel : ObservableObject
     private bool suppressAppearancePresetTracking;
     private string statusText = "Import a user-provided M3U/M3U8 playlist to begin.";
     private string playbackStatusText = "Playback idle.";
+    private string playbackDiagnosticsText = "Playback diagnostics appear after playback starts.";
+    private string lastPlaybackStateDiagnosticsText = "Playback diagnostics appear after playback starts.";
+    private string playbackTroubleshootingText = "If audio plays but video stays black, disable hardware decoding and retry the channel.";
+    private string appliedPlaybackProfileText = "Playback profile: current playback controls are active until a source profile is saved or applied.";
     private string importSummaryText = "No playlist imported yet.";
     private string refreshDiffText = "Refresh diff unavailable until a playlist is imported.";
     private string profileSummaryText = "Profile: automatic per-playlist/source organization will activate after import.";
@@ -177,6 +182,7 @@ public sealed class MainViewModel : ObservableObject
     private string? selectedChannelLogoPath;
     private BufferingPreset selectedBufferingPreset = BufferingPreset.Balanced;
     private Guid? nowPlayingChannelId;
+    private bool isHardwareDecodingDisabled;
     private int volume = 80;
     private CancellationTokenSource? logoCts;
     private CancellationTokenSource? logoPrefetchCts;
@@ -229,6 +235,7 @@ public sealed class MainViewModel : ObservableObject
         ImportEpgCommand = new AsyncRelayCommand(_ => ImportEpgAsync(), _ => !IsBusy);
         ImportEpgUrlCommand = new AsyncRelayCommand(_ => ImportEpgUrlAsync(), _ => !IsBusy);
         PlaySelectedCommand = new AsyncRelayCommand(_ => PlaySelectedAsync(), _ => SelectedChannel is not null);
+        RetryPlaybackCommand = new AsyncRelayCommand(_ => RetryPlaybackAsync(), _ => !IsBusy && GetRetryChannel() is not null);
         PlaySelectedFallbackCommand = new AsyncRelayCommand(_ => PlaySelectedFallbackAsync(), _ => SelectedChannelFallback is not null);
         PauseCommand = new AsyncRelayCommand(_ => PauseAsync());
         StopCommand = new AsyncRelayCommand(_ => StopAsync());
@@ -257,6 +264,7 @@ public sealed class MainViewModel : ObservableObject
         ExportSmartGroupPresetsCommand = new AsyncRelayCommand(_ => ExportSmartGroupPresetsAsync(), _ => !IsBusy && SmartGroupPresets.Count > 0);
         RenameSourceProfileCommand = new RelayCommand(_ => RenameSelectedSourceProfile(), _ => SelectedSourceProfile is not null);
         SaveSourcePlaybackProfileCommand = new RelayCommand(_ => SaveSelectedSourcePlaybackProfile(), _ => SelectedSourceProfile is not null);
+        SaveCurrentPlaybackProfileCommand = new RelayCommand(_ => SaveCurrentPlaybackProfile(), _ => GetCurrentPlaybackProfileChannel() is not null);
         ImportSourceProfilesCommand = new AsyncRelayCommand(_ => ImportSourceProfilesAsync(), _ => !IsBusy);
         ExportSourceProfilesCommand = new AsyncRelayCommand(_ => ExportSourceProfilesAsync(), _ => !IsBusy && (sourceProfileNames.Count > 0 || sourcePlaybackProfiles.Count > 0 || sourceAppearancePresets.Count > 0 || sourceDefaultHiddenGroups.Count > 0));
         ApplyAppearancePresetCommand = new RelayCommand(_ => ApplySelectedAppearancePreset());
@@ -473,6 +481,8 @@ public sealed class MainViewModel : ObservableObject
 
     public ICommand PlaySelectedCommand { get; }
 
+    public ICommand RetryPlaybackCommand { get; }
+
     public ICommand PlaySelectedFallbackCommand { get; }
 
     public ICommand PauseCommand { get; }
@@ -528,6 +538,8 @@ public sealed class MainViewModel : ObservableObject
     public ICommand RenameSourceProfileCommand { get; }
 
     public ICommand SaveSourcePlaybackProfileCommand { get; }
+
+    public ICommand SaveCurrentPlaybackProfileCommand { get; }
 
     public ICommand ImportSourceProfilesCommand { get; }
 
@@ -899,6 +911,12 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    public bool SelectedSourceHardwareDecodingDisabled
+    {
+        get => selectedSourceHardwareDecodingDisabled;
+        set => SetProperty(ref selectedSourceHardwareDecodingDisabled, value);
+    }
+
     public string RenameCustomGroupName
     {
         get => renameCustomGroupName;
@@ -1165,7 +1183,7 @@ public sealed class MainViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(IsAdvancedModeVisible));
                 StatusText = value
-                    ? "Basic mode enabled: advanced organization, EPG, VOD, diagnostics, and release panels are hidden."
+                    ? "Simple UI enabled: advanced organization, VOD, diagnostics, and lab-style tools are tucked away."
                     : "Advanced mode enabled: full IPTV organization and diagnostics panels are visible.";
                 _ = SaveUiPreferencesSafelyAsync();
             }
@@ -1200,6 +1218,24 @@ public sealed class MainViewModel : ObservableObject
     {
         get => playbackStatusText;
         private set => SetProperty(ref playbackStatusText, value);
+    }
+
+    public string PlaybackDiagnosticsText
+    {
+        get => playbackDiagnosticsText;
+        private set => SetProperty(ref playbackDiagnosticsText, value);
+    }
+
+    public string PlaybackTroubleshootingText
+    {
+        get => playbackTroubleshootingText;
+        private set => SetProperty(ref playbackTroubleshootingText, value);
+    }
+
+    public string AppliedPlaybackProfileText
+    {
+        get => appliedPlaybackProfileText;
+        private set => SetProperty(ref appliedPlaybackProfileText, value);
     }
 
     public string ImportSummaryText
@@ -1499,6 +1535,20 @@ public sealed class MainViewModel : ObservableObject
             if (SetProperty(ref selectedBufferingPreset, value))
             {
                 _ = SetBufferingPresetSafelyAsync(value);
+                RefreshAppliedPlaybackProfileText(useSavedProfileLabel: false);
+            }
+        }
+    }
+
+    public bool IsHardwareDecodingDisabled
+    {
+        get => isHardwareDecodingDisabled;
+        set
+        {
+            if (SetProperty(ref isHardwareDecodingDisabled, value))
+            {
+                _ = SetHardwareDecodingSafelyAsync(!value);
+                RefreshAppliedPlaybackProfileText(useSavedProfileLabel: false);
             }
         }
     }
@@ -1512,6 +1562,15 @@ public sealed class MainViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(IsVideoPlaceholderVisible));
                 OnPropertyChanged(nameof(IsVideoSurfaceVisible));
+                if (RetryPlaybackCommand is AsyncRelayCommand retry)
+                {
+                    retry.RaiseCanExecuteChanged();
+                }
+
+                if (SaveCurrentPlaybackProfileCommand is RelayCommand saveCurrentProfile)
+                {
+                    saveCurrentProfile.RaiseCanExecuteChanged();
+                }
             }
         }
     }
@@ -2427,8 +2486,63 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        Channel channelToPlay = SelectedChannel;
+        await PlayChannelAsync(SelectedChannel).ConfigureAwait(true);
+    }
+
+    private async Task RetryPlaybackAsync()
+    {
+        Channel? channelToRetry = GetRetryChannel();
+        if (channelToRetry is null)
+        {
+            PlaybackTroubleshootingText = "Select a channel before retrying playback.";
+            return;
+        }
+
+        if (SelectedChannel?.Id != channelToRetry.Id)
+        {
+            SelectedChannel = channelToRetry;
+        }
+
+        PlaybackTroubleshootingText = IsHardwareDecodingDisabled
+            ? "Retrying with hardware decoding disabled. If video appears, press Save Source to remember this source workaround."
+            : "Retrying with hardware decoding enabled. If audio returns with a black picture, disable hardware decoding and retry.";
+        AddDiagnostic($"Retrying playback for '{channelToRetry.DisplayName}' on host {channelToRetry.StreamUrl.Host}.");
+        await PlayChannelAsync(channelToRetry, useCurrentPlaybackControls: true).ConfigureAwait(true);
+    }
+
+    private Channel? GetRetryChannel()
+    {
+        if (NowPlayingChannelId is Guid nowPlayingId)
+        {
+            Channel? nowPlaying = allChannels.FirstOrDefault(channel => channel.Id == nowPlayingId);
+            if (nowPlaying is not null)
+            {
+                return nowPlaying;
+            }
+        }
+
+        return SelectedChannel;
+    }
+
+    private Channel? GetCurrentPlaybackProfileChannel() => GetRetryChannel();
+
+    private async Task PlayChannelAsync(Channel channelToPlay, bool useCurrentPlaybackControls = false)
+    {
+        bool hasSavedPlaybackProfile = HasSavedPlaybackProfile(channelToPlay.SourceId);
         ProviderPlaybackProfile profile = GetPlaybackProfile(channelToPlay.SourceId);
+        if (useCurrentPlaybackControls)
+        {
+            profile = SourcePlaybackProfileManager.BuildCurrentSettingsProfile(
+                profile,
+                SelectedBufferingPreset,
+                IsHardwareDecodingDisabled);
+            hasSavedPlaybackProfile = false;
+        }
+
+        AppliedPlaybackProfileText = SourcePlaybackProfileManager.FormatAppliedStatus(
+            GetSourcePlaybackProfileDisplayName(channelToPlay.SourceId),
+            profile,
+            hasSavedPlaybackProfile);
         int attempts = Math.Clamp(profile.RetryCount, 0, 3) + 1;
         try
         {
@@ -2438,6 +2552,16 @@ public sealed class MainViewModel : ObservableObject
                 OnPropertyChanged(nameof(SelectedBufferingPreset));
                 await playbackEngine.SetBufferingPresetAsync(profile.BufferingPreset, shutdownCts.Token).ConfigureAwait(true);
                 AddDiagnostic($"Applied provider playback profile buffer {profile.BufferingPreset}.");
+            }
+
+            if (IsHardwareDecodingDisabled != profile.HardwareDecodingDisabled)
+            {
+                isHardwareDecodingDisabled = profile.HardwareDecodingDisabled;
+                OnPropertyChanged(nameof(IsHardwareDecodingDisabled));
+                await playbackEngine.SetHardwareDecodingAsync(!profile.HardwareDecodingDisabled, shutdownCts.Token).ConfigureAwait(true);
+                AddDiagnostic(profile.HardwareDecodingDisabled
+                    ? "Applied provider playback profile with hardware decoding disabled."
+                    : "Applied provider playback profile with hardware decoding enabled.");
             }
 
             Exception? lastException = null;
@@ -2467,7 +2591,7 @@ public sealed class MainViewModel : ObservableObject
             }
 
             QueueResumeSeek(channelToPlay);
-            UpdateSelectedChannel(channel => channel with { LastWatchedAt = DateTimeOffset.UtcNow }, refreshGroups: false);
+            UpdateChannelLastWatched(channelToPlay.Id);
             AddDiagnostic($"Playback requested for '{channelToPlay.DisplayName}' on host {channelToPlay.StreamUrl.Host}.");
         }
         catch (OperationCanceledException)
@@ -2528,6 +2652,23 @@ public sealed class MainViewModel : ObservableObject
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             PlaybackStatusText = $"Buffering preset update failed: {SensitiveTextRedactor.RedactText(ex.Message)}";
+            AddDiagnostic(PlaybackStatusText);
+        }
+    }
+
+    private async Task SetHardwareDecodingSafelyAsync(bool enabled)
+    {
+        try
+        {
+            await playbackEngine.SetHardwareDecodingAsync(enabled, shutdownCts.Token).ConfigureAwait(true);
+            PlaybackTroubleshootingText = enabled
+                ? "Hardware decoding enabled. If video stays black while audio plays, disable hardware decoding and retry."
+                : "Hardware decoding disabled. Retry the channel to test software decoding; if it works, press Save Source.";
+            AddDiagnostic(PlaybackTroubleshootingText);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            PlaybackStatusText = $"Hardware decoding update failed: {SensitiveTextRedactor.RedactText(ex.Message)}";
             AddDiagnostic(PlaybackStatusText);
         }
     }
@@ -3239,6 +3380,25 @@ public sealed class MainViewModel : ObservableObject
         }
 
         ScheduleSearch();
+        _ = SaveChannelStatesSafelyAsync();
+    }
+
+    private void UpdateChannelLastWatched(Guid channelId)
+    {
+        int index = allChannels.FindIndex(channel => channel.Id == channelId);
+        if (index < 0)
+        {
+            return;
+        }
+
+        Channel updated = allChannels[index] with { LastWatchedAt = DateTimeOffset.UtcNow };
+        allChannels[index] = updated;
+        UpdateChannelStateIndex(updated);
+        if (SelectedChannel?.Id == updated.Id)
+        {
+            SelectedChannel = updated;
+        }
+
         _ = SaveChannelStatesSafelyAsync();
     }
 
@@ -4243,8 +4403,38 @@ public sealed class MainViewModel : ObservableObject
 
         selectedSourceRetryCount = profile.RetryCount;
         selectedSourceBufferingPreset = profile.BufferingPreset;
+        selectedSourceHardwareDecodingDisabled = profile.HardwareDecodingDisabled;
         OnPropertyChanged(nameof(SelectedSourceRetryCount));
         OnPropertyChanged(nameof(SelectedSourceBufferingPreset));
+        OnPropertyChanged(nameof(SelectedSourceHardwareDecodingDisabled));
+    }
+
+    private void SaveCurrentPlaybackProfile()
+    {
+        Channel? channel = GetCurrentPlaybackProfileChannel();
+        if (channel is null)
+        {
+            StatusText = "Select or play a channel before saving current playback settings for a source.";
+            return;
+        }
+
+        string sourceId = channel.SourceId.ToString();
+        ProviderPlaybackProfile profile = SourcePlaybackProfileManager.SaveCurrentSettings(
+            sourcePlaybackProfiles,
+            sourceId,
+            SelectedBufferingPreset,
+            IsHardwareDecodingDisabled);
+
+        SyncSelectedSourcePlaybackProfile(sourceId, profile);
+        _ = SaveOrganizationPreferencesSafelyAsync();
+        RaiseProfileCommandStates();
+        ProfileSummaryText = FormatProfileSummary();
+        string sourceDisplayName = GetSourcePlaybackProfileDisplayName(channel.SourceId);
+        string status = SourcePlaybackProfileManager.FormatSavedStatus(sourceDisplayName, profile);
+        StatusText = status;
+        PlaybackTroubleshootingText = "Saved the current playback recovery settings for this source. Future channels from this source will apply them automatically.";
+        AppliedPlaybackProfileText = SourcePlaybackProfileManager.FormatAppliedStatus(sourceDisplayName, profile, isSavedProfile: true);
+        AddDiagnostic(status);
     }
 
     private void LoadSelectedSourceAppearancePreset(string? sourceId)
@@ -4268,11 +4458,13 @@ public sealed class MainViewModel : ObservableObject
         sourcePlaybackProfiles[SelectedSourceProfile.SourceId] = new ProviderPlaybackProfile
         {
             RetryCount = SelectedSourceRetryCount,
-            BufferingPreset = SelectedSourceBufferingPreset
+            BufferingPreset = SelectedSourceBufferingPreset,
+            HardwareDecodingDisabled = SelectedSourceHardwareDecodingDisabled
         };
         _ = SaveOrganizationPreferencesSafelyAsync();
         RaiseProfileCommandStates();
-        StatusText = $"Saved playback profile for '{SelectedSourceProfile.DisplayName}': {SelectedSourceRetryCount:N0} retries, {SelectedSourceBufferingPreset} buffer.";
+        ProviderPlaybackProfile profile = NormalizePlaybackProfile(sourcePlaybackProfiles[SelectedSourceProfile.SourceId]);
+        StatusText = SourcePlaybackProfileManager.FormatSavedStatus(SelectedSourceProfile.DisplayName, profile);
     }
 
     private void SaveSelectedSourceAppearancePreset()
@@ -4323,7 +4515,7 @@ public sealed class MainViewModel : ObservableObject
         {
             ProviderPlaybackProfile current = NormalizePlaybackProfile(sourcePlaybackProfiles[sourceId]);
             ProviderPlaybackProfile incoming = NormalizePlaybackProfile(imported.SourcePlaybackProfiles[sourceId]);
-            conflicts.Add($"Playback profile for source {sourceId}: {current.RetryCount:N0}/{current.BufferingPreset} -> {incoming.RetryCount:N0}/{incoming.BufferingPreset}.");
+            conflicts.Add($"Playback profile for source {sourceId}: {FormatPlaybackProfile(current)} -> {FormatPlaybackProfile(incoming)}.");
         }
 
         foreach (string sourceId in imported.SourceAppearancePresets.Keys.Where(sourceId => sourceAppearancePresets.ContainsKey(sourceId)).Take(25))
@@ -4484,7 +4676,63 @@ public sealed class MainViewModel : ObservableObject
         string key = sourceId.ToString();
         return sourcePlaybackProfiles.TryGetValue(key, out ProviderPlaybackProfile? profile)
             ? NormalizePlaybackProfile(profile)
-            : new ProviderPlaybackProfile { RetryCount = 0, BufferingPreset = SelectedBufferingPreset };
+            : new ProviderPlaybackProfile
+            {
+                RetryCount = 0,
+                BufferingPreset = SelectedBufferingPreset,
+                HardwareDecodingDisabled = IsHardwareDecodingDisabled
+            };
+    }
+
+    private bool HasSavedPlaybackProfile(Guid sourceId)
+    {
+        return sourcePlaybackProfiles.ContainsKey(sourceId.ToString());
+    }
+
+    private string GetSourcePlaybackProfileDisplayName(Guid sourceId)
+    {
+        int channelCount = allChannels.Count(channel => channel.SourceId == sourceId);
+        return GetSourceProfileName(sourceId, channelCount);
+    }
+
+    private void SyncSelectedSourcePlaybackProfile(string sourceId, ProviderPlaybackProfile profile)
+    {
+        if (!string.Equals(SelectedSourceProfile?.SourceId, sourceId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        ProviderPlaybackProfile normalized = NormalizePlaybackProfile(profile);
+        selectedSourceRetryCount = normalized.RetryCount;
+        selectedSourceBufferingPreset = normalized.BufferingPreset;
+        selectedSourceHardwareDecodingDisabled = normalized.HardwareDecodingDisabled;
+        OnPropertyChanged(nameof(SelectedSourceRetryCount));
+        OnPropertyChanged(nameof(SelectedSourceBufferingPreset));
+        OnPropertyChanged(nameof(SelectedSourceHardwareDecodingDisabled));
+    }
+
+    private void RefreshAppliedPlaybackProfileText(bool useSavedProfileLabel)
+    {
+        Channel? channel = GetCurrentPlaybackProfileChannel();
+        if (channel is null)
+        {
+            return;
+        }
+
+        sourcePlaybackProfiles.TryGetValue(channel.SourceId.ToString(), out ProviderPlaybackProfile? savedProfile);
+        ProviderPlaybackProfile profile = SourcePlaybackProfileManager.BuildCurrentSettingsProfile(
+            savedProfile,
+            SelectedBufferingPreset,
+            IsHardwareDecodingDisabled);
+        AppliedPlaybackProfileText = SourcePlaybackProfileManager.FormatAppliedStatus(
+            GetSourcePlaybackProfileDisplayName(channel.SourceId),
+            profile,
+            useSavedProfileLabel && savedProfile is not null);
+    }
+
+    private static string FormatPlaybackProfile(ProviderPlaybackProfile profile)
+    {
+        return SourcePlaybackProfileManager.FormatConflictValue(profile);
     }
 
     private void RefreshLibraryHealth(PlaylistImportSummary? importSummary = null, TimeSpan? importDuration = null)
@@ -5708,14 +5956,7 @@ public sealed class MainViewModel : ObservableObject
 
     private static ProviderPlaybackProfile NormalizePlaybackProfile(ProviderPlaybackProfile profile)
     {
-        BufferingPreset bufferingPreset = Enum.IsDefined(profile.BufferingPreset)
-            ? profile.BufferingPreset
-            : BufferingPreset.Balanced;
-        return new ProviderPlaybackProfile
-        {
-            RetryCount = Math.Clamp(profile.RetryCount, 0, 3),
-            BufferingPreset = bufferingPreset
-        };
+        return SourcePlaybackProfileManager.Normalize(profile);
     }
 
     private static string? NormalizeSecret(string? value)
@@ -6064,14 +6305,22 @@ public sealed class MainViewModel : ObservableObject
         PlaybackStatusText = state.Channel is null
             ? state.Message
             : $"{state.Status}: {state.Channel.DisplayName} â€” {state.Message}";
+        lastPlaybackStateDiagnosticsText = FormatPlaybackDiagnostics(state);
+        PlaybackDiagnosticsText = lastPlaybackStateDiagnosticsText;
+        PlaybackTroubleshootingText = FormatPlaybackTroubleshooting(state);
         UpdateNowPlayingMarker(state);
         UpdateStreamHealth(state);
         AddDiagnostic(PlaybackStatusText);
+        if (!string.IsNullOrWhiteSpace(state.DiagnosticText))
+        {
+            AddDiagnostic($"Playback diagnostics: {SensitiveTextRedactor.RedactText(state.DiagnosticText)}");
+        }
     }
 
     private void ApplyPlaybackProgress(PlaybackProgressSnapshot progress)
     {
         PlaybackProgressText = progress.DisplayText;
+        PlaybackDiagnosticsText = $"{lastPlaybackStateDiagnosticsText} Last progress: {progress.DisplayText}";
         if (progress.Channel is null ||
             progress.ProgressPercent is not int percent ||
             progress.Channel.ContentKind is not (ContentKind.Vod or ContentKind.Series) ||
@@ -6120,6 +6369,38 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private string FormatPlaybackDiagnostics(PlaybackStateSnapshot state)
+    {
+        string channelPart = state.Channel is null
+            ? "no channel"
+            : $"channel '{state.Channel.DisplayName}' on host {state.Channel.StreamUrl.Host}";
+        string decodePart = IsHardwareDecodingDisabled
+            ? "hardware decoding disabled"
+            : "hardware decoding enabled";
+        string diagnostic = string.IsNullOrWhiteSpace(state.DiagnosticText)
+            ? "engine diagnostics unavailable"
+            : SensitiveTextRedactor.RedactText(state.DiagnosticText);
+        return $"Playback diagnostics: {state.Status}; {channelPart}; {decodePart}; {diagnostic}";
+    }
+
+    private string FormatPlaybackTroubleshooting(PlaybackStateSnapshot state)
+    {
+        return state.Status switch
+        {
+            PlaybackStatus.Buffering =>
+                "Buffering: if this repeats, try the PoorNetwork buffer preset and retry.",
+            PlaybackStatus.TimedOut =>
+                "Timed out: retry, try the PoorNetwork buffer preset, or choose another channel. If audio is playing with a black picture, disable hardware decoding and retry.",
+            PlaybackStatus.Playing when IsHardwareDecodingDisabled =>
+                "Playing with hardware decoding disabled. If video now appears, press Save Source to keep this setting for this provider.",
+            PlaybackStatus.Playing =>
+                "Playing. If audio plays but video stays black, disable hardware decoding and retry.",
+            PlaybackStatus.Failed or PlaybackStatus.Unsupported =>
+                "Playback failed: retry once, try PoorNetwork buffering, then try disabling hardware decoding if audio-only behavior occurs.",
+            _ => "If audio plays but video stays black, disable hardware decoding and retry the channel."
+        };
+    }
+
     private void UpdateNowPlayingMarker(PlaybackStateSnapshot state)
     {
         if (state.Channel is null)
@@ -6135,11 +6416,9 @@ public sealed class MainViewModel : ObservableObject
             case PlaybackStatus.Paused:
                 NowPlayingChannelId = state.Channel.Id;
                 break;
-            case PlaybackStatus.Stopped:
-            case PlaybackStatus.Failed:
-            case PlaybackStatus.Unsupported:
-            case PlaybackStatus.TimedOut:
-                if (NowPlayingChannelId == state.Channel.Id)
+            default:
+                if (PlaybackStartupWatchdogPolicy.ShouldClearActivePlayback(state.Status) &&
+                    NowPlayingChannelId == state.Channel.Id)
                 {
                     NowPlayingChannelId = null;
                 }
@@ -6165,6 +6444,16 @@ public sealed class MainViewModel : ObservableObject
         if (PlaySelectedCommand is AsyncRelayCommand play)
         {
             play.RaiseCanExecuteChanged();
+        }
+
+        if (RetryPlaybackCommand is AsyncRelayCommand retry)
+        {
+            retry.RaiseCanExecuteChanged();
+        }
+
+        if (SaveCurrentPlaybackProfileCommand is RelayCommand saveCurrentProfile)
+        {
+            saveCurrentProfile.RaiseCanExecuteChanged();
         }
 
         if (ToggleFavoriteCommand is RelayCommand favorite)
@@ -6405,6 +6694,11 @@ public sealed class MainViewModel : ObservableObject
         if (LoadSampleCommand is AsyncRelayCommand sample)
         {
             sample.RaiseCanExecuteChanged();
+        }
+
+        if (RetryPlaybackCommand is AsyncRelayCommand retry)
+        {
+            retry.RaiseCanExecuteChanged();
         }
 
         if (OpenRecentPlaylistSourceCommand is AsyncRelayCommand openRecent)

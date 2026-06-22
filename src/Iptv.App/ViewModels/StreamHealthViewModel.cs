@@ -13,6 +13,26 @@ public sealed record StreamHealthViewModel(
     DateTimeOffset LastUpdatedAt,
     string LastMessage)
 {
+    public string RecommendationText
+    {
+        get
+        {
+            if (LastStatus == PlaybackStatus.TimedOut || FailureCount >= 2)
+            {
+                return "Recommendation: use PoorNetwork buffer, then Retry; if audio plays with black video, disable hardware decoding.";
+            }
+
+            if (SlowEventCount >= 2)
+            {
+                return "Recommendation: use PoorNetwork buffer for this source.";
+            }
+
+            return string.Empty;
+        }
+    }
+
     public string DisplayText =>
-        $"{ChannelName} [{Host}] — {LastStatus}; ok {SuccessCount:N0}, fail {FailureCount:N0}, slow {SlowEventCount:N0}; {LastUpdatedAt.ToLocalTime():g}";
+        string.IsNullOrWhiteSpace(RecommendationText)
+            ? $"{ChannelName} [{Host}] — {LastStatus}; ok {SuccessCount:N0}, fail {FailureCount:N0}, slow {SlowEventCount:N0}; {LastUpdatedAt.ToLocalTime():g}"
+            : $"{ChannelName} [{Host}] — {LastStatus}; ok {SuccessCount:N0}, fail {FailureCount:N0}, slow {SlowEventCount:N0}; {LastUpdatedAt.ToLocalTime():g}; {RecommendationText}";
 }

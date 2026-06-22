@@ -85,7 +85,7 @@ public sealed record UiPreferences
 
     public int FullscreenMonitorIndex { get; init; } = -1;
 
-    public bool IsBasicMode { get; init; }
+    public bool IsBasicMode { get; init; } = true;
 
     public bool FirstRunSetupCompleted { get; init; }
 

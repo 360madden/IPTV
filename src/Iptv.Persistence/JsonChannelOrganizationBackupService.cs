@@ -241,7 +241,8 @@ public sealed class JsonChannelOrganizationBackupService : IChannelOrganizationB
             normalized[sourceId.Trim()] = new ProviderPlaybackProfile
             {
                 RetryCount = Math.Clamp(profile.RetryCount, 0, 3),
-                BufferingPreset = bufferingPreset
+                BufferingPreset = bufferingPreset,
+                HardwareDecodingDisabled = profile.HardwareDecodingDisabled
             };
         }
 

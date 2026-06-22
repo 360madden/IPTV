@@ -22,6 +22,7 @@ public sealed class ThemeContrastTests
         AssertContrast(themeFile, colors, "TextSecondaryColor", "AppBackgroundColor", 4.5);
         AssertContrast(themeFile, colors, "TextSecondaryColor", "PanelColor", 4.5);
         AssertContrast(themeFile, colors, "TextSecondaryColor", "PanelAltColor", 4.5);
+        AssertContrast(themeFile, colors, "TextDisabledColor", "DisabledControlSurfaceColor", 3.0);
         AssertContrast(themeFile, colors, "AccentTextColor", "AccentColor", 4.5);
         AssertContrast(themeFile, colors, "SelectionTextColor", "DropdownSelectedColor", 4.5);
     }
@@ -34,6 +35,7 @@ public sealed class ThemeContrastTests
 
         AssertContrast(themeFile, colors, "ControlBorderColor", "ControlSurfaceColor", 3.0);
         AssertContrast(themeFile, colors, "FocusRingColor", "ControlSurfaceColor", 3.0);
+        AssertContrast(themeFile, colors, "DisabledControlBorderColor", "DisabledControlSurfaceColor", 2.0);
         AssertContrast(themeFile, colors, "PlayerPlaceholderBorderColor", "PlayerPlaceholderColor", 3.0);
     }
 

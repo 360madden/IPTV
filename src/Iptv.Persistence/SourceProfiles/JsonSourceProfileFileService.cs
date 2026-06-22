@@ -125,7 +125,8 @@ public sealed class JsonSourceProfileFileService : ISourceProfileFileService
             RetryCount = Math.Clamp(profile.RetryCount, 0, 3),
             BufferingPreset = Enum.IsDefined(profile.BufferingPreset)
                 ? profile.BufferingPreset
-                : BufferingPreset.Balanced
+                : BufferingPreset.Balanced,
+            HardwareDecodingDisabled = profile.HardwareDecodingDisabled
         };
     }
 

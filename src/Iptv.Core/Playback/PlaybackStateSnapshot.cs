@@ -6,7 +6,8 @@ public sealed record PlaybackStateSnapshot(
     PlaybackStatus Status,
     Channel? Channel,
     string Message,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    string? DiagnosticText = null)
 {
     public static PlaybackStateSnapshot Idle { get; } = new(
         PlaybackStatus.Idle,

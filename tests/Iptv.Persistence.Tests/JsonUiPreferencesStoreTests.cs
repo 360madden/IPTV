@@ -91,7 +91,7 @@ public sealed class JsonUiPreferencesStoreTests
             Assert.Equal(UiPreferences.DefaultClockOverlayOpacity, loaded.ClockOverlayOpacity);
             Assert.True(loaded.AutoHideFullscreenControls);
             Assert.Equal(-1, loaded.FullscreenMonitorIndex);
-            Assert.False(loaded.IsBasicMode);
+            Assert.True(loaded.IsBasicMode);
             Assert.False(loaded.FirstRunSetupCompleted);
             Assert.Equal(100, loaded.LogoCacheLimitMegabytes);
             Assert.Equal(AppTheme.Dark, loaded.AppTheme);
@@ -137,7 +137,7 @@ public sealed class JsonUiPreferencesStoreTests
             Assert.Equal(UiPreferences.DefaultClockOverlayOpacity, loaded.ClockOverlayOpacity);
             Assert.True(loaded.AutoHideFullscreenControls);
             Assert.Equal(-1, loaded.FullscreenMonitorIndex);
-            Assert.False(loaded.IsBasicMode);
+            Assert.True(loaded.IsBasicMode);
             Assert.False(loaded.FirstRunSetupCompleted);
             Assert.Equal(100, loaded.LogoCacheLimitMegabytes);
             Assert.Equal(AppTheme.Dark, loaded.AppTheme);

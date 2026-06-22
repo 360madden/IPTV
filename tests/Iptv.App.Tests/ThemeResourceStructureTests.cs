@@ -53,6 +53,16 @@ public sealed class ThemeResourceStructureTests
             "Expected keyboard focus visuals on the common interactive controls.");
     }
 
+    [Fact]
+    public void ControlsDictionary_UsesCustomButtonTemplateForReadableDisabledButtons()
+    {
+        string text = File.ReadAllText(GetControlsDictionaryPath());
+
+        Assert.Contains("ButtonChrome", text, StringComparison.Ordinal);
+        Assert.Contains("DisabledControlSurfaceBrush", text, StringComparison.Ordinal);
+        Assert.Contains("DisabledControlBorderBrush", text, StringComparison.Ordinal);
+    }
+
     private static XDocument LoadControlsDictionary() => XDocument.Load(GetControlsDictionaryPath());
 
     private static string GetControlsDictionaryPath([CallerFilePath] string sourcePath = "")
